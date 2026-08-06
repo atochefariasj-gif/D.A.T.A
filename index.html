@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control de Cisternas</title>
+    
+    <!-- Importamos Firebase desde la nube de Google -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            max-width: 480px;
+            margin: 30px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        }
+        h1, h2, h3 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        p {
+            text-align: center;
+            color: #666;
+            font-size: 14px;
+        }
+        .botones-roles {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-top: 25px;
+        }
+        .btn-rol {
+            padding: 12px;
+            font-size: 16px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            color: white;
+            font-weight: bold;
+        }
+        .btn-chofer { background-color: #e67e22; }
+        .btn-operador { background-color: #3498db; }
+        .btn-admin { background-color: #2ecc71; }
+
+        .lista-usuarios {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .btn-usuario {
+            padding: 10px;
+            font-size: 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: #f39c12;
+            color: white;
+            font-weight: bold;
+            text-align: left;
+            padding-left: 15px;
+        }
+        .btn-usuario.operador { background-color: #2980b9; }
+
+        .btn-volver {
+            background-color: #7f8c8d;
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        .btn-alerta-cisterna {
+            background-color: #e74c3c;
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            padding: 15px;
+            width: 100%;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        
+        .btn-alerta-llena-dinamico {
+            background-color: #8e44ad;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            padding: 15px;
+            width: 100%;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-bottom: 10px;
+            text-align: left;
+        }
+
+        .input-grupo {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input[type="text"], input[type="date"], select {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 14px;
+            margin-bottom: 10px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        ul { list-style: none; padding: 0; }
+        li {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+            font-size: 18px;
+        }
+        li.completado span { text-decoration: line-through; color: #888; }
+        .oculto { display: none !important; }
+
+        .info-usuario {
+            background: #e8f4fd;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #2980b9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .btn-salir {
+            background: #e74c3c;
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .seccion-exportar {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .filtros-fechas { display: flex; gap: 10px; margin-bottom: 10px; }
+        .campo-fecha { flex: 1; display: flex; flex-direction: column; font-size: 12px; color: #555; }
+        .btn-excel { background-color: #27ae60; width: 100%; font-weight: bold; margin-top: 5px; }
+
+        .tabla-historial {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            margin-top: 10px;
+        }
+        .tabla-historial th, .tabla-historial td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .tabla-historial th { background-color: #2c3e50; color: white; }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 1000;
+        }
+        .modal-contenido {
+            background: white; padding: 25px; border-radius: 10px; text-align: center; max-width: 320px;
+            box-shadow: 0 5px 25px rgba(231, 76, 60, 0.6);
+        }
+        .modal-contenido h3 { color: #c0392b; margin-top: 0; font-size: 24px; }
+        .btn-aceptar-alerta {
+            background-color: #2ecc71; color: white; font-size: 16px; padding: 12px 20px;
+            border: none; border-radius: 5px; cursor: pointer; margin-top: 15px; font-weight: bold; width: 100%;
+        }
+        
+        .aviso-permisos {
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            font-size: 13px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="seccion-roles">
+        <h1>Selecciona tu Perfil</h1>
+        <p>Elige tu área de trabajo:</p>
+        
+        <div class="botones-roles">
+            <button class="btn-rol btn-chofer" onclick="mostrarUsuarios('Chofer')">Soy Chofer</button>
+            <button class="btn-rol btn-operador" onclick="mostrarUsuarios('Operador')">Soy Operador</button>
+            <button class="btn-rol btn-admin" onclick="pedirClaveAdmin('Administrador', '9999')">Administrador</button>
+        </div>
+    </div>
+
+    <div id="seccion-usuarios-especificos" class="oculto">
+        <h1 id="tituloListaUsuarios">Selecciona tu Nombre</h1>
+        <p>Haz clic en tu nombre para ingresar:</p>
+        
+        <div class="lista-usuarios" id="contenedorBotonesUsuarios"></div>
+
+        <button class="btn-rol btn-volver" onclick="volverARoles()">⬅ Volver</button>
+    </div>
+
+    <div id="seccion-app" class="oculto">
+        <div class="info-usuario">
+            <span id="textoBienvenida">Bienvenido</span>
+            <button id="btnSalir" class="btn-salir">Cerrar Sesión</button>
+        </div>
+
+        <div class="aviso-permisos" id="avisoPermiso" style="display:none;">
+            ⚠️ Las notificaciones están desactivadas. <button onclick="solicitarPermisosNotificacion()" style="padding: 5px 10px; font-size: 11px; margin-top: 5px;">Activar Alertas</button>
+        </div>
+
+        <h2 id="tituloPanel">Panel de Control</h2>
+
+        <!-- SECCIÓN EXCLUSIVA PARA CHOFER -->
+        <div id="contenedorCisterna" class="oculto">
+            <label for="selectCisternaChofer"><strong>Selecciona tu Cisterna a Cargo:</strong></label>
+            <select id="selectCisternaChofer">
+                <option value="">-- Selecciona una cisterna --</option>
+                <option value="Cisterna 01">Cisterna 01</option>
+                <option value="Cisterna 02">Cisterna 02</option>
+                <option value="Cisterna 03">Cisterna 03</option>
+            </select>
+            <button class="btn-alerta-cisterna" id="btnCisterna">🚨 Cisterna en Planta</button>
+        </div>
+
+        <!-- SECCIÓN EXCLUSIVA PARA OPERADOR -->
+        <div id="contenedorCisternaLlenaDinamica" class="oculto">
+            <p>Cisternas esperando en planta:</p>
+            <div id="contenedorBotonesCisternasActivas"></div>
+        </div>
+
+        <div id="contenedorExportar" class="seccion-exportar oculto">
+            <h3>📊 Exportar Reportes a Excel</h3>
+            <div class="filtros-fechas">
+                <div class="campo-fecha">
+                    <label for="fechaInicio">Desde:</label>
+                    <input type="date" id="fechaInicio">
+                </div>
+                <div class="campo-fecha">
+                    <label for="fechaFin">Hasta:</label>
+                    <input type="date" id="fechaFin">
+                </div>
+            </div>
+            <button class="btn-excel" id="btnExportarExcel">📥 Descargar Excel (CSV)</button>
+        </div>
+
+        <div class="input-grupo oculto" id="contenedorAgregar">
+            <input type="text" id="nuevaOpcion" placeholder="Escribe una nueva tarea...">
+            <button id="btnAgregar">Agregar</button>
+        </div>
+
+        <ul id="lista">
+            <li><input type="checkbox"> <span>Revisión de niveles de aceite</span></li>
+            <li><input type="checkbox"> <span>Chequeo de neumáticos</span></li>
+        </ul>
+
+        <div class="seccion-historial">
+            <h3>📋 Historial de Reportes</h3>
+            <table class="tabla-historial">
+                <thead>
+                    <tr>
+                        <th>Fecha y Hora</th>
+                        <th>Evento / Alerta</th>
+                    </tr>
+                </thead>
+                <tbody id="cuerpoHistorial">
+                    <tr>
+                        <td colspan="2" style="text-align: center; color: #888;">No hay registros aún</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- VENTANA MODAL DE ALARMA -->
+    <div id="modalAlerta" class="modal-overlay oculto">
+        <div class="modal-contenido">
+            <h3 id="tituloModalAlerta">🚨 ¡ALERTA!</h3>
+            <p id="textoAlertaModal">¡Una cisterna acaba de llegar a planta!</p>
+            <button class="btn-aceptar-alerta" id="btnCerrarAlerta">Silenciar y Aceptar</button>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            databaseURL: "https://reporte-c7556-default-rtdb.firebaseio.com/"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        const listaUsuarios = {
+            Chofer: [
+                { nombre: "Carlos Gómez", clave: "1111" },
+                { nombre: "Pedro Ruiz", clave: "2222" },
+                { nombre: "Luis Mendoza", clave: "3333" }
+            ],
+            Operador: [
+                { nombre: "Mario Vargas", clave: "4444" },
+                { nombre: "Ana Torres", clave: "5555" },
+                { nombre: "Jorge Castro", clave: "6666" }
+            ]
+        };
+
+        const seccionRoles = document.getElementById('seccion-roles');
+        const seccionUsuariosEspecificos = document.getElementById('seccion-usuarios-especificos');
+        const tituloListaUsuarios = document.getElementById('tituloListaUsuarios');
+        const contenedorBotonesUsuarios = document.getElementById('contenedorBotonesUsuarios');
+        
+        const seccionApp = document.getElementById('seccion-app');
+        const textoBienvenida = document.getElementById('textoBienvenida');
+        const tituloPanel = document.getElementById('tituloPanel');
+        const contenedorAgregar = document.getElementById('contenedorAgregar');
+        const contenedorCisterna = document.getElementById('contenedorCisterna');
+        const contenedorCisternaLlenaDinamica = document.getElementById('contenedorCisternaLlenaDinamica');
+        const contenedorBotonesCisternasActivas = document.getElementById('contenedorBotonesCisternasActivas');
+        const contenedorExportar = document.getElementById('contenedorExportar');
+        const selectCisternaChofer = document.getElementById('selectCisternaChofer');
+        
+        const btnCisterna = document.getElementById('btnCisterna');
+        const btnExportarExcel = document.getElementById('btnExportarExcel');
+        const fechaInicio = document.getElementById('fechaInicio');
+        const fechaFin = document.getElementById('fechaFin');
+        const btnSalir = document.getElementById('btnSalir');
+        
+        const inputOpcion = document.getElementById('nuevaOpcion');
+        const btnAgregar = document.getElementById('btnAgregar');
+        const lista = document.getElementById('lista');
+        const cuerpoHistorial = document.getElementById('cuerpoHistorial');
+
+        const modalAlerta = document.getElementById('modalAlerta');
+        const tituloModalAlerta = document.getElementById('tituloModalAlerta');
+        const textoAlertaModal = document.getElementById('textoAlertaModal');
+        const btnCerrarAlerta = document.getElementById('btnCerrarAlerta');
+        const avisoPermiso = document.getElementById('avisoPermiso');
+
+        let rolActual = "";
+        let usuarioActual = "";
+        let intervaloAlarma = null;
+        let intervaloVoz = null;
+        let audioCtx = null;
+        let listaHistorialGlobal = [];
+        let ultimoIdProcesado = 0;
+
+        function verificarPermisosNotificacion() {
+            if (window.Notification) {
+                if (Notification.permission === "default") {
+                    avisoPermiso.style.display = "block";
+                } else if (Notification.permission === "denied") {
+                    avisoPermiso.style.display = "block";
+                    avisoPermiso.innerHTML = "⚠️ Las notificaciones están bloqueadas en tu navegador. Habilítalas en los ajustes de Chrome.";
+                } else {
+                    avisoPermiso.style.display = "none";
+                }
+            }
+        }
+
+        function solicitarPermisosNotificacion() {
+            if (window.Notification) {
+                Notification.requestPermission().then(permission => {
+                    verificarPermisosNotificacion();
+                    if (permission === "granted") {
+                        new Notification("¡Alertas activadas!", { body: "Ahora recibirás avisos de cisternas." });
+                    }
+                });
+            }
+        }
+
+        function mostrarUsuarios(tipoRol) {
+            rolActual = tipoRol;
+            tituloListaUsuarios.textContent = `Selecciona tu nombre (${tipoRol})`;
+            contenedorBotonesUsuarios.innerHTML = "";
+
+            listaUsuarios[tipoRol].forEach(user => {
+                const btn = document.createElement('button');
+                btn.className = tipoRol === 'Operador' ? 'btn-usuario operador' : 'btn-usuario';
+                btn.textContent = `👤 ${user.nombre}`;
+                btn.onclick = function() { pedirClaveUsuario(user); };
+                contenedorBotonesUsuarios.appendChild(btn);
+            });
+
+            seccionRoles.classList.add('oculto');
+            seccionUsuariosEspecificos.classList.remove('oculto');
+        }
+
+        function volverARoles() {
+            seccionUsuariosEspecificos.classList.add('oculto');
+            seccionRoles.classList.remove('oculto');
+            rolActual = "";
+        }
+
+        function inicializarAudioContext() {
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+            } catch(e) {}
+        }
+
+        function pedirClaveUsuario(user) {
+            let ingreso = prompt(`Ingresa la contraseña para ${user.nombre}:`);
+            if (ingreso === null) return;
+
+            if (ingreso === user.clave) {
+                usuarioActual = user.nombre;
+                inicializarAudioContext();
+                verificarPermisosNotificacion();
+                configurarInterfazPorRol();
+            } else {
+                alert("¡Contraseña incorrecta!");
+            }
+        }
+
+        function pedirClaveAdmin(nombreRol, claveCorrecta) {
+            let ingreso = prompt(`Ingresa la contraseña para Administrador:`);
+            if (ingreso === null) return;
+
+            if (ingreso === claveCorrecta) {
+                rolActual = nombreRol;
+                usuarioActual = "Administrador Principal";
+                inicializarAudioContext();
+                verificarPermisosNotificacion();
+                configurarInterfazPorRol();
+            } else {
+                alert("¡Contraseña incorrecta!");
+            }
+        }
+
+        function configurarInterfazPorRol() {
+            seccionRoles.classList.add('oculto');
+            seccionUsuariosEspecificos.classList.add('oculto');
+            seccionApp.classList.remove('oculto');
+            textoBienvenida.textContent = `${usuarioActual} (${rolActual})`;
+
+            if (rolActual === 'Administrador') {
+                tituloPanel.textContent = "Panel de Administrador";
+                contenedorAgregar.classList.remove('oculto');
+                contenedorCisterna.classList.add('oculto');
+                contenedorCisternaLlenaDinamica.classList.add('oculto');
+                contenedorExportar.classList.remove('oculto');
+            } else if (rolActual === 'Operador') {
+                tituloPanel.textContent = "Panel de Operador";
+                contenedorAgregar.classList.add('oculto');
+                contenedorCisterna.classList.add('oculto');
+                contenedorCisternaLlenaDinamica.classList.remove('oculto');
+                contenedorExportar.classList.add('oculto');
+            } else if (rolActual === 'Chofer') {
+                tituloPanel.textContent = "Panel de Chofer";
+                contenedorAgregar.classList.add('oculto');
+                contenedorCisterna.classList.remove('oculto');
+                contenedorCisternaLlenaDinamica.classList.add('oculto');
+                contenedorExportar.classList.add('oculto');
+            }
+        }
+
+        function cerrarSesion() {
+            seccionApp.classList.add('oculto');
+            seccionRoles.classList.remove('oculto');
+            rolActual = "";
+            usuarioActual = "";
+        }
+
+        function sonarPitido() {
+            try {
+                inicializarAudioContext();
+                if (!audioCtx) return;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                
+                osc.type = 'square';
+                osc.frequency.value = 950; 
+                gain.gain.setValueAtTime(0.8, audioCtx.currentTime);
+                
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.35);
+            } catch (e) {}
+        }
+
+        function decirMensajeVoz(textoTexto) {
+            if ('speechSynthesis' in window) {
+                try {
+                    window.speechSynthesis.cancel();
+                    const mensaje = new SpeechSynthesisUtterance(textoTexto);
+                    mensaje.lang = 'es-ES';
+                    window.speechSynthesis.speak(mensaje);
+                } catch(e) {}
+            }
+        }
+
+        function activarAlarmaVisualYSonora(titulo, texto, fraseVoz, fechaHora, idEvento) {
+            if (idEvento && idEvento === ultimoIdProcesado) return;
+            if (idEvento) ultimoIdProcesado = idEvento;
+
+            inicializarAudioContext();
+            tituloModalAlerta.textContent = titulo;
+            textoAlertaModal.textContent = `${texto}\nRegistrado: ${fechaHora}`;
+            modalAlerta.classList.remove('oculto');
+
+            if (window.Notification && Notification.permission === "granted") {
+                try {
+                    new Notification(titulo, {
+                        body: texto,
+                        icon: "https://cdn-icons-png.flaticon.com/512/565/565547.png",
+                        vibrate: [200, 100, 200]
+                    });
+                } catch(e) {}
+            }
+
+            sonarPitido();
+            if (!intervaloAlarma) {
+                intervaloAlarma = setInterval(sonarPitido, 600);
+            }
+
+            decirMensajeVoz(fraseVoz);
+            if (!intervaloVoz) {
+                intervaloVoz = setInterval(() => decirMensajeVoz(fraseVoz), 4500);
+            }
+        }
+
+        function obtenerFechaISO() {
+            const d = new Date();
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        // 1. EL CHOFER REGISTRA SU CISTERNA EN PLANTA
+        btnCisterna.addEventListener('click', function() {
+            const cisternaSeleccionada = selectCisternaChofer.value;
+            if (!cisternaSeleccionada) {
+                alert("Por favor selecciona qué cisterna tienes a cargo.");
+                return;
+            }
+
+            inicializarAudioContext();
+            const ahora = new Date();
+            const fechaIso = obtenerFechaISO();
+            const horaFormateada = ahora.toLocaleTimeString();
+            const fechaHoraCompleta = `${ahora.toLocaleDateString()} - ${horaFormateada}`;
+            const idUnico = Date.now();
+
+            database.ref('cisternasActivas/' + cisternaSeleccionada).set({
+                chofer: usuarioActual,
+                cisterna: cisternaSeleccionada,
+                fechaHora: fechaHoraCompleta,
+                id: idUnico
+            });
+
+            database.ref('historial').push({
+                texto: `🚨 ${cisternaSeleccionada} en Planta - Chofer: ${usuarioActual}`,
+                fechaHora: fechaHoraCompleta,
+                fechaIso: fechaIso
+            });
+
+            alert(`Has reportado la ${cisternaSeleccionada} en planta con éxito.`);
+        });
+
+        // 2. EL OPERADOR ESCUCHA LAS CISTERNAS ACTIVAS Y CREA BOTONES DINÁMICOS
+        database.ref('cisternasActivas').on('value', function(snapshot) {
+            contenedorBotonesCisternasActivas.innerHTML = "";
+            const cisternas = snapshot.val();
+
+            if (!cisternas) {
+                contenedorBotonesCisternasActivas.innerHTML = "<p style='color: #888;'>No hay cisternas en planta actualmente.</p>";
+                return;
+            }
+
+            Object.keys(cisternas).forEach(idCisterna => {
+                const datos = cisternas[idCisterna];
+
+                if (rolActual === "Operador") {
+                    const botonDinamico = document.createElement('button');
+                    botonDinamico.className = "btn-alerta-llena-dinamico";
+                    botonDinamico.innerHTML = `🟣 Cisterna Llena - ${idCisterna} (Chofer: ${datos.chofer})`;
+
+                    botonDinamico.onclick = function() {
+                        if (confirm(`¿Confirmar que la ${idCisterna} está llena y enviar alarma al chofer ${datos.chofer}?`)) {
+                            const ahora = new Date();
+                            const fechaIso = obtenerFechaISO();
+                            const horaFormateada = ahora.toLocaleTimeString();
+                            const fechaHoraCompleta = `${ahora.toLocaleDateString()} - ${horaFormateada}`;
+
+                            database.ref('alertas/cisternaLlena').set({
+                                estado: "activada",
+                                choferDestino: datos.chofer,
+                                cisterna: idCisterna,
+                                nombreOperador: usuarioActual,
+                                fechaHora: fechaHoraCompleta,
+                                id: Date.now()
+                            });
+
+                            database.ref('historial').push({
+                                texto: `🟣 ${idCisterna} Llena - Operador: ${usuarioActual} (Chofer: ${datos.chofer})`,
+                                fechaHora: fechaHoraCompleta,
+                                fechaIso: fechaIso
+                            });
+
+                            database.ref('cisternasActivas/' + idCisterna).remove();
+                        }
+                    };
+
+                    contenedorBotonesCisternasActivas.appendChild(botonDinamico);
+                }
+            });
+        });
+
+        // 3. ALARMA PARA EL OPERADOR CUANDO LLEGA UNA CISTERNA
+        database.ref('cisternasActivas').on('child_added', function(snapshot) {
+            const datos = snapshot.val();
+            if (datos && rolActual === "Operador") {
+                const mensajeVoz = `El chofer ${datos.chofer} reporta que la ${datos.cisterna} ya está en planta`;
+                activarAlarmaVisualYSonora("🚨 ¡ATENCIÓN!", `El chofer ${datos.chofer} indicó que la ${datos.cisterna} llegó a planta.`, mensajeVoz, datos.fechaHora, datos.id);
+            }
+        });
+
+        // 4. ALARMA PARA EL CHOFER ESPECÍFICO CUANDO SU CISTERNA ESTÁ LLENA
+        database.ref('alertas/cisternaLlena').on('value', function(snapshot) {
+            const datos = snapshot.val();
+            if (datos && datos.estado === "activada" && rolActual === "Chofer") {
+                if (datos.choferDestino === usuarioActual) {
+                    const mensajeVoz = `El operador ${datos.nombreOperador} reporta que tu ${datos.cisterna} ya está llena`;
+                    activarAlarmaVisualYSonora("🟣 ¡AVISO!", `El operador ${datos.nombreOperador} indicó que tu ${datos.cisterna} está llena.`, mensajeVoz, datos.fechaHora, datos.id);
+                }
+            }
+        });
+
+        database.ref('historial').on('value', function(snapshot) {
+            cuerpoHistorial.innerHTML = "";
+            listaHistorialGlobal = [];
+            const registros = snapshot.val();
+
+            if (!registros) {
+                cuerpoHistorial.innerHTML = `<tr><td colspan="2" style="text-align: center; color: #888;">No hay registros aún</td></tr>`;
+                return;
+            }
+
+            Object.values(registros).forEach(item => {
+                listaHistorialGlobal.push(item);
+                const fila = document.createElement('tr');
+                fila.innerHTML = `<td>${item.fechaHora}</td><td>${item.texto}</td>`;
+                cuerpoHistorial.appendChild(fila);
+            });
+        });
+
+        btnExportarExcel.addEventListener('click', function() {
+            inicializarAudioContext();
+            const inicio = fechaInicio.value;
+            const fin = fechaFin.value;
+
+            if (!inicio || !fin) {
+                alert("Por favor selecciona una Fecha de Inicio y una Fecha de Fin.");
+                return;
+            }
+
+            if (inicio > fin) {
+                alert("La fecha de inicio no puede ser posterior a la fecha de fin.");
+                return;
+            }
+
+            const registrosFiltrados = listaHistorialGlobal.filter(item => {
+                if (!item.fechaIso) return false;
+                return item.fechaIso >= inicio && item.fechaIso <= fin;
+            });
+
+            if (registrosFiltrados.length === 0) {
+                alert("No hay registros en el rango de fechas seleccionado.");
+                return;
+            }
+
+            let contenidoCsv = "\uFEFFFecha y Hora,Evento / Alerta\n";
+            registrosFiltrados.forEach(item => {
+                let textoLimpio = item.texto.replace(/,/g, " ");
+                contenidoCsv += `"${item.fechaHora}","${textoLimpio}"\n`;
+            });
+
+            const blob = new Blob([contenidoCsv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const enlace = document.createElement('a');
+            enlace.setAttribute('href', url);
+            enlace.setAttribute('download', `Reporte_Cisternas_${inicio}_al_${fin}.csv`);
+            document.body.appendChild(enlace);
+            enlace.click();
+            document.body.removeChild(enlace);
+        });
+
+        btnCerrarAlerta.addEventListener('click', function() {
+            if (intervaloAlarma !== null) { clearInterval(intervaloAlarma); intervaloAlarma = null; }
+            if (intervaloVoz !== null) { clearInterval(intervaloVoz); intervaloVoz = null; }
+            if ('speechSynthesis' in window) { window.speechSynthesis.cancel(); }
+
+            modalAlerta.classList.add('oculto');
+            
+            database.ref('alertas/cisternaLlena').set({ estado: "apagada", choferDestino: "", cisterna: "", nombreOperador: "", fechaHora: "", id: 0 });
+        });
+
+        function agregarElemento() {
+            inicializarAudioContext();
+            const texto = inputOpcion.value.trim();
+            if (texto === "") return;
+            const li = document.createElement('li');
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            const span = document.createElement('span');
+            span.textContent = texto;
+
+            checkbox.addEventListener('change', function() {
+                if (checkbox.checked) { li.classList.add('completado'); } 
+                else { li.classList.remove('completado'); }
+            });
+
+            li.appendChild(checkbox);
+            li.appendChild(span);
+            lista.appendChild(li);
+            inputOpcion.value = "";
+            inputOpcion.focus();
+        }
+
+        btnSalir.addEventListener('click', cerrarSesion);
+        btnAgregar.addEventListener('click', agregarElemento);
+        inputOpcion.addEventListener('keypress', (e) => { if (e.key === 'Enter') agregarElemento(); });
+    </script>
+
+</body>
+</html>
