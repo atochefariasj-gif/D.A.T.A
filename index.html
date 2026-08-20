@@ -12,6 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Librería para generar códigos QR -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         :root {
@@ -244,6 +245,7 @@
             <div class="btn-option" onclick="openOption('Visual3D')"><span>🧊</span> <div><strong>Visual 3D & Reportes</strong></div></div>
             <div class="btn-option" onclick="openOption('Bitacora')"><span>📝</span> <div><strong>Bitácora de Turnos</strong></div></div>
             
+            <!-- Botón exclusivo Admin para generar QR -->
             <div id="admin-qr-btn-container" style="display:none;" class="mt-2">
                 <button onclick="generarQRActivo()" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white font-bold text-xs shadow flex items-center justify-center gap-1.5">
                     🖨️ Generar Código QR de este Activo
@@ -326,14 +328,17 @@
                                 <label for="input-archivo" class="w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-md text-white font-bold text-xs shadow transition flex items-center justify-center cursor-pointer">📂 Importar .glb</label>
                                 <input type="file" id="input-archivo" accept=".glb,.gltf" class="hidden">
                             </div>
+                            <!-- Campo para pegar la URL del modelo 3D -->
+<div class="admin-controls">
+    <input type="text" id="input-url-modelo" placeholder="Pega aquí el enlace Raw de GitHub (.glb)">
+    <button onclick="guardarUrlModelo()">Guardar URL de Modelo</button>
+</div>
                             <div id="contenedor-admin-reportes-btn" class="mb-2 hidden">
                                 <button onclick="abrirModalVerReportes()" class="w-full py-2 bg-amber-600 hover:bg-amber-500 rounded-md text-white font-bold text-xs shadow transition flex items-center justify-center gap-1">📋 Ver Reportes</button>
                             </div>
                             <div>
                                 <h2 class="text-xs font-semibold uppercase text-gray-400 mb-1">Partes</h2>
                                 <input type="text" id="buscador-piezas" placeholder="Buscar..." class="w-full p-1.5 bg-gray-900 text-white rounded border border-gray-600 text-xs outline-none">
-                                <!-- Agrega este input en tu HTML de administración -->
-<input type="text" id="input-url-modelo" placeholder="Pega aquí la URL 'Raw' de GitHub">
                             </div>
                         </div>
                         <div class="flex-1 overflow-y-auto my-1 pr-1 space-y-1 text-xs" id="lista-partes"></div>
@@ -427,7 +432,6 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-        import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDH4yJZOodA_bLfZ-13j-69B6lGYlD411E",
@@ -440,28 +444,7 @@
 
         const app = initializeApp(firebaseConfig);
         const dbFirestore = getFirestore(app);
-        const storage = getStorage(app);
         const dbRef = doc(dbFirestore, "sincronizacion", "datos_activos_v2");
-
-        // Función para subir archivos grandes a Firebase Storage con barra de progreso
-        window.subirArchivoAStorage = async (file, pathPrefix) => {
-            const storageRef = ref(storage, `${pathPrefix}/${Date.now()}_${file.name}`);
-            const uploadTask = uploadBytesResumable(storageRef, file);
-
-            return new Promise((resolve, reject) => {
-                uploadTask.on('state_changed', 
-                    (snapshot) => {
-                        const progreso = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                        console.log(`Subiendo archivo: ${progreso.toFixed(2)}%`);
-                    },
-                    (error) => reject(error),
-                    async () => {
-                        const url = await getDownloadURL(uploadTask.snapshot.ref);
-                        resolve(url);
-                    }
-                );
-            });
-        };
 
         window.sincronizarNube = async function(localDb) {
             try {
@@ -477,9 +460,6 @@
                     localStorage.setItem("data_control_activos_db_v4", cloudData);
                     if (document.getElementById('view-lines').classList.contains('active-view')) renderLines();
                     if (document.getElementById('view-machines').classList.contains('active-view')) renderMachines();
-                    // Si se encuentra en una subvista, recargamos los datos visuales actuales de forma segura
-                    if (document.getElementById('view-instructions').classList.contains('active-view')) loadInstructionsData();
-                    if (document.getElementById('view-manuals').classList.contains('active-view')) loadManualsData();
                 }
             }
         });
@@ -493,6 +473,7 @@
         let isEditMode = false;
         let rolPendiente = '';
 
+        // Variables para control de acceso directo vía QR
         let qrContextoLinea = null;
         let qrContextoMaquinaId = null;
 
@@ -536,6 +517,7 @@
             if (window.sincronizarNube) window.sincronizarNube(db);
         }
 
+        // Detección de parámetros de URL (Deep Linking para QR)
         window.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams(window.location.search);
             const qLine = params.get('linea');
@@ -573,6 +555,7 @@
             currentRole = role;
             document.getElementById('main-menu').classList.remove('active-view');
 
+            // Si se entró mediante QR, redirigir directo al menú de opciones de esa máquina
             if (qrContextoLinea && qrContextoMaquinaId) {
                 let db = getDatabase();
                 let mach = db[qrContextoLinea].find(m => m.id === qrContextoMaquinaId);
@@ -673,30 +656,42 @@
             document.querySelectorAll('.view-section').forEach(el => { if(el.id !== 'view-machine-detail') el.classList.remove('active-view'); });
         }
 
+        // Generar Código QR del Activo actual
         function generarQRActivo() {
             let db = getDatabase();
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (!mach) return;
 
             document.getElementById('lbl-qr-maquina-nombre').innerText = `${currentLine} ➔ ${mach.name}`;
+            
+            // Construir URL limpia apuntando al dominio actual con parámetros
             let baseUrl = window.location.origin + window.location.pathname;
             let targetUrl = `${baseUrl}?linea=${encodeURIComponent(currentLine)}&maquina=${currentMachineId}`;
             
             document.getElementById('lbl-qr-url').innerText = targetUrl;
+            
             let box = document.getElementById('qr-code-box');
             box.innerHTML = '';
             
             new QRCode(box, {
-                text: targetUrl, width: 180, height: 180, colorDark : "#000000", colorLight : "#ffffff", correctLevel : QRCode.CorrectLevel.H
+                text: targetUrl,
+                width: 180,
+                height: 180,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
             });
 
             document.getElementById('modal-qr-generado').style.display = 'flex';
         }
 
-        function cerrarModalQR() { document.getElementById('modal-qr-generado').style.display = 'none'; }
+        function cerrarModalQR() {
+            document.getElementById('modal-qr-generado').style.display = 'none';
+        }
 
         function volverDesdeDetalle() {
             if (qrContextoLinea && qrContextoMaquinaId) {
+                // Si entró por QR, al volver regresa al menú principal de roles
                 document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
                 document.getElementById('main-menu').classList.add('active-view');
             } else {
@@ -857,7 +852,6 @@
             if (mach && mach.kardex[idx]) { mach.kardex[idx][field] = val; saveDatabase(db); }
         }
 
-        // --- INSTRUCCIONES CON FIREBASE STORAGE ---
         function loadInstructionsData() {
             let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (!mach) return;
@@ -872,34 +866,28 @@
                 wrapper.appendChild(card);
             });
         }
-
-        async function uploadInstructionImages(e) {
+        function uploadInstructionImages(e) {
             if (currentRole !== 'admin') return;
             let files = e.target.files; if (!files.length) return;
             let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
-            
-            for (let file of files) {
-                try {
-                    const downloadUrl = await window.subirArchivoAStorage(file, `instrucciones/${currentMachineId}`);
+            let processed = 0;
+            Array.from(files).forEach(file => {
+                let reader = new FileReader();
+                reader.onload = function(evt) {
                     if (!mach.instructionImages) mach.instructionImages = [];
-                    mach.instructionImages.push(downloadUrl);
-                } catch(err) {
-                    console.error("Error al subir imagen:", err);
-                    alert("Hubo un error al subir una de las imágenes.");
-                }
-            }
-            saveDatabase(db);
-            loadInstructionsData();
-            e.target.value = ''; // Limpiar input file
+                    mach.instructionImages.push(evt.target.result);
+                    processed++;
+                    if (processed === files.length) { saveDatabase(db); loadInstructionsData(); }
+                };
+                reader.readAsDataURL(file);
+            });
         }
-
         function removeInstructionImage(idx) {
             if (currentRole !== 'admin') return;
             let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
             mach.instructionImages.splice(idx, 1); saveDatabase(db); loadInstructionsData();
         }
 
-        // --- MANUALES CON FIREBASE STORAGE ---
         function loadManualsData() {
             let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (!mach) return;
@@ -910,31 +898,26 @@
             if (manuals.length === 0) { wrapper.innerHTML = `<span style="opacity: 0.5; font-size: 11px; padding: 20px;">Sin manuales PDF.</span>`; return; }
             manuals.forEach((man, idx) => {
                 let row = document.createElement('div'); row.className = 'manual-item-row';
-                row.innerHTML = `<div class="manual-info"><span>📄</span><span class="manual-name">${man.name}</span></div><div style="display:flex; gap:6px;"><a href="${man.data}" target="_blank" download="${man.name}" style="background:#0077b6; color:#fff; padding:4px 8px; border-radius:4px; font-size:10px; text-decoration:none; font-weight:bold;">📥 Descargar</a>${currentRole==='admin'?`<button onclick="removeManualPdf(${idx})" style="background:red; color:#fff; border:none; border-radius:4px; padding:4px 6px; font-size:10px; cursor:pointer;">Eliminar</button>`:''}</div>`;
+                row.innerHTML = `<div class="manual-info"><span>📄</span><span class="manual-name">${man.name}</span></div><div style="display:flex; gap:6px;"><a href="${man.data}" download="${man.name}" style="background:#0077b6; color:#fff; padding:4px 8px; border-radius:4px; font-size:10px; text-decoration:none; font-weight:bold;">📥 Descargar</a>${currentRole==='admin'?`<button onclick="removeManualPdf(${idx})" style="background:red; color:#fff; border:none; border-radius:4px; padding:4px 6px; font-size:10px; cursor:pointer;">Eliminar</button>`:''}</div>`;
                 wrapper.appendChild(row);
             });
         }
-
-        async function uploadManualsPdf(e) {
+        function uploadManualsPdf(e) {
             if (currentRole !== 'admin') return;
             let files = e.target.files; if (!files.length) return;
             let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
-            
-            for (let file of files) {
-                try {
-                    const downloadUrl = await window.subirArchivoAStorage(file, `manuales/${currentMachineId}`);
+            let processed = 0;
+            Array.from(files).forEach(file => {
+                let reader = new FileReader();
+                reader.onload = function(evt) {
                     if (!mach.manualsPdf) mach.manualsPdf = [];
-                    mach.manualsPdf.push({ name: file.name, data: downloadUrl });
-                } catch(err) {
-                    console.error("Error al subir manual:", err);
-                    alert("Hubo un error al subir el archivo PDF.");
-                }
-            }
-            saveDatabase(db);
-            loadManualsData();
-            e.target.value = ''; // Limpiar input file
+                    mach.manualsPdf.push({ name: file.name, data: evt.target.result });
+                    processed++;
+                    if (processed === files.length) { saveDatabase(db); loadManualsData(); }
+                };
+                reader.readAsDataURL(file);
+            });
         }
-
         function removeManualPdf(idx) {
             if (currentRole !== 'admin') return;
             let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
@@ -1007,7 +990,7 @@
         let piezaSeleccionadaActual = "";
         let vistaExplosionada = false;
         let piezasDetectadas = [];
-        const defaultGLBUrl = "https://firebasestorage.googleapis.com/v0/b/data-4f604.firebasestorage.app/o/tu-carpeta%2FEXTRACTORA_POLICYTRUS.glb?alt=media&token=tu-token";
+        const defaultGLBUrl = "modelos/EXTRACTORA_POLICYTRUS.glb";
 
         function init3D() {
             const container = document.getElementById('canvas-3d');
@@ -1029,36 +1012,8 @@
             document.getElementById('input-archivo').addEventListener('change', async function(e) {
                 if (currentRole !== 'admin') return;
                 const archivo = e.target.files[0]; if (!archivo) return;
-                
-                const btnExplo = document.getElementById('btn-explo');
-                btnExplo.innerText = "⏳ Procesando..."; 
-                btnExplo.disabled = true;
-
-                const reader = new FileReader();
-                reader.onload = async function(event) {
-                    const base64Data = event.target.result; // El archivo convertido en texto Base64
-                    
-                    try {
-                        // Guardamos el Base64 directamente en la base de datos de la máquina
-                        let db = getDatabase();
-                        let mach = db[currentLine].find(m => m.id === currentMachineId);
-                        if (mach) {
-                            mach.model3dBase64 = base64Data;
-                            saveDatabase(db);
-                        }
-                        
-                        alert("¡Modelo 3D guardado y sincronizado internamente!");
-                        cargarModeloMaquinaActual();
-                    } catch (err) {
-                        console.error("Error al guardar el modelo:", err);
-                        alert("El archivo puede ser demasiado pesado para la base de datos.");
-                        btnExplo.innerText = "💥 Vista Explosionada";
-                        btnExplo.disabled = false;
-                    }
-                };
-                
-                reader.readAsDataURL(archivo); // Lee el archivo como una URL de datos Base64
-                e.target.value = ''; // Limpiar input
+                await localforage.setItem(`glb_machine_${currentLine}_${currentMachineId}`, archivo);
+                cargarModeloMaquinaActual(); alert("Modelo 3D guardado.");
             });
 
             let pdX = 0, pdY = 0, moved = false;
@@ -1093,19 +1048,28 @@
         }
 
         async function cargarModeloMaquinaActual() {
+    const btnExplo = document.getElementById('btn-explo');
+    btnExplo.innerText = "⏳ Cargando..."; 
+    btnExplo.disabled = true;
+
+    // Limpiamos el visor
+    while(grupoMaquina.children.length > 0) grupoMaquina.remove(grupoMaquina.children[0]);
+
     let db = getDatabase();
     let mach = db[currentLine].find(m => m.id === currentMachineId);
+    
+    // Prioridad: 1. URL personalizada de GitHub | 2. Modelo por defecto
+    const fuenteModelo = (mach && mach.model3dUrl) ? mach.model3dUrl : defaultGLBUrl;
 
-    // Si tiene URL, la usamos; si no, el modelo por defecto
-    const urlParaCargar = (mach && mach.urlModelo3d) ? mach.urlModelo3d : defaultGLBUrl;
-
-    // Cargamos el modelo usando la URL de GitHub
-    gltfLoader.load(urlParaCargar, (gltf) => {
+    gltfLoader.load(fuenteModelo, (gltf) => {
         procesarModelo(gltf, mach ? mach.name : "Activo");
+        btnExplo.innerText = "💥 Vista Explosionada";
+        btnExplo.disabled = false;
     }, undefined, (error) => {
-        console.error("Error al cargar desde GitHub:", error);
-        // Si falla (ej. URL mal copiada), volvemos al defecto
-        cargarModeloDefecto();
+        console.error("Error al cargar modelo:", error);
+        alert("No se pudo cargar el modelo 3D. Verifica que la URL sea un enlace 'Raw' de GitHub.");
+        btnExplo.innerText = "💥 Vista Explosionada";
+        btnExplo.disabled = false;
     });
 }
 
@@ -1289,6 +1253,20 @@
             let hits = raycaster.intersectObjects(piezasDetectadas, true);
             if (hits.length > 0 && hits[0].object.name) seleccionarComponente(hits[0].object.name);
         }
+        function guardarUrlModelo() {
+    const url = document.getElementById('input-url-modelo').value;
+    if (!url) return alert("Por favor pega una URL válida");
+
+    let db = getDatabase();
+    let mach = db[currentLine].find(m => m.id === currentMachineId);
+
+    if (mach) {
+        mach.model3dUrl = url; // Guardamos el enlace en la propiedad model3dUrl
+        saveDatabase(db); // Esta función es la que ya usas para sincronizar con Firebase
+        alert("¡URL del modelo 3D guardada y sincronizada!");
+        cargarModeloMaquinaActual(); // Recargamos el modelo con el nuevo enlace
+    }
+}
     </script>
 </body>
 </html>
