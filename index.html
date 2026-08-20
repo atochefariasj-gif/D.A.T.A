@@ -426,8 +426,8 @@
     <!-- LOGICA SUPABASE -->
     <script>
         // Inicialización del Cliente de Supabase
-        const SUPABASE_URL = 'https://rutxbcxqrqgidrniggte.supabase.co';
-        const SUPABASE_ANON_KEY = 'sb_publishable_QDGp8xnqOirYEHlEv7Y5lg_ufe2TebO'; // Reemplaza por tu clave pública de Supabase
+        const SUPABASE_URL = 'https://rubxcbcpxgjdlmiggzle.supabase.co';
+        const SUPABASE_ANON_KEY = 'TU_ANON_KEY_PUBLICA'; // Reemplaza por tu clave pública de Supabase
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         const DB_KEY = "data_control_activos_db_v4";
@@ -1001,45 +1001,21 @@
                 const archivo = e.target.files[0]; if (!archivo) return;
                 
                 // Guardar en Supabase Storage (Bucket: modelos-glb)
-                // Sanitizamos la ruta antes de subirla a Supabase
-                // En lugar de usar currentMachine, usa una ruta limpia directa con el nombre del archivo y la fecha
-const filePath = `maquinas/${Date.now()}_${archivo.name}`;
+                const filePath = `maquinas/${currentLine}_${currentMachineId}_${Date.now()}.glb`;
+                const { data: storageData, error: storageError } = await supabaseClient.storage
+                    .from('modelos-glb')
+                    .upload(filePath, archivo);
 
-// Sanitizamos la ruta para asegurarnos de que no tenga tildes ni espacios
-const filePathLimpio = sanitizarRuta(filePath);
-
-// Subida a Supabase Storage
-const { data: storageData, error: storageError } = await supabaseClient.storage
-    .from('modelos-glb')
-    .upload(filePathLimpio, archivo);
                 if (storageError) {
-    console.error("Error al subir a Supabase Storage:", storageError);
-    alert("Error al subir el modelo a la nube.");
-    return;
-}
-
-// 1. Obtener la URL pública del archivo recién subido en Supabase
-const { data: publicUrlData } = supabaseClient.storage
-    .from('modelos-glb')
-    .getPublicUrl(filePathLimpio);
-
-const modeloUrl = publicUrlData.publicUrl;
-
-// 2. Guardar esa URL en tu tabla de la base de datos de Supabase
-// (Asegúrate de ajustar 'maquinas' y las columnas según tu base de datos)
-const { error: dbError } = await supabaseClient
-    .from('maquinas') // o la tabla que utilices para los datos de los activos
-    .update({ modelos_url: modeloUrl }) // campo donde guardas la URL del modelo 3D
-    .eq('nombre', currentMachine); // identificador de la máquina actual
-
-if (dbError) {
-    console.error("Error al actualizar la base de datos:", dbError);
-} else {
-    alert("¡Modelo subido y sincronizado con la nube con éxito!");
-}
+                    console.error("Error al subir a Supabase Storage:", storageError.message);
+                    alert("Error al subir el modelo a la nube.");
+                    return;
+                }
 
                 // Guardar referencia en localforage/base de datos local también
-            
+                await localforage.setItem(`glb_machine_${currentLine}_${currentMachineId}`, archivo);
+                cargarModeloMaquinaActual(); 
+                alert("Modelo 3D guardado y subido con éxito a Supabase.");
             });
 
             let pdX = 0, pdY = 0, moved = false;
@@ -1270,14 +1246,6 @@ if (dbError) {
             let hits = raycaster.intersectObjects(piezasDetectadas, true);
             if (hits.length > 0 && hits[0].object.name) seleccionarComponente(hits[0].object.name);
         }
-        // Función para eliminar tildes, espacios y caracteres especiales
-function sanitizarRuta(ruta) {
-    return ruta
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") // Convierte ó -> o, á -> a, etc.
-        .replace(/\s+/g, "_")            // Reemplaza espacios por _
-        .replace(/[^a-zA-Z0-9_\-\./]/g, ""); // Elimina cualquier otro carácter especial
-}
     </script>
 </body>
 </html>
