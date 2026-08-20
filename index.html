@@ -328,68 +328,6 @@
                                 <label for="input-archivo" class="w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-md text-white font-bold text-xs shadow transition flex items-center justify-center cursor-pointer">📂 Importar .glb</label>
                                 <input type="file" id="input-archivo" accept=".glb,.gltf" class="hidden">
                             </div>
-                            <script>
-    // 1. INICIALIZACIÓN DE SUPABASE
-    const SUPABASE_URL = 'https://rutxbcxqrwgidrniggte.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_QDgp8xnq0irYEHlEv7Y5lg_ufe2Te...'; // Tu clave publicable
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    // 2. FUNCIÓN DE GUARDAR CONFIGURACIÓN (Base de Datos)
-    window.sincronizarNube = async function(localDb) {
-        try {
-            const { error } = await supabase
-                .from('configuracion')
-                .upsert({ id: 'datos_activos', data: localDb, actualizado_en: new Date() });
-            
-            if (error) console.error("Error al guardar en Supabase:", error);
-        } catch (e) { 
-            console.error("Excepción al sincronizar:", e); 
-        }
-    };
-
-    // 3. TIEMPO REAL (Actualiza otros dispositivos automáticamente)
-    supabase
-        .channel('db_changes')
-        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'configuracion' }, payload => {
-            console.log("¡Cambios detectados en la nube! Actualizando interfaz...");
-            localStorage.setItem("data_control_activos_db_v4", JSON.stringify(payload.new.data));
-            
-            // Refresca tus vistas si están activas
-            if (typeof renderLines === 'function') renderLines();
-            if (typeof renderMachines === 'function') renderMachines();
-        })
-        .subscribe();
-
-    // 4. SUBIR MODELOS 3D (.glb) AL STORAGE
-    window.subirModeloASupabase = async function(file, linea, maquinaId) {
-        const filePath = `${linea}/${maquinaId}.glb`;
-
-        const { data, error } = await supabase.storage
-            .from('modelos-glb')
-            .upload(filePath, file, {
-                cacheControl: '3600',
-                upsert: true // Sobrescribe si ya existe una versión anterior
-            });
-
-        if (error) {
-            console.error("Error al subir el modelo:", error.message);
-            alert("No se pudo subir el modelo: " + error.message);
-        } else {
-            console.log("¡Modelo subido correctamente!", data);
-            alert("¡Modelo 3D subido con éxito a la nube!");
-            // Opcional: recargar el visor o la URL del modelo
-        }
-    };
-
-    // 5. OBTENER URL PÚBLICA DEL MODELO 3D PARA EL VISOR
-    window.obtenerModeloUrl = function(linea, maquinaId) {
-        const { data } = supabase.storage
-            .from('modelos-glb')
-            .getPublicUrl(`${linea}/${maquinaId}.glb`);
-        
-        return data.publicUrl;
-    };
-</script>
                             <div id="contenedor-admin-reportes-btn" class="mb-2 hidden">
                                 <button onclick="abrirModalVerReportes()" class="w-full py-2 bg-amber-600 hover:bg-amber-500 rounded-md text-white font-bold text-xs shadow transition flex items-center justify-center gap-1">📋 Ver Reportes</button>
                             </div>
@@ -1297,6 +1235,90 @@
             let hits = raycaster.intersectObjects(piezasDetectadas, true);
             if (hits.length > 0 && hits[0].object.name) seleccionarComponente(hits[0].object.name);
         }
+        async function subirYActualizarModelo(event) {
+    const archivo = event.target.files[0];
+    if (!archivo) return;
+
+    // Nombre fijo o único para el archivo en Supabase Storage
+    const nombreRuta = "modelo_actual.glb"; 
+    const bucketName = "modelos-3d"; // Asegúrate de que este sea el nombre de tu bucket en Supabase
+
+    // 1. Subir o reemplazar el archivo en Supabase Storage
+    const { data: storageData, error: storageError } = await supabase.storage
+        .from(bucketName)
+        .upload(nombreRuta, archivo, { upsert: true });
+
+    if (storageError) {
+        console.error("Error al subir el archivo:", storageError.message);
+        return;
+    }
+
+    // 2. Obtener la URL pública del archivo subido
+    const { data: { publicUrl } } = supabase.storage
+        .from(bucketName)
+        .getPublicUrl(nombreRuta);
+
+    // 3. Actualizar la tabla `configuracion` (fila con id = 1) con la nueva URL
+    const { error: dbError } = await supabase
+        .from('configuracion')
+        .update({ modelo_url: publicUrl })
+        .eq('id', 1);
+
+    if (dbError) {
+        console.error("Error al actualizar la base de datos:", dbError.message);
+    } else {
+        alert("¡Modelo actualizado y sincronizado con éxito!");
+    }
+}
+
+// Asociar a tu input de tipo file
+document.getElementById('inputArchivo').addEventListener('change', subirYActualizarModelo);
+// Función para cargar el modelo en tu visor 3D (Three.js)
+function cargarModeloEnVisor(url) {
+    const loader = new THREE.GLTFLoader();
+    loader.load(url, (gltf) => {
+        // Opcional: Remueve el modelo anterior de la escena si ya existe uno
+        const modeloAnterior = scene.getObjectByName("modeloIndustrial");
+        if (modeloAnterior) scene.remove(modeloAnterior);
+
+        gltf.scene.name = "modeloIndustrial";
+        scene.add(gltf.scene);
+        console.log("Modelo 3D actualizado en pantalla.");
+    }, undefined, (error) => {
+        console.error("Error al cargar el GLB:", error);
+    });
+}
+
+// 1. Cargar el modelo actual al abrir la página
+async function obtenerModeloInicial() {
+    const { data, error } = await supabase
+        .from('configuracion')
+        .select('modelo_url')
+        .eq('id', 1)
+        .single();
+
+    if (data && data.modelo_url && data.modelo_url !== "ninguno") {
+        cargarModeloEnVisor(data.modelo_url);
+    }
+}
+obtenerModeloInicial();
+
+// 2. Escuchar cambios en tiempo real desde cualquier otro dispositivo
+supabase
+    .channel('cambios-configuracion')
+    .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'configuracion',
+        filter: 'id=eq.1'
+    }, (payload) => {
+        const nuevaUrl = payload.new.modelo_url;
+        if (nuevaUrl && nuevaUrl !== "ninguno") {
+            console.log("¡Nuevo modelo detectado en la nube! Actualizando...");
+            cargarModeloEnVisor(nuevaUrl);
+        }
+    })
+    .subscribe();
     </script>
 </body>
 </html>
