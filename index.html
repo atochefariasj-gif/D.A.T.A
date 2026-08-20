@@ -328,11 +328,6 @@
                                 <label for="input-archivo" class="w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-md text-white font-bold text-xs shadow transition flex items-center justify-center cursor-pointer">📂 Importar .glb</label>
                                 <input type="file" id="input-archivo" accept=".glb,.gltf" class="hidden">
                             </div>
-                            <!-- Campo para pegar la URL del modelo 3D -->
-<div class="admin-controls">
-    <input type="text" id="input-url-modelo" placeholder="Pega aquí el enlace Raw de GitHub (.glb)">
-    <button onclick="guardarUrlModelo()">Guardar URL de Modelo</button>
-</div>
                             <div id="contenedor-admin-reportes-btn" class="mb-2 hidden">
                                 <button onclick="abrirModalVerReportes()" class="w-full py-2 bg-amber-600 hover:bg-amber-500 rounded-md text-white font-bold text-xs shadow transition flex items-center justify-center gap-1">📋 Ver Reportes</button>
                             </div>
@@ -1052,25 +1047,31 @@
     btnExplo.innerText = "⏳ Cargando..."; 
     btnExplo.disabled = true;
 
-    // Limpiamos el visor
     while(grupoMaquina.children.length > 0) grupoMaquina.remove(grupoMaquina.children[0]);
 
-    let db = getDatabase();
-    let mach = db[currentLine].find(m => m.id === currentMachineId);
-    
-    // Prioridad: 1. URL personalizada de GitHub | 2. Modelo por defecto
-    const fuenteModelo = (mach && mach.model3dUrl) ? mach.model3dUrl : defaultGLBUrl;
+    try {
+        let db = getDatabase();
+        let mach = db[currentLine].find(m => m.id === currentMachineId);
 
-    gltfLoader.load(fuenteModelo, (gltf) => {
-        procesarModelo(gltf, mach ? mach.name : "Activo");
-        btnExplo.innerText = "💥 Vista Explosionada";
-        btnExplo.disabled = false;
-    }, undefined, (error) => {
-        console.error("Error al cargar modelo:", error);
-        alert("No se pudo cargar el modelo 3D. Verifica que la URL sea un enlace 'Raw' de GitHub.");
-        btnExplo.innerText = "💥 Vista Explosionada";
-        btnExplo.disabled = false;
-    });
+        // Si la máquina tiene una URL de GitHub registrada, la usamos directamente
+        if (mach && mach.model3dUrl) {
+            gltfLoader.load(mach.model3dUrl, (gltf) => {
+                procesarModelo(gltf, mach.name);
+                btnExplo.innerText = "💥 Vista Explosionada";
+                btnExplo.disabled = false;
+            }, undefined, (error) => {
+                console.error("Error cargando desde URL:", error);
+                alert("No se pudo cargar el modelo desde la URL. Usando por defecto...");
+                cargarModeloPorDefecto();
+            });
+        } else {
+            // Si no tiene URL guardada, carga el modelo por defecto
+            cargarModeloPorDefecto();
+        }
+    } catch (error) {
+        console.error("Error general al cargar modelo:", error);
+        cargarModeloPorDefecto();
+    }
 }
 
         function cargarModeloDefecto() {
@@ -1253,20 +1254,6 @@
             let hits = raycaster.intersectObjects(piezasDetectadas, true);
             if (hits.length > 0 && hits[0].object.name) seleccionarComponente(hits[0].object.name);
         }
-        function guardarUrlModelo() {
-    const url = document.getElementById('input-url-modelo').value;
-    if (!url) return alert("Por favor pega una URL válida");
-
-    let db = getDatabase();
-    let mach = db[currentLine].find(m => m.id === currentMachineId);
-
-    if (mach) {
-        mach.model3dUrl = url; // Guardamos el enlace en la propiedad model3dUrl
-        saveDatabase(db); // Esta función es la que ya usas para sincronizar con Firebase
-        alert("¡URL del modelo 3D guardada y sincronizada!");
-        cargarModeloMaquinaActual(); // Recargamos el modelo con el nuevo enlace
-    }
-}
     </script>
 </body>
 </html>
