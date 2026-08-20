@@ -328,11 +328,68 @@
                                 <label for="input-archivo" class="w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-md text-white font-bold text-xs shadow transition flex items-center justify-center cursor-pointer">📂 Importar .glb</label>
                                 <input type="file" id="input-archivo" accept=".glb,.gltf" class="hidden">
                             </div>
-                            <!-- Campo para pegar la URL del modelo 3D -->
-<div class="admin-controls">
-    <input type="text" id="input-url-modelo" placeholder="Pega aquí el enlace Raw de GitHub (.glb)">
-    <button onclick="guardarUrlModelo()">Guardar URL de Modelo</button>
-</div>
+                            <script>
+    // 1. INICIALIZACIÓN DE SUPABASE
+    const SUPABASE_URL = 'https://rutxbcxqrwgidrniggte.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_QDgp8xnq0irYEHlEv7Y5lg_ufe2Te...'; // Tu clave publicable
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // 2. FUNCIÓN DE GUARDAR CONFIGURACIÓN (Base de Datos)
+    window.sincronizarNube = async function(localDb) {
+        try {
+            const { error } = await supabase
+                .from('configuracion')
+                .upsert({ id: 'datos_activos', data: localDb, actualizado_en: new Date() });
+            
+            if (error) console.error("Error al guardar en Supabase:", error);
+        } catch (e) { 
+            console.error("Excepción al sincronizar:", e); 
+        }
+    };
+
+    // 3. TIEMPO REAL (Actualiza otros dispositivos automáticamente)
+    supabase
+        .channel('db_changes')
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'configuracion' }, payload => {
+            console.log("¡Cambios detectados en la nube! Actualizando interfaz...");
+            localStorage.setItem("data_control_activos_db_v4", JSON.stringify(payload.new.data));
+            
+            // Refresca tus vistas si están activas
+            if (typeof renderLines === 'function') renderLines();
+            if (typeof renderMachines === 'function') renderMachines();
+        })
+        .subscribe();
+
+    // 4. SUBIR MODELOS 3D (.glb) AL STORAGE
+    window.subirModeloASupabase = async function(file, linea, maquinaId) {
+        const filePath = `${linea}/${maquinaId}.glb`;
+
+        const { data, error } = await supabase.storage
+            .from('modelos-glb')
+            .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: true // Sobrescribe si ya existe una versión anterior
+            });
+
+        if (error) {
+            console.error("Error al subir el modelo:", error.message);
+            alert("No se pudo subir el modelo: " + error.message);
+        } else {
+            console.log("¡Modelo subido correctamente!", data);
+            alert("¡Modelo 3D subido con éxito a la nube!");
+            // Opcional: recargar el visor o la URL del modelo
+        }
+    };
+
+    // 5. OBTENER URL PÚBLICA DEL MODELO 3D PARA EL VISOR
+    window.obtenerModeloUrl = function(linea, maquinaId) {
+        const { data } = supabase.storage
+            .from('modelos-glb')
+            .getPublicUrl(`${linea}/${maquinaId}.glb`);
+        
+        return data.publicUrl;
+    };
+</script>
                             <div id="contenedor-admin-reportes-btn" class="mb-2 hidden">
                                 <button onclick="abrirModalVerReportes()" class="w-full py-2 bg-amber-600 hover:bg-amber-500 rounded-md text-white font-bold text-xs shadow transition flex items-center justify-center gap-1">📋 Ver Reportes</button>
                             </div>
@@ -1048,53 +1105,17 @@
         }
 
         async function cargarModeloMaquinaActual() {
-    const btnExplo = document.getElementById('btn-explo');
-    
-    // Indicamos visualmente que el proceso ha iniciado
-    if (btnExplo) {
-        btnExplo.innerText = "⏳ Cargando..."; 
-        btnExplo.disabled = true;
-    }
+            const btnExplo = document.getElementById('btn-explo');
+            btnExplo.innerText = "⏳ Cargando..."; btnExplo.disabled = true;
+            while(grupoMaquina.children.length > 0) grupoMaquina.remove(grupoMaquina.children[0]);
 
-    // Limpiar el contenedor 3D actual antes de cargar el nuevo
-    while (grupoMaquina.children.length > 0) {
-        grupoMaquina.remove(grupoMaquina.children[0]);
-    }
-
-    try {
-        // Obtenemos los datos de la máquina actual
-        let db = getDatabase();
-        let mach = db[currentLine].find(m => m.id === currentMachineId);
-
-        // Definimos la ruta: si existe 'model3dFile', usamos la carpeta local /modelos/
-        // Si no, usamos el modelo por defecto definido en otra parte
-        let urlModelo = (mach && mach.model3dFile) 
-            ? `./modelos/${mach.model3dFile}` 
-            : defaultGLBUrl;
-
-        // Carga el modelo directamente
-        gltfLoader.load(urlModelo, (gltf) => {
-            procesarModelo(gltf, mach ? mach.name : "Máquina");
-            
-            if (btnExplo) {
-                btnExplo.innerText = "💥 Vista Explosionada";
-                btnExplo.disabled = false;
-            }
-        }, undefined, (error) => {
-            console.error("Error al cargar el modelo:", error);
-            // Si falla la carga, intentamos cargar el modelo por defecto como salvavidas
-            cargarModeloPorDefecto();
-            if (btnExplo) {
-                btnExplo.innerText = "💥 Vista Explosionada";
-                btnExplo.disabled = false;
-            }
-        });
-
-    } catch (error) {
-        console.error("Error crítico en cargarModeloMaquinaActual:", error);
-        cargarModeloPorDefecto();
-    }
-}
+            try {
+                const blob = await localforage.getItem(`glb_machine_${currentLine}_${currentMachineId}`);
+                if (blob) {
+                    gltfLoader.load(URL.createObjectURL(blob), (gltf) => procesarModelo(gltf, "Personalizado"), undefined, () => cargarModeloDefecto());
+                } else { cargarModeloDefecto(); }
+            } catch (e) { cargarModeloDefecto(); }
+        }
 
         function cargarModeloDefecto() {
             gltfLoader.load(defaultGLBUrl, (gltf) => procesarModelo(gltf, "POLICYTRUS"), undefined, () => {
@@ -1276,20 +1297,6 @@
             let hits = raycaster.intersectObjects(piezasDetectadas, true);
             if (hits.length > 0 && hits[0].object.name) seleccionarComponente(hits[0].object.name);
         }
-        function guardarUrlModelo() {
-    const url = document.getElementById('input-url-modelo').value;
-    if (!url) return alert("Por favor pega una URL válida");
-
-    let db = getDatabase();
-    let mach = db[currentLine].find(m => m.id === currentMachineId);
-
-    if (mach) {
-        mach.model3dUrl = url; // Guardamos el enlace en la propiedad model3dUrl
-        saveDatabase(db); // Esta función es la que ya usas para sincronizar con Firebase
-        alert("¡URL del modelo 3D guardada y sincronizada!");
-        cargarModeloMaquinaActual(); // Recargamos el modelo con el nuevo enlace
-    }
-}
     </script>
 </body>
 </html>
