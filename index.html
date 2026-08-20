@@ -328,6 +328,11 @@
                                 <label for="input-archivo" class="w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-md text-white font-bold text-xs shadow transition flex items-center justify-center cursor-pointer">📂 Importar .glb</label>
                                 <input type="file" id="input-archivo" accept=".glb,.gltf" class="hidden">
                             </div>
+                            <!-- Campo para pegar la URL del modelo 3D -->
+<div class="admin-controls">
+    <input type="text" id="input-url-modelo" placeholder="Pega aquí el enlace Raw de GitHub (.glb)">
+    <button onclick="guardarUrlModelo()">Guardar URL de Modelo</button>
+</div>
                             <div id="contenedor-admin-reportes-btn" class="mb-2 hidden">
                                 <button onclick="abrirModalVerReportes()" class="w-full py-2 bg-amber-600 hover:bg-amber-500 rounded-md text-white font-bold text-xs shadow transition flex items-center justify-center gap-1">📋 Ver Reportes</button>
                             </div>
@@ -1271,6 +1276,20 @@
             let hits = raycaster.intersectObjects(piezasDetectadas, true);
             if (hits.length > 0 && hits[0].object.name) seleccionarComponente(hits[0].object.name);
         }
+        function guardarUrlModelo() {
+    const url = document.getElementById('input-url-modelo').value;
+    if (!url) return alert("Por favor pega una URL válida");
+
+    let db = getDatabase();
+    let mach = db[currentLine].find(m => m.id === currentMachineId);
+
+    if (mach) {
+        mach.model3dUrl = url; // Guardamos el enlace en la propiedad model3dUrl
+        saveDatabase(db); // Esta función es la que ya usas para sincronizar con Firebase
+        alert("¡URL del modelo 3D guardada y sincronizada!");
+        cargarModeloMaquinaActual(); // Recargamos el modelo con el nuevo enlace
+    }
+}
     </script>
 </body>
 </html>
