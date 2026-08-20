@@ -477,35 +477,6 @@
                 }
             }
         });
-        // Reemplaza o integra esta función en tu bloque de scripts:
-async function procesarSubidaYGuardarGLB(archivo, machineId) {
-    try {
-        console.log("Iniciando subida del archivo .glb...");
-        
-        // Usando la estructura modular o namespaced que ya tienes cargada en tu HTML
-        const storageRef = firebase.storage().ref('modelos_glb/' + Date.now() + '_' + archivo.name);
-        const snapshot = await storageRef.put(archivo);
-        const downloadURL = await snapshot.ref.getDownloadURL();
-        
-        console.log("URL obtenida de Storage:", downloadURL);
-
-        // Guardar la URL en Firestore
-        const db = firebase.firestore();
-        await db.collection("maquinas").doc(machineId).update({
-            modelo3D_url: downloadURL
-        });
-
-        alert("¡Modelo .glb subido y guardado correctamente!");
-        
-        if (typeof cargarModeloRepoAcutal === 'function') {
-            cargarModeloRepoAcutal(machineId);
-        }
-
-    } catch (error) {
-        console.error("Error detallado:", error);
-        alert("Hubo un error al subir el archivo: " + error.message);
-    }
-};
     </script>
 
     <script>
@@ -1100,22 +1071,41 @@ async function procesarSubidaYGuardarGLB(archivo, machineId) {
             });
         }
 
-        async function cargarModeloMaquinaActual() {
-            const btnExplo = document.getElementById('btn-explo');
-            btnExplo.innerText = "⏳ Cargando..."; btnExplo.disabled = true;
-            while(grupoMaquina.children.length > 0) grupoMaquina.remove(grupoMaquina.children[0]);
+        // ==========================================
+// 1. FUNCIÓN PARA SUBIR Y SINCRONIZAR EL .GLB
+// ==========================================
+async function subirYSincronizarModeloGLB(archivo, machineId) {
+    try {
+        console.log("Iniciando subida del archivo a Firebase Storage...");
+        
+        // Referencia a los servicios de Firebase
+        const storage = firebase.storage();
+        const db = firebase.firestore();
 
-            try {
-                const cloudUrl = await window.obtenerURLModeloGLB(currentLine, currentMachineId);
-                if (cloudUrl) {
-                    gltfLoader.load(cloudUrl + "?v=" + new Date().getTime(), (gltf) => procesarModelo(gltf, "Nube (Sincronizado)"), undefined, () => cargarModeloDefecto());
-                } else { 
-                    cargarModeloDefecto(); 
-                }
-            } catch (e) { 
-                cargarModeloDefecto(); 
-            }
-        }
+        // Creamos una ruta única en Storage usando el nombre del archivo y la fecha
+        const rutaStorage = ref(storage, `modelos_glb/${Date.now()}_${archivo.name}`);
+        
+        // Subimos el archivo físico
+        const snapshot = await storage.ref(`modelos_glb/${archivo.name}`).put(archivo);
+        
+        // Obtenemos la URL pública para que cualquier otro dispositivo pueda descargar el modelo 3D
+        const urlPublica = await snapshot.ref.getDownloadURL();
+        console.log("¡Archivo subido! URL de descarga:", urlPublica);
+
+        // Actualizamos Firestore. Al hacer esto, TODOS los dispositivos conectados 
+        // a esta máquina recibirán la actualización en tiempo real.
+        await db.collection("maquinas").doc(machineId).update({
+            urlModeloGLB: urlPublica,
+            ultimaActualizacion: new Date().toISOString()
+        });
+
+        alert("¡Éxito! El modelo .glb se ha subido y sincronizado con los demás dispositivos.");
+
+    } catch (error) {
+        console.error("Error al sincronizar el modelo:", error);
+        alert("No se pudo cargar el archivo: " + error.message);
+    }
+}
 
         function cargarModeloDefecto() {
             gltfLoader.load(defaultGLBUrl, (gltf) => procesarModelo(gltf, "POLICYTRUS (Local)"), undefined, () => {
@@ -1297,6 +1287,28 @@ async function procesarSubidaYGuardarGLB(archivo, machineId) {
             let hits = raycaster.intersectObjects(piezasDetectadas, true);
             if (hits.length > 0 && hits[0].object.name) seleccionarComponente(hits[0].object.name);
         }
+        // ==========================================
+// 2. ESCUCHADOR EN TIEMPO REAL PARA OTROS DISPOSITIVOS
+// ==========================================
+function escucharCambiosDeModelo(machineId) {
+    const db = firebase.firestore();
+
+    // Esto se ejecuta automáticamente en cuanto subas el archivo desde tu dispositivo de administrador
+    db.collection("maquinas").doc(machineId).onSnapshot((doc) => {
+        if (doc.exists) {
+            const datos = doc.data();
+            const urlRemota = datos.urlModeloGLB;
+
+            if (urlRemota) {
+                console.log("Nuevo modelo detectado en la nube, cargando en visor 3D...");
+                // Aquí llamas a tu función de Three.js / model-viewer para renderizar el archivo usando la URL
+                cargarVisor3DDesdeURL(urlRemota); 
+            }
+        } else {
+            console.log("No se encontró la máquina en la base de datos.");
+        }
+    });
+}
     </script>
     <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
 <script>eruda.init();</script>
