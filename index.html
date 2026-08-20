@@ -425,25 +425,8 @@
 
     <!-- FIREBASE & LOGICA -->
     <script type="module">
-        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
-
-// Estas credenciales las sacas de: Supabase Dashboard > Settings > API
-const SUPABASE_URL = 'https://rutxbcxqrqgidrniggte.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_QDGp8xnqOirYEHlEv7Y5lg_ufe2TebO';
-
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// Exportamos supabase para poder usarlo en el resto de los scripts
-window.supabase = supabase;
-supabase
-  .channel('realtime_maquinas')
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'maquinas' }, payload => {
-    console.log('Cambio detectado:', payload);
-    // Aquí actualizas tu localStorage y refrescas la vista
-    // Ejemplo:
-    // fetchMaquinasDesdeSupabaseYActualizarUI(); 
-  })
-  .subscribe();
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDH4yJZOodA_bLfZ-13j-69B6lGYlD411E",
@@ -463,34 +446,15 @@ supabase
                 await setDoc(dbRef, { data: JSON.stringify(localDb), timestamp: new Date().toISOString() });
             } catch (e) { console.error("Error nube:", e); }
         };
-        window.addEventListener('DOMContentLoaded', async () => {
-    // 1. Cargamos datos desde Supabase
-    await cargarMaquinasDesdeSupabase();
-    
-    // 2. Mantenemos tu lógica original de QR
-    const params = new URLSearchParams(window.location.search);
-    // ... resto de tu lógica de QR
-});
 
-        // --- LO QUE DEBES PONER ---
-supabase
-  .channel('public:activos') // Nombre del canal (puede ser cualquiera)
-  .on('postgres_changes', { 
-      event: 'UPDATE', 
-      schema: 'public', 
-      table: 'activos' // El nombre de tu tabla en Supabase
-  }, payload => {
-      // payload.new contiene los datos actualizados que vienen de la nube
-      console.log('Cambio detectado:', payload.new);
-      
-      // Actualizamos tu almacenamiento local
-      localStorage.setItem("data_control_activos_db_v4", JSON.stringify(payload.new.content));
-      
-      // Forzamos a la UI a refrescarse
-      if (typeof renderLines === 'function') renderLines();
-      if (typeof renderMachines === 'function') renderMachines();
-  })
-  .subscribe();
+        onSnapshot(dbRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const cloudData = docSnap.data().data;
+                const localData = localStorage.getItem("data_control_activos_db_v4");
+                if (cloudData && cloudData !== localData) {
+                    localStorage.setItem("data_control_activos_db_v4", cloudData);
+                    if (document.getElementById('view-lines').classList.contains('active-view')) renderLines();
+                    if (document.getElementById('view-machines').classList.contains('active-view')) renderMachines();
                 }
             }
         });
@@ -543,21 +507,31 @@ supabase
             return JSON.parse(data);
         }
 
-        async function guardarMaquinaEnSupabase(maquina) {
-    const { data, error } = await supabase
-        .from('maquinas')
-        .upsert({
-            id: maquina.id,
-            linea: maquina.linea, // Asegúrate de incluir el nombre de la línea
-            nombre: maquina.name,
-            meta: maquina.meta,
-            motors: maquina.motors,
-            kardex: maquina.kardex,
-            reportes_piezas: maquina.reportesPiezas
+        function saveDatabase(db) {
+            localStorage.setItem(DB_KEY, JSON.stringify(db));
+            if (window.sincronizarNube) window.sincronizarNube(db);
+        }
+
+        // Detección de parámetros de URL (Deep Linking para QR)
+        window.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            const qLine = params.get('linea');
+            const qMachId = params.get('maquina');
+
+            if (qLine && qMachId) {
+                let db = getDatabase();
+                if (db[qLine]) {
+                    let mach = db[qLine].find(m => m.id == qMachId);
+                    if (mach) {
+                        qrContextoLinea = qLine;
+                        qrContextoMaquinaId = Number(qMachId);
+                        currentLine = qLine;
+                        currentMachineId = Number(qMachId);
+                        document.getElementById('machine-indicator').innerText = `QR: ${mach.name} (${qLine})`;
+                    }
+                }
+            }
         });
-        
-    if (error) console.error("Error al guardar:", error);
-}
 
         function solicitarPassword(rol) {
             rolPendiente = rol;
@@ -1004,7 +978,14 @@ supabase
             document.getElementById('view-alertas').classList.add('active-view');
         }
 
-      
+        function openImageModal(src) { document.getElementById('modal-img-tag').src = src; document.getElementById('img-modal').style.display = 'flex'; }
+        function closeImageModal() { document.getElementById('img-modal').style.display = 'none'; }
+
+        let scene, camera, renderer, grupoMaquina, controls, raycaster, mouse, gltfLoader;
+        let piezaSeleccionadaActual = "";
+        let vistaExplosionada = false;
+        let piezasDetectadas = [];
+        const defaultGLBUrl = "modelos/EXTRACTORA_POLICYTRUS.glb";
 
         function init3D() {
             const container = document.getElementById('canvas-3d');
@@ -1254,46 +1235,6 @@ supabase
             let hits = raycaster.intersectObjects(piezasDetectadas, true);
             if (hits.length > 0 && hits[0].object.name) seleccionarComponente(hits[0].object.name);
         }
-        async function cargarMaquinasDesdeSupabase() {
-    // Consultamos toda la tabla 'maquinas'
-    const { data, error } = await supabase
-        .from('maquinas')
-        .select('*');
-
-    if (error) {
-        console.error("Error al cargar desde Supabase:", error);
-        return;
-    }
-
-    // Organizamos los datos para que coincidan con la estructura que tu app espera:
-    // { "Linea A": [maquinas...], "Linea B": [maquinas...] }
-    const dbOrganizada = {};
-    data.forEach(m => {
-        if (!dbOrganizada[m.linea]) dbOrganizada[m.linea] = [];
-        
-        // Mapeamos los nombres de columnas de Supabase a los nombres de variables de tu JS
-        dbOrganizada[m.linea].push({
-            id: m.id,
-            name: m.nombre,
-            meta: m.meta,
-            motors: m.motors,
-            kardex: m.kardex,
-            reportesPiezas: m.reportes_piezas,
-            instructionImages: m.instruction_images || [], // Asegúrate de tener estas columnas
-            manualsPdf: m.manuals_pdf || [],
-            bitacora: m.bitacora || []
-        });
-    });
-
-    // Guardamos en localStorage para que la app funcione offline si se pierde la conexión
-    localStorage.setItem(DB_KEY, JSON.stringify(dbOrganizada));
-    
-    // Refrescamos la interfaz
-    renderLines();
-    if(document.getElementById('view-machines').classList.contains('active-view')) renderMachines();
-    
-    console.log("Datos sincronizados con éxito");
-}
     </script>
 </body>
 </html>
