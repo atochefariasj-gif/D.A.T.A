@@ -14,6 +14,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <!-- Librería para generar códigos QR -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- Supabase JS Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --primary-color: #2b2d42;
@@ -423,41 +425,38 @@
         </div>
     </div>
 
-    <!-- FIREBASE & LOGICA -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyDH4yJZOodA_bLfZ-13j-69B6lGYlD411E",
-            authDomain: "data-4f604.firebaseapp.com",
-            projectId: "data-4f604",
-            storageBucket: "data-4f604.firebasestorage.app",
-            messagingSenderId: "186125262351",
-            appId: "1:186125262351:web:a38416e752f52eda404d7a"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const dbFirestore = getFirestore(app);
-        const dbRef = doc(dbFirestore, "sincronizacion", "datos_activos_v2");
+    <!-- SUPABASE CONFIGURACIÓN Y LÓGICA -->
+    <script>
+        const SUPABASE_URL = 'https://rutxbcxqrqgidrniggte.supabase.co';
+        const SUPABASE_ANON_KEY = 'sb_publishable_QDGp8xnqOirYEHlEv7Y5lg_ufe2TebO'; // Reemplaza por tu llave pública real de Supabase
+        
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         window.sincronizarNube = async function(localDb) {
             try {
-                await setDoc(dbRef, { data: JSON.stringify(localDb), timestamp: new Date().toISOString() });
-            } catch (e) { console.error("Error nube:", e); }
+                // Se guarda/actualiza el registro único con ID 1 en la tabla 'configuracion'
+                const { error } = await supabaseClient
+                    .from('configuracion')
+                    .upsert({ id: 1, payload: localDb, updated_at: new Date().toISOString() });
+                if (error) console.error("Error al sincronizar con Supabase:", error);
+            } catch (e) { console.error("Excepción al sincronizar nube:", e); }
         };
 
-        onSnapshot(dbRef, (docSnap) => {
-            if (docSnap.exists()) {
-                const cloudData = docSnap.data().data;
-                const localData = localStorage.getItem("data_control_activos_db_v4");
-                if (cloudData && cloudData !== localData) {
-                    localStorage.setItem("data_control_activos_db_v4", cloudData);
-                    if (document.getElementById('view-lines').classList.contains('active-view')) renderLines();
-                    if (document.getElementById('view-machines').classList.contains('active-view')) renderMachines();
+        // Suscripción en tiempo real a la tabla 'configuracion'
+        supabaseClient
+            .channel('public:configuracion')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'configuracion' }, payload => {
+                if (payload.new && payload.new.payload) {
+                    const cloudData = JSON.stringify(payload.new.payload);
+                    const localData = localStorage.getItem("data_control_activos_db_v4");
+                    if (cloudData && cloudData !== localData) {
+                        localStorage.setItem("data_control_activos_db_v4", cloudData);
+                        if (document.getElementById('view-lines').classList.contains('active-view')) renderLines();
+                        if (document.getElementById('view-machines').classList.contains('active-view')) renderMachines();
+                    }
                 }
-            }
-        });
+            })
+            .subscribe();
     </script>
 
     <script>
@@ -468,7 +467,6 @@
         let isEditMode = false;
         let rolPendiente = '';
 
-        // Variables para control de acceso directo vía QR
         let qrContextoLinea = null;
         let qrContextoMaquinaId = null;
 
@@ -512,8 +510,21 @@
             if (window.sincronizarNube) window.sincronizarNube(db);
         }
 
-        // Detección de parámetros de URL (Deep Linking para QR)
-        window.addEventListener('DOMContentLoaded', () => {
+        window.addEventListener('DOMContentLoaded', async () => {
+            // Intentar cargar la base de datos inicial desde Supabase si existe
+            try {
+                const { data, error } = await supabaseClient
+                    .from('configuracion')
+                    .select('payload')
+                    .eq('id', 1)
+                    .single();
+                if (data && data.payload) {
+                    localStorage.setItem(DB_KEY, JSON.stringify(data.payload));
+                }
+            } catch (e) {
+                console.log("Usando base de datos local predeterminada.");
+            }
+
             const params = new URLSearchParams(window.location.search);
             const qLine = params.get('linea');
             const qMachId = params.get('maquina');
@@ -550,7 +561,6 @@
             currentRole = role;
             document.getElementById('main-menu').classList.remove('active-view');
 
-            // Si se entró mediante QR, redirigir directo al menú de opciones de esa máquina
             if (qrContextoLinea && qrContextoMaquinaId) {
                 let db = getDatabase();
                 let mach = db[qrContextoLinea].find(m => m.id === qrContextoMaquinaId);
@@ -651,20 +661,16 @@
             document.querySelectorAll('.view-section').forEach(el => { if(el.id !== 'view-machine-detail') el.classList.remove('active-view'); });
         }
 
-        // Generar Código QR del Activo actual
         function generarQRActivo() {
             let db = getDatabase();
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (!mach) return;
 
             document.getElementById('lbl-qr-maquina-nombre').innerText = `${currentLine} ➔ ${mach.name}`;
-            
-            // Construir URL limpia apuntando al dominio actual con parámetros
             let baseUrl = window.location.origin + window.location.pathname;
             let targetUrl = `${baseUrl}?linea=${encodeURIComponent(currentLine)}&maquina=${currentMachineId}`;
             
             document.getElementById('lbl-qr-url').innerText = targetUrl;
-            
             let box = document.getElementById('qr-code-box');
             box.innerHTML = '';
             
@@ -686,7 +692,6 @@
 
         function volverDesdeDetalle() {
             if (qrContextoLinea && qrContextoMaquinaId) {
-                // Si entró por QR, al volver regresa al menú principal de roles
                 document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
                 document.getElementById('main-menu').classList.add('active-view');
             } else {
@@ -861,22 +866,28 @@
                 wrapper.appendChild(card);
             });
         }
-        function uploadInstructionImages(e) {
+        
+        async function uploadInstructionImages(e) {
             if (currentRole !== 'admin') return;
             let files = e.target.files; if (!files.length) return;
             let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
             let processed = 0;
-            Array.from(files).forEach(file => {
-                let reader = new FileReader();
-                reader.onload = function(evt) {
+            
+            for (let file of Array.from(files)) {
+                const fileName = `inst_${Date.now()}_${file.name}`;
+                const { data, error } = await supabaseClient.storage.from('modelos-glb').upload(fileName, file);
+                if (!error) {
+                    const { data: publicUrlData } = supabaseClient.storage.from('modelos-glb').getPublicUrl(fileName);
                     if (!mach.instructionImages) mach.instructionImages = [];
-                    mach.instructionImages.push(evt.target.result);
-                    processed++;
-                    if (processed === files.length) { saveDatabase(db); loadInstructionsData(); }
-                };
-                reader.readAsDataURL(file);
-            });
+                    mach.instructionImages.push(publicUrlData.publicUrl);
+                } else {
+                    console.error("Error subiendo imagen a Supabase Storage:", error);
+                }
+                processed++;
+                if (processed === files.length) { saveDatabase(db); loadInstructionsData(); }
+            }
         }
+
         function removeInstructionImage(idx) {
             if (currentRole !== 'admin') return;
             let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
@@ -893,26 +904,32 @@
             if (manuals.length === 0) { wrapper.innerHTML = `<span style="opacity: 0.5; font-size: 11px; padding: 20px;">Sin manuales PDF.</span>`; return; }
             manuals.forEach((man, idx) => {
                 let row = document.createElement('div'); row.className = 'manual-item-row';
-                row.innerHTML = `<div class="manual-info"><span>📄</span><span class="manual-name">${man.name}</span></div><div style="display:flex; gap:6px;"><a href="${man.data}" download="${man.name}" style="background:#0077b6; color:#fff; padding:4px 8px; border-radius:4px; font-size:10px; text-decoration:none; font-weight:bold;">📥 Descargar</a>${currentRole==='admin'?`<button onclick="removeManualPdf(${idx})" style="background:red; color:#fff; border:none; border-radius:4px; padding:4px 6px; font-size:10px; cursor:pointer;">Eliminar</button>`:''}</div>`;
+                row.innerHTML = `<div class="manual-info"><span>📄</span><span class="manual-name">${man.name}</span></div><div style="display:flex; gap:6px;"><a href="${man.data}" target="_blank" style="background:#0077b6; color:#fff; padding:4px 8px; border-radius:4px; font-size:10px; text-decoration:none; font-weight:bold;">📥 Ver / Descargar</a>${currentRole==='admin'?`<button onclick="removeManualPdf(${idx})" style="background:red; color:#fff; border:none; border-radius:4px; padding:4px 6px; font-size:10px; cursor:pointer;">Eliminar</button>`:''}</div>`;
                 wrapper.appendChild(row);
             });
         }
-        function uploadManualsPdf(e) {
+
+        async function uploadManualsPdf(e) {
             if (currentRole !== 'admin') return;
             let files = e.target.files; if (!files.length) return;
             let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
             let processed = 0;
-            Array.from(files).forEach(file => {
-                let reader = new FileReader();
-                reader.onload = function(evt) {
+
+            for (let file of Array.from(files)) {
+                const fileName = `pdf_${Date.now()}_${file.name}`;
+                const { data, error } = await supabaseClient.storage.from('modelos-glb').upload(fileName, file);
+                if (!error) {
+                    const { data: publicUrlData } = supabaseClient.storage.from('modelos-glb').getPublicUrl(fileName);
                     if (!mach.manualsPdf) mach.manualsPdf = [];
-                    mach.manualsPdf.push({ name: file.name, data: evt.target.result });
-                    processed++;
-                    if (processed === files.length) { saveDatabase(db); loadManualsData(); }
-                };
-                reader.readAsDataURL(file);
-            });
+                    mach.manualsPdf.push({ name: file.name, data: publicUrlData.publicUrl });
+                } else {
+                    console.error("Error subiendo PDF a Supabase Storage:", error);
+                }
+                processed++;
+                if (processed === files.length) { saveDatabase(db); loadManualsData(); }
+            }
         }
+
         function removeManualPdf(idx) {
             if (currentRole !== 'admin') return;
             let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
@@ -1007,8 +1024,18 @@
             document.getElementById('input-archivo').addEventListener('change', async function(e) {
                 if (currentRole !== 'admin') return;
                 const archivo = e.target.files[0]; if (!archivo) return;
-                await localforage.setItem(`glb_machine_${currentLine}_${currentMachineId}`, archivo);
-                cargarModeloMaquinaActual(); alert("Modelo 3D guardado.");
+                
+                const fileName = `glb_${currentLine}_${currentMachineId}_${Date.now()}.glb`;
+                const { data, error } = await supabaseClient.storage.from('modelos-glb').upload(fileName, archivo);
+                if (!error) {
+                    const { data: urlData } = supabaseClient.storage.from('modelos-glb').getPublicUrl(fileName);
+                    await localforage.setItem(`glb_machine_url_${currentLine}_${currentMachineId}`, urlData.publicUrl);
+                    cargarModeloMaquinaActual();
+                    alert("Modelo 3D guardado y subido a Supabase Storage.");
+                } else {
+                    alert("Error al subir archivo GLB a Supabase.");
+                    console.error(error);
+                }
             });
 
             let pdX = 0, pdY = 0, moved = false;
@@ -1048,9 +1075,9 @@
             while(grupoMaquina.children.length > 0) grupoMaquina.remove(grupoMaquina.children[0]);
 
             try {
-                const blob = await localforage.getItem(`glb_machine_${currentLine}_${currentMachineId}`);
-                if (blob) {
-                    gltfLoader.load(URL.createObjectURL(blob), (gltf) => procesarModelo(gltf, "Personalizado"), undefined, () => cargarModeloDefecto());
+                const urlGlb = await localforage.getItem(`glb_machine_url_${currentLine}_${currentMachineId}`);
+                if (urlGlb) {
+                    gltfLoader.load(urlGlb, (gltf) => procesarModelo(gltf, "Personalizado"), undefined, () => cargarModeloDefecto());
                 } else { cargarModeloDefecto(); }
             } catch (e) { cargarModeloDefecto(); }
         }
