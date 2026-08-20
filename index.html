@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>D.A.T.A - Control de Activos Industrial</title>
+    <link rel="manifest" href="manifest.json">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -310,9 +312,10 @@
                 <label style="font-size: 11px; font-weight: bold; display: block; margin-bottom: 4px;">Nueva Nota de Turno:</label>
                 <textarea id="txt-nueva-nota" class="w-full h-16 p-2 bg-gray-900/10 border border-gray-500/30 rounded text-xs outline-none resize-none mb-2" placeholder="Escribe observaciones, ajustes o novedades..."></textarea>
                 <button onclick="guardarNotaBitacora()" class="py-1.5 px-4 bg-blue-600 hover:bg-blue-500 rounded text-white font-bold text-xs shadow transition">Publicar Nota</button>
-                <button class="back-btn" onclick="salirBitacora()">⬅ Volver a Opciones</button>
+                  <button class="back-btn" onclick="salirBitacora()">⬅ Volver</button>
             </div>
             <div class="bitacora-list-container" id="bitacora-list-wrapper"></div>
+          
         </div>
 
         <!-- VISUAL 3D -->
@@ -421,11 +424,10 @@
         </div>
     </div>
 
-    <!-- FIREBASE & LOGICA DE SINCRONIZACIÓN -->
+    <!-- FIREBASE & LOGICA -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDH4yJZOodA_bLfZ-13j-69B6lGYlD411E",
@@ -438,32 +440,12 @@
 
         const app = initializeApp(firebaseConfig);
         const dbFirestore = getFirestore(app);
-        const dbStorage = getStorage(app);
         const dbRef = doc(dbFirestore, "sincronizacion", "datos_activos_v2");
 
         window.sincronizarNube = async function(localDb) {
             try {
                 await setDoc(dbRef, { data: JSON.stringify(localDb), timestamp: new Date().toISOString() });
             } catch (e) { console.error("Error nube:", e); }
-        };
-
-        // Exportamos funciones de Storage para usarlas globalmente en el script inferior
-        window.subirArchivoGLBAPowerCloud = async function(linea, maquinaId, fileObject) {
-            const filePath = `models/linea_${encodeURIComponent(linea)}_mach_${maquinaId}.glb`;
-            const storageRef = ref(dbStorage, filePath);
-            await uploadBytes(storageRef, fileObject);
-            const downloadURL = await getDownloadURL(storageRef);
-            return downloadURL;
-        };
-
-        window.obtenerURLModeloGLB = async function(linea, maquinaId) {
-            try {
-                const filePath = `models/linea_${encodeURIComponent(linea)}_mach_${maquinaId}.glb`;
-                const storageRef = ref(dbStorage, filePath);
-                return await getDownloadURL(storageRef);
-            } catch (e) {
-                return null; // Si no hay modelo personalizado en la nube, retorna null para usar el por defecto
-            }
         };
 
         onSnapshot(dbRef, (docSnap) => {
@@ -487,6 +469,7 @@
         let isEditMode = false;
         let rolPendiente = '';
 
+        // Variables para control de acceso directo vía QR
         let qrContextoLinea = null;
         let qrContextoMaquinaId = null;
 
@@ -530,6 +513,7 @@
             if (window.sincronizarNube) window.sincronizarNube(db);
         }
 
+        // Detección de parámetros de URL (Deep Linking para QR)
         window.addEventListener('DOMContentLoaded', () => {
             const params = new URLSearchParams(window.location.search);
             const qLine = params.get('linea');
@@ -567,6 +551,7 @@
             currentRole = role;
             document.getElementById('main-menu').classList.remove('active-view');
 
+            // Si se entró mediante QR, redirigir directo al menú de opciones de esa máquina
             if (qrContextoLinea && qrContextoMaquinaId) {
                 let db = getDatabase();
                 let mach = db[qrContextoLinea].find(m => m.id === qrContextoMaquinaId);
@@ -667,6 +652,7 @@
             document.querySelectorAll('.view-section').forEach(el => { if(el.id !== 'view-machine-detail') el.classList.remove('active-view'); });
         }
 
+        // Generar Código QR del Activo actual
         function generarQRActivo() {
             let db = getDatabase();
             let mach = db[currentLine].find(m => m.id === currentMachineId);
@@ -674,6 +660,7 @@
 
             document.getElementById('lbl-qr-maquina-nombre').innerText = `${currentLine} ➔ ${mach.name}`;
             
+            // Construir URL limpia apuntando al dominio actual con parámetros
             let baseUrl = window.location.origin + window.location.pathname;
             let targetUrl = `${baseUrl}?linea=${encodeURIComponent(currentLine)}&maquina=${currentMachineId}`;
             
@@ -700,6 +687,7 @@
 
         function volverDesdeDetalle() {
             if (qrContextoLinea && qrContextoMaquinaId) {
+                // Si entró por QR, al volver regresa al menú principal de roles
                 document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
                 document.getElementById('main-menu').classList.add('active-view');
             } else {
@@ -1017,27 +1005,11 @@
             grupoMaquina = new THREE.Group(); scene.add(grupoMaquina);
             cargarModeloMaquinaActual();
 
-            // MODIFICACIÓN: Gestión robusta de errores y restauración de estado del botón y del input
             document.getElementById('input-archivo').addEventListener('change', async function(e) {
                 if (currentRole !== 'admin') return;
-                const archivo = e.target.files[0]; 
-                if (!archivo) return;
-                
-                const btnExplo = document.getElementById('btn-explo');
-                const textoOriginal = btnExplo.innerText; 
-                btnExplo.innerText = "⏳ Subiendo a la nube...";
-                
-                try {
-                    await window.subirArchivoGLBAPowerCloud(currentLine, currentMachineId, archivo);
-                    await cargarModeloMaquinaActual(); 
-                    alert("¡Modelo 3D subido y sincronizado en la nube con éxito!");
-                } catch(err) {
-                    console.error(err);
-                    alert("Hubo un error al subir el archivo a la nube. Revisa la consola o los permisos.");
-                } finally {
-                    btnExplo.innerText = textoOriginal;
-                    e.target.value = ''; // Limpia el input para permitir reintentar con el mismo archivo
-                }
+                const archivo = e.target.files[0]; if (!archivo) return;
+                await localforage.setItem(`glb_machine_${currentLine}_${currentMachineId}`, archivo);
+                cargarModeloMaquinaActual(); alert("Modelo 3D guardado.");
             });
 
             let pdX = 0, pdY = 0, moved = false;
@@ -1071,46 +1043,21 @@
             });
         }
 
-        // ==========================================
-// 1. FUNCIÓN PARA SUBIR Y SINCRONIZAR EL .GLB
-// ==========================================
-async function procesarSubidaYGuardarGLB(archivo, machineId) {
-    // 1. Validar que el ID de la máquina no esté vacío
-    if (!machineId) {
-        alert("Error: No se detectó el ID de la máquina actual.");
-        return;
-    }
+        async function cargarModeloMaquinaActual() {
+            const btnExplo = document.getElementById('btn-explo');
+            btnExplo.innerText = "⏳ Cargando..."; btnExplo.disabled = true;
+            while(grupoMaquina.children.length > 0) grupoMaquina.remove(grupoMaquina.children[0]);
 
-    try {
-        console.log("Subiendo archivo para la máquina:", machineId);
-        
-        // 2. Referencia a Firebase Storage
-        const storageRef = firebase.storage().ref('modelos_glb/' + Date.now() + '_' + archivo.name);
-        const snapshot = await storageRef.put(archivo);
-        const downloadURL = await snapshot.ref.getDownloadURL();
-
-        // 3. Guardar en Firestore usando el ID correcto
-        const db = firebase.firestore();
-        await db.collection("maquinas").doc(machineId).update({
-            modelo3D_url: downloadURL
-        });
-
-        alert("¡Modelo .glb subido con éxito!");
-
-        // 4. Asegúrate de llamar a una función que SÍ exista en tu código
-        // (Reemplaza 'cargarModeloRepoAcutal' por el nombre real de tu función para mostrar el 3D)
-        if (typeof cargarModeloRepoAcutal === 'function') {
-            cargarModeloRepoAcutal(machineId);
+            try {
+                const blob = await localforage.getItem(`glb_machine_${currentLine}_${currentMachineId}`);
+                if (blob) {
+                    gltfLoader.load(URL.createObjectURL(blob), (gltf) => procesarModelo(gltf, "Personalizado"), undefined, () => cargarModeloDefecto());
+                } else { cargarModeloDefecto(); }
+            } catch (e) { cargarModeloDefecto(); }
         }
 
-    } catch (error) {
-        console.error("Error en Firebase:", error);
-        alert("Error al subir: " + error.message);
-    }
-}
-
         function cargarModeloDefecto() {
-            gltfLoader.load(defaultGLBUrl, (gltf) => procesarModelo(gltf, "POLICYTRUS (Local)"), undefined, () => {
+            gltfLoader.load(defaultGLBUrl, (gltf) => procesarModelo(gltf, "POLICYTRUS"), undefined, () => {
                 document.getElementById('btn-explo').innerText = "💥 Vista Explosionada";
                 document.getElementById('btn-explo').disabled = false;
             });
@@ -1289,30 +1236,6 @@ async function procesarSubidaYGuardarGLB(archivo, machineId) {
             let hits = raycaster.intersectObjects(piezasDetectadas, true);
             if (hits.length > 0 && hits[0].object.name) seleccionarComponente(hits[0].object.name);
         }
-        // ==========================================
-// 2. ESCUCHADOR EN TIEMPO REAL PARA OTROS DISPOSITIVOS
-// ==========================================
-function escucharCambiosDeModelo(machineId) {
-    const db = firebase.firestore();
-
-    // Esto se ejecuta automáticamente en cuanto subas el archivo desde tu dispositivo de administrador
-    db.collection("maquinas").doc(machineId).onSnapshot((doc) => {
-        if (doc.exists) {
-            const datos = doc.data();
-            const urlRemota = datos.urlModeloGLB;
-
-            if (urlRemota) {
-                console.log("Nuevo modelo detectado en la nube, cargando en visor 3D...");
-                // Aquí llamas a tu función de Three.js / model-viewer para renderizar el archivo usando la URL
-                cargarVisor3DDesdeURL(urlRemota); 
-            }
-        } else {
-            console.log("No se encontró la máquina en la base de datos.");
-        }
-    });
-}
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-<script>eruda.init();</script>
 </body>
 </html>
