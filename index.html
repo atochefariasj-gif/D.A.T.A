@@ -1002,14 +1002,16 @@
                 
                 // Guardar en Supabase Storage (Bucket: modelos-glb)
                 // Sanitizamos la ruta antes de subirla a Supabase
-                const filePath = `maquinas/${currentMachine}/${Date.now()}_${archivo.name}`;
+                // En lugar de usar currentMachine, usa una ruta limpia directa con el nombre del archivo y la fecha
+const filePath = `maquinas/${Date.now()}_${archivo.name}`;
+
+// Sanitizamos la ruta para asegurarnos de que no tenga tildes ni espacios
 const filePathLimpio = sanitizarRuta(filePath);
 
 // Subida a Supabase Storage
 const { data: storageData, error: storageError } = await supabaseClient.storage
     .from('modelos-glb')
     .upload(filePathLimpio, archivo);
-
                 if (storageError) {
                     console.error("Error al subir a Supabase Storage:", storageError.message);
                     alert("Error al subir el modelo a la nube.");
