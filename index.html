@@ -1029,30 +1029,33 @@
                 const archivo = e.target.files[0]; if (!archivo) return;
                 
                 const btnExplo = document.getElementById('btn-explo');
-                btnExplo.innerText = "⏳ Subiendo..."; 
+                btnExplo.innerText = "⏳ Procesando..."; 
                 btnExplo.disabled = true;
 
-                try {
-                    // Sube el archivo a Firebase Storage usando tu función existente
-                    const downloadUrl = await window.subirArchivoAStorage(archivo, `modelos_3d/${currentMachineId}`);
+                const reader = new FileReader();
+                reader.onload = async function(event) {
+                    const base64Data = event.target.result; // El archivo convertido en texto Base64
                     
-                    // Guarda la URL en la base de datos de la máquina actual
-                    let db = getDatabase();
-                    let mach = db[currentLine].find(m => m.id === currentMachineId);
-                    if (mach) {
-                        mach.model3dUrl = downloadUrl;
-                        saveDatabase(db);
+                    try {
+                        // Guardamos el Base64 directamente en la base de datos de la máquina
+                        let db = getDatabase();
+                        let mach = db[currentLine].find(m => m.id === currentMachineId);
+                        if (mach) {
+                            mach.model3dBase64 = base64Data;
+                            saveDatabase(db);
+                        }
+                        
+                        alert("¡Modelo 3D guardado y sincronizado internamente!");
+                        cargarModeloMaquinaActual();
+                    } catch (err) {
+                        console.error("Error al guardar el modelo:", err);
+                        alert("El archivo puede ser demasiado pesado para la base de datos.");
+                        btnExplo.innerText = "💥 Vista Explosionada";
+                        btnExplo.disabled = false;
                     }
-                    
-                    alert("¡Modelo 3D subido y sincronizado con éxito!");
-                    cargarModeloMaquinaActual();
-                } catch (err) {
-                    console.error("Error al subir el modelo 3D:", err);
-                    alert("Hubo un error al subir el archivo a la nube.");
-                    btnExplo.innerText = "💥 Vista Explosionada";
-                    btnExplo.disabled = false;
-                }
+                };
                 
+                reader.readAsDataURL(archivo); // Lee el archivo como una URL de datos Base64
                 e.target.value = ''; // Limpiar input
             });
 
@@ -1095,14 +1098,14 @@
             let db = getDatabase();
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             
-            // Si la máquina tiene una URL de modelo en la nube, la usa; si no, usa el defecto
-            const urlModelo = (mach && mach.model3dUrl) ? mach.model3dUrl : defaultGLBUrl;
+            // Verificamos si la máquina tiene un modelo en Base64 guardado
+            const fuenteModelo = (mach && mach.model3dBase64) ? mach.model3dBase64 : defaultGLBUrl;
 
-            gltfLoader.load(urlModelo, (gltf) => {
+            gltfLoader.load(fuenteModelo, (gltf) => {
                 procesarModelo(gltf, mach ? mach.name : "Personalizado");
             }, undefined, (error) => {
-                console.error("No se pudo cargar el modelo de la nube, usando defecto...", error);
-                if (urlModelo !== defaultGLBUrl) {
+                console.error("Error al cargar el modelo interno, usando defecto...", error);
+                if (fuenteModelo !== defaultGLBUrl) {
                     gltfLoader.load(defaultGLBUrl, (gltf) => procesarModelo(gltf, "POLICYTRUS"), undefined, () => {
                         btnExplo.innerText = "💥 Vista Explosionada";
                         btnExplo.disabled = false;
@@ -1294,7 +1297,5 @@
             if (hits.length > 0 && hits[0].object.name) seleccionarComponente(hits[0].object.name);
         }
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-<script>eruda.init();</script>
 </body>
 </html>
