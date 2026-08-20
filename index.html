@@ -1039,9 +1039,7 @@ if (dbError) {
 }
 
                 // Guardar referencia en localforage/base de datos local también
-                await localforage.setItem(`glb_machine_${currentLine}_${currentMachineId}`, archivo);
-                cargarModeloMaquinaActual(); 
-                alert("Modelo 3D guardado y subido con éxito a Supabase.");
+            
             });
 
             let pdX = 0, pdY = 0, moved = false;
