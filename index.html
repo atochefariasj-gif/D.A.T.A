@@ -477,6 +477,35 @@
                 }
             }
         });
+        // Reemplaza o integra esta función en tu bloque de scripts:
+async function procesarSubidaYGuardarGLB(archivo, machineId) {
+    try {
+        console.log("Iniciando subida del archivo .glb...");
+        
+        // Usando la estructura modular o namespaced que ya tienes cargada en tu HTML
+        const storageRef = firebase.storage().ref('modelos_glb/' + Date.now() + '_' + archivo.name);
+        const snapshot = await storageRef.put(archivo);
+        const downloadURL = await snapshot.ref.getDownloadURL();
+        
+        console.log("URL obtenida de Storage:", downloadURL);
+
+        // Guardar la URL en Firestore
+        const db = firebase.firestore();
+        await db.collection("maquinas").doc(machineId).update({
+            modelo3D_url: downloadURL
+        });
+
+        alert("¡Modelo .glb subido y guardado correctamente!");
+        
+        if (typeof cargarModeloRepoAcutal === 'function') {
+            cargarModeloRepoAcutal(machineId);
+        }
+
+    } catch (error) {
+        console.error("Error detallado:", error);
+        alert("Hubo un error al subir el archivo: " + error.message);
+    }
+};
     </script>
 
     <script>
