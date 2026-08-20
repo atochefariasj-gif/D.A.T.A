@@ -332,6 +332,8 @@
                             <div>
                                 <h2 class="text-xs font-semibold uppercase text-gray-400 mb-1">Partes</h2>
                                 <input type="text" id="buscador-piezas" placeholder="Buscar..." class="w-full p-1.5 bg-gray-900 text-white rounded border border-gray-600 text-xs outline-none">
+                                <!-- Agrega este input en tu HTML de administración -->
+<input type="text" id="input-url-modelo" placeholder="Pega aquí la URL 'Raw' de GitHub">
                             </div>
                         </div>
                         <div class="flex-1 overflow-y-auto my-1 pr-1 space-y-1 text-xs" id="lista-partes"></div>
@@ -1091,30 +1093,21 @@
         }
 
         async function cargarModeloMaquinaActual() {
-            const btnExplo = document.getElementById('btn-explo');
-            btnExplo.innerText = "⏳ Cargando..."; btnExplo.disabled = true;
-            while(grupoMaquina.children.length > 0) grupoMaquina.remove(grupoMaquina.children[0]);
+    let db = getDatabase();
+    let mach = db[currentLine].find(m => m.id === currentMachineId);
 
-            let db = getDatabase();
-            let mach = db[currentLine].find(m => m.id === currentMachineId);
-            
-            // Verificamos si la máquina tiene un modelo en Base64 guardado
-            const fuenteModelo = (mach && mach.model3dBase64) ? mach.model3dBase64 : defaultGLBUrl;
+    // Si tiene URL, la usamos; si no, el modelo por defecto
+    const urlParaCargar = (mach && mach.urlModelo3d) ? mach.urlModelo3d : defaultGLBUrl;
 
-            gltfLoader.load(fuenteModelo, (gltf) => {
-                procesarModelo(gltf, mach ? mach.name : "Personalizado");
-            }, undefined, (error) => {
-                console.error("Error al cargar el modelo interno, usando defecto...", error);
-                if (fuenteModelo !== defaultGLBUrl) {
-                    gltfLoader.load(defaultGLBUrl, (gltf) => procesarModelo(gltf, "POLICYTRUS"), undefined, () => {
-                        btnExplo.innerText = "💥 Vista Explosionada";
-                        btnExplo.disabled = false;
-                    });
-                } else {
-                    cargarModeloDefecto();
-                }
-            });
-        }
+    // Cargamos el modelo usando la URL de GitHub
+    gltfLoader.load(urlParaCargar, (gltf) => {
+        procesarModelo(gltf, mach ? mach.name : "Activo");
+    }, undefined, (error) => {
+        console.error("Error al cargar desde GitHub:", error);
+        // Si falla (ej. URL mal copiada), volvemos al defecto
+        cargarModeloDefecto();
+    });
+}
 
         function cargarModeloDefecto() {
             gltfLoader.load(defaultGLBUrl, (gltf) => procesarModelo(gltf, "POLICYTRUS"), undefined, () => {
