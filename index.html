@@ -1044,32 +1044,49 @@
 
         async function cargarModeloMaquinaActual() {
     const btnExplo = document.getElementById('btn-explo');
-    btnExplo.innerText = "⏳ Cargando..."; 
-    btnExplo.disabled = true;
+    
+    // Indicamos visualmente que el proceso ha iniciado
+    if (btnExplo) {
+        btnExplo.innerText = "⏳ Cargando..."; 
+        btnExplo.disabled = true;
+    }
 
-    while(grupoMaquina.children.length > 0) grupoMaquina.remove(grupoMaquina.children[0]);
+    // Limpiar el contenedor 3D actual antes de cargar el nuevo
+    while (grupoMaquina.children.length > 0) {
+        grupoMaquina.remove(grupoMaquina.children[0]);
+    }
 
     try {
+        // Obtenemos los datos de la máquina actual
         let db = getDatabase();
         let mach = db[currentLine].find(m => m.id === currentMachineId);
 
-        // Si la máquina tiene una URL de GitHub registrada, la usamos directamente
-        if (mach && mach.model3dUrl) {
-            gltfLoader.load(mach.model3dUrl, (gltf) => {
-                procesarModelo(gltf, mach.name);
+        // Definimos la ruta: si existe 'model3dFile', usamos la carpeta local /modelos/
+        // Si no, usamos el modelo por defecto definido en otra parte
+        let urlModelo = (mach && mach.model3dFile) 
+            ? `./modelos/${mach.model3dFile}` 
+            : defaultGLBUrl;
+
+        // Carga el modelo directamente
+        gltfLoader.load(urlModelo, (gltf) => {
+            procesarModelo(gltf, mach ? mach.name : "Máquina");
+            
+            if (btnExplo) {
                 btnExplo.innerText = "💥 Vista Explosionada";
                 btnExplo.disabled = false;
-            }, undefined, (error) => {
-                console.error("Error cargando desde URL:", error);
-                alert("No se pudo cargar el modelo desde la URL. Usando por defecto...");
-                cargarModeloPorDefecto();
-            });
-        } else {
-            // Si no tiene URL guardada, carga el modelo por defecto
+            }
+        }, undefined, (error) => {
+            console.error("Error al cargar el modelo:", error);
+            // Si falla la carga, intentamos cargar el modelo por defecto como salvavidas
             cargarModeloPorDefecto();
-        }
+            if (btnExplo) {
+                btnExplo.innerText = "💥 Vista Explosionada";
+                btnExplo.disabled = false;
+            }
+        });
+
     } catch (error) {
-        console.error("Error general al cargar modelo:", error);
+        console.error("Error crítico en cargarModeloMaquinaActual:", error);
         cargarModeloPorDefecto();
     }
 }
