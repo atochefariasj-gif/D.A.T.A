@@ -425,8 +425,25 @@
 
     <!-- FIREBASE & LOGICA -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+
+// Estas credenciales las sacas de: Supabase Dashboard > Settings > API
+const SUPABASE_URL = 'https://rutxbcxqrqgidrniggte.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_QDGp8xnqOirYEHlEv7Y5lg_ufe2TebO';
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Exportamos supabase para poder usarlo en el resto de los scripts
+window.supabase = supabase;
+supabase
+  .channel('realtime_maquinas')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'maquinas' }, payload => {
+    console.log('Cambio detectado:', payload);
+    // Aquí actualizas tu localStorage y refrescas la vista
+    // Ejemplo:
+    // fetchMaquinasDesdeSupabaseYActualizarUI(); 
+  })
+  .subscribe();
 
         const firebaseConfig = {
             apiKey: "AIzaSyDH4yJZOodA_bLfZ-13j-69B6lGYlD411E",
@@ -446,15 +463,34 @@
                 await setDoc(dbRef, { data: JSON.stringify(localDb), timestamp: new Date().toISOString() });
             } catch (e) { console.error("Error nube:", e); }
         };
+        window.addEventListener('DOMContentLoaded', async () => {
+    // 1. Cargamos datos desde Supabase
+    await cargarMaquinasDesdeSupabase();
+    
+    // 2. Mantenemos tu lógica original de QR
+    const params = new URLSearchParams(window.location.search);
+    // ... resto de tu lógica de QR
+});
 
-        onSnapshot(dbRef, (docSnap) => {
-            if (docSnap.exists()) {
-                const cloudData = docSnap.data().data;
-                const localData = localStorage.getItem("data_control_activos_db_v4");
-                if (cloudData && cloudData !== localData) {
-                    localStorage.setItem("data_control_activos_db_v4", cloudData);
-                    if (document.getElementById('view-lines').classList.contains('active-view')) renderLines();
-                    if (document.getElementById('view-machines').classList.contains('active-view')) renderMachines();
+        // --- LO QUE DEBES PONER ---
+supabase
+  .channel('public:activos') // Nombre del canal (puede ser cualquiera)
+  .on('postgres_changes', { 
+      event: 'UPDATE', 
+      schema: 'public', 
+      table: 'activos' // El nombre de tu tabla en Supabase
+  }, payload => {
+      // payload.new contiene los datos actualizados que vienen de la nube
+      console.log('Cambio detectado:', payload.new);
+      
+      // Actualizamos tu almacenamiento local
+      localStorage.setItem("data_control_activos_db_v4", JSON.stringify(payload.new.content));
+      
+      // Forzamos a la UI a refrescarse
+      if (typeof renderLines === 'function') renderLines();
+      if (typeof renderMachines === 'function') renderMachines();
+  })
+  .subscribe();
                 }
             }
         });
@@ -507,31 +543,21 @@
             return JSON.parse(data);
         }
 
-        function saveDatabase(db) {
-            localStorage.setItem(DB_KEY, JSON.stringify(db));
-            if (window.sincronizarNube) window.sincronizarNube(db);
-        }
-
-        // Detección de parámetros de URL (Deep Linking para QR)
-        window.addEventListener('DOMContentLoaded', () => {
-            const params = new URLSearchParams(window.location.search);
-            const qLine = params.get('linea');
-            const qMachId = params.get('maquina');
-
-            if (qLine && qMachId) {
-                let db = getDatabase();
-                if (db[qLine]) {
-                    let mach = db[qLine].find(m => m.id == qMachId);
-                    if (mach) {
-                        qrContextoLinea = qLine;
-                        qrContextoMaquinaId = Number(qMachId);
-                        currentLine = qLine;
-                        currentMachineId = Number(qMachId);
-                        document.getElementById('machine-indicator').innerText = `QR: ${mach.name} (${qLine})`;
-                    }
-                }
-            }
+        async function guardarMaquinaEnSupabase(maquina) {
+    const { data, error } = await supabase
+        .from('maquinas')
+        .upsert({
+            id: maquina.id,
+            linea: maquina.linea, // Asegúrate de incluir el nombre de la línea
+            nombre: maquina.name,
+            meta: maquina.meta,
+            motors: maquina.motors,
+            kardex: maquina.kardex,
+            reportes_piezas: maquina.reportesPiezas
         });
+        
+    if (error) console.error("Error al guardar:", error);
+}
 
         function solicitarPassword(rol) {
             rolPendiente = rol;
@@ -985,7 +1011,7 @@
         let piezaSeleccionadaActual = "";
         let vistaExplosionada = false;
         let piezasDetectadas = [];
-        
+        const defaultGLBUrl = "modelos/EXTRACTORA_POLICYTRUS.glb";
 
         function init3D() {
             const container = document.getElementById('canvas-3d');
@@ -1235,90 +1261,46 @@
             let hits = raycaster.intersectObjects(piezasDetectadas, true);
             if (hits.length > 0 && hits[0].object.name) seleccionarComponente(hits[0].object.name);
         }
-        async function subirYActualizarModelo(event) {
-    const archivo = event.target.files[0];
-    if (!archivo) return;
+        async function cargarMaquinasDesdeSupabase() {
+    // Consultamos toda la tabla 'maquinas'
+    const { data, error } = await supabase
+        .from('maquinas')
+        .select('*');
 
-    // Nombre fijo o único para el archivo en Supabase Storage
-    const nombreRuta = "modelo_actual.glb"; 
-    const bucketName = "modelos-3d"; // Asegúrate de que este sea el nombre de tu bucket en Supabase
-
-    // 1. Subir o reemplazar el archivo en Supabase Storage
-    const { data: storageData, error: storageError } = await supabase.storage
-        .from(bucketName)
-        .upload(nombreRuta, archivo, { upsert: true });
-
-    if (storageError) {
-        console.error("Error al subir el archivo:", storageError.message);
+    if (error) {
+        console.error("Error al cargar desde Supabase:", error);
         return;
     }
 
-    // 2. Obtener la URL pública del archivo subido
-    const { data: { publicUrl } } = supabase.storage
-        .from(bucketName)
-        .getPublicUrl(nombreRuta);
-
-    // 3. Actualizar la tabla `configuracion` (fila con id = 1) con la nueva URL
-    const { error: dbError } = await supabase
-        .from('configuracion')
-        .update({ modelo_url: publicUrl })
-        .eq('id', 1);
-
-    if (dbError) {
-        console.error("Error al actualizar la base de datos:", dbError.message);
-    } else {
-        alert("¡Modelo actualizado y sincronizado con éxito!");
-    }
-}
-
-// Asociar a tu input de tipo file
-document.getElementById('inputArchivo').addEventListener('change', subirYActualizarModelo);
-// Función para cargar el modelo en tu visor 3D (Three.js)
-function cargarModeloEnVisor(url) {
-    const loader = new THREE.GLTFLoader();
-    loader.load(url, (gltf) => {
-        // Opcional: Remueve el modelo anterior de la escena si ya existe uno
-        const modeloAnterior = scene.getObjectByName("modeloIndustrial");
-        if (modeloAnterior) scene.remove(modeloAnterior);
-
-        gltf.scene.name = "modeloIndustrial";
-        scene.add(gltf.scene);
-        console.log("Modelo 3D actualizado en pantalla.");
-    }, undefined, (error) => {
-        console.error("Error al cargar el GLB:", error);
+    // Organizamos los datos para que coincidan con la estructura que tu app espera:
+    // { "Linea A": [maquinas...], "Linea B": [maquinas...] }
+    const dbOrganizada = {};
+    data.forEach(m => {
+        if (!dbOrganizada[m.linea]) dbOrganizada[m.linea] = [];
+        
+        // Mapeamos los nombres de columnas de Supabase a los nombres de variables de tu JS
+        dbOrganizada[m.linea].push({
+            id: m.id,
+            name: m.nombre,
+            meta: m.meta,
+            motors: m.motors,
+            kardex: m.kardex,
+            reportesPiezas: m.reportes_piezas,
+            instructionImages: m.instruction_images || [], // Asegúrate de tener estas columnas
+            manualsPdf: m.manuals_pdf || [],
+            bitacora: m.bitacora || []
+        });
     });
+
+    // Guardamos en localStorage para que la app funcione offline si se pierde la conexión
+    localStorage.setItem(DB_KEY, JSON.stringify(dbOrganizada));
+    
+    // Refrescamos la interfaz
+    renderLines();
+    if(document.getElementById('view-machines').classList.contains('active-view')) renderMachines();
+    
+    console.log("Datos sincronizados con éxito");
 }
-
-// 1. Cargar el modelo actual al abrir la página
-async function obtenerModeloInicial() {
-    const { data, error } = await supabase
-        .from('configuracion')
-        .select('modelo_url')
-        .eq('id', 1)
-        .single();
-
-    if (data && data.modelo_url && data.modelo_url !== "ninguno") {
-        cargarModeloEnVisor(data.modelo_url);
-    }
-}
-obtenerModeloInicial();
-
-// 2. Escuchar cambios en tiempo real desde cualquier otro dispositivo
-supabase
-    .channel('cambios-configuracion')
-    .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'configuracion',
-        filter: 'id=eq.1'
-    }, (payload) => {
-        const nuevaUrl = payload.new.modelo_url;
-        if (nuevaUrl && nuevaUrl !== "ninguno") {
-            console.log("¡Nuevo modelo detectado en la nube! Actualizando...");
-            cargarModeloEnVisor(nuevaUrl);
-        }
-    })
-    .subscribe();
     </script>
 </body>
 </html>
