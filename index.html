@@ -197,9 +197,9 @@
         <div id="main-menu" class="view-section active-view">
             <span class="icon-gear">⚙️</span>
             <h1>D.A.T.A</h1>
-            <div class="subtitle">Dosier de Activos y Tarjetas de Andamiaje</div>
+            <div class="subtitle">Dosier de Activos y Tarjetas de Andamiaje[cite: 3]</div>
             
-            <div id="machine-indicator" class="machine-badge">ID QR: Planta Central</div>
+            <div id="machine-indicator" class="machine-badge">ID QR: Planta Central[cite: 3]</div>
             
             <button class="btn btn-visitor" onclick="selectRole('visitante')">👤 Visitante</button>
             <button class="btn btn-maintenance" onclick="solicitarPassword('mantenimiento')">🔧 Mantenimiento</button>
@@ -315,7 +315,6 @@
                 <button class="back-btn" onclick="salirBitacora()">⬅ Volver a Opciones</button>
             </div>
             <div class="bitacora-list-container" id="bitacora-list-wrapper"></div>
-            <!-- BOTÓN DE VOLVER INTEGRADO AQUÍ -->
         </div>
 
         <!-- VISUAL 3D -->
@@ -428,6 +427,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDH4yJZOodA_bLfZ-13j-69B6lGYlD411E",
@@ -440,7 +440,11 @@
 
         const app = initializeApp(firebaseConfig);
         const dbFirestore = getFirestore(app);
+        const storage = getStorage(app);
         const dbRef = doc(dbFirestore, "sincronizacion", "datos_activos_v2");
+
+        window.firebaseStorage = storage;
+        window.firebaseStorageModules = { ref, uploadBytes, getDownloadURL };
 
         window.sincronizarNube = async function(localDb) {
             try {
@@ -660,7 +664,6 @@
 
             document.getElementById('lbl-qr-maquina-nombre').innerText = `${currentLine} ➔ ${mach.name}`;
             
-            // Construir URL limpia apuntando al dominio actual con parámetros
             let baseUrl = window.location.origin + window.location.pathname;
             let targetUrl = `${baseUrl}?linea=${encodeURIComponent(currentLine)}&maquina=${currentMachineId}`;
             
@@ -687,7 +690,6 @@
 
         function volverDesdeDetalle() {
             if (qrContextoLinea && qrContextoMaquinaId) {
-                // Si entró por QR, al volver regresa al menú principal de roles
                 document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
                 document.getElementById('main-menu').classList.add('active-view');
             } else {
@@ -1008,8 +1010,31 @@
             document.getElementById('input-archivo').addEventListener('change', async function(e) {
                 if (currentRole !== 'admin') return;
                 const archivo = e.target.files[0]; if (!archivo) return;
-                await localforage.setItem(`glb_machine_${currentLine}_${currentMachineId}`, archivo);
-                cargarModeloMaquinaActual(); alert("Modelo 3D guardado.");
+                
+                const btnExplo = document.getElementById('btn-explo');
+                btnExplo.innerText = "⏳ Subiendo a la nube..."; 
+                btnExplo.disabled = true;
+
+                try {
+                    const storageRef = window.firebaseStorageModules.ref(window.firebaseStorage, `modelos_glb/${currentLine}_${currentMachineId}.glb`);
+                    await window.firebaseStorageModules.uploadBytes(storageRef, archivo);
+                    const downloadURL = await window.firebaseStorageModules.getDownloadURL(storageRef);
+
+                    let db = getDatabase();
+                    let mach = db[currentLine].find(m => m.id === currentMachineId);
+                    if (mach) {
+                        mach.model3dUrl = downloadURL;
+                        saveDatabase(db);
+                    }
+
+                    alert("¡Modelo 3D subido y sincronizado con éxito en la nube!");
+                    cargarModeloMaquinaActual();
+                } catch (error) {
+                    console.error("Error al subir el archivo a Firebase Storage:", error);
+                    alert("Hubo un error al subir el archivo.");
+                    btnExplo.innerText = "💥 Vista Explosionada";
+                    btnExplo.disabled = false;
+                }
             });
 
             let pdX = 0, pdY = 0, moved = false;
@@ -1048,12 +1073,19 @@
             btnExplo.innerText = "⏳ Cargando..."; btnExplo.disabled = true;
             while(grupoMaquina.children.length > 0) grupoMaquina.remove(grupoMaquina.children[0]);
 
-            try {
-                const blob = await localforage.getItem(`glb_machine_${currentLine}_${currentMachineId}`);
-                if (blob) {
-                    gltfLoader.load(URL.createObjectURL(blob), (gltf) => procesarModelo(gltf, "Personalizado"), undefined, () => cargarModeloDefecto());
-                } else { cargarModeloDefecto(); }
-            } catch (e) { cargarModeloDefecto(); }
+            let db = getDatabase();
+            let mach = db[currentLine].find(m => m.id === currentMachineId);
+
+            if (mach && mach.model3dUrl) {
+                gltfLoader.load(mach.model3dUrl, (gltf) => {
+                    procesarModelo(gltf, mach.name);
+                }, undefined, (error) => {
+                    console.error("Error cargando desde la nube, usando defecto:", error);
+                    cargarModeloDefecto();
+                });
+            } else { 
+                cargarModeloDefecto(); 
+            }
         }
 
         function cargarModeloDefecto() {
