@@ -1074,36 +1074,38 @@
         // ==========================================
 // 1. FUNCIÓN PARA SUBIR Y SINCRONIZAR EL .GLB
 // ==========================================
-async function subirYSincronizarModeloGLB(archivo, machineId) {
+async function procesarSubidaYGuardarGLB(archivo, machineId) {
+    // 1. Validar que el ID de la máquina no esté vacío
+    if (!machineId) {
+        alert("Error: No se detectó el ID de la máquina actual.");
+        return;
+    }
+
     try {
-        console.log("Iniciando subida del archivo a Firebase Storage...");
+        console.log("Subiendo archivo para la máquina:", machineId);
         
-        // Referencia a los servicios de Firebase
-        const storage = firebase.storage();
+        // 2. Referencia a Firebase Storage
+        const storageRef = firebase.storage().ref('modelos_glb/' + Date.now() + '_' + archivo.name);
+        const snapshot = await storageRef.put(archivo);
+        const downloadURL = await snapshot.ref.getDownloadURL();
+
+        // 3. Guardar en Firestore usando el ID correcto
         const db = firebase.firestore();
-
-        // Creamos una ruta única en Storage usando el nombre del archivo y la fecha
-        const rutaStorage = ref(storage, `modelos_glb/${Date.now()}_${archivo.name}`);
-        
-        // Subimos el archivo físico
-        const snapshot = await storage.ref(`modelos_glb/${archivo.name}`).put(archivo);
-        
-        // Obtenemos la URL pública para que cualquier otro dispositivo pueda descargar el modelo 3D
-        const urlPublica = await snapshot.ref.getDownloadURL();
-        console.log("¡Archivo subido! URL de descarga:", urlPublica);
-
-        // Actualizamos Firestore. Al hacer esto, TODOS los dispositivos conectados 
-        // a esta máquina recibirán la actualización en tiempo real.
         await db.collection("maquinas").doc(machineId).update({
-            urlModeloGLB: urlPublica,
-            ultimaActualizacion: new Date().toISOString()
+            modelo3D_url: downloadURL
         });
 
-        alert("¡Éxito! El modelo .glb se ha subido y sincronizado con los demás dispositivos.");
+        alert("¡Modelo .glb subido con éxito!");
+
+        // 4. Asegúrate de llamar a una función que SÍ exista en tu código
+        // (Reemplaza 'cargarModeloRepoAcutal' por el nombre real de tu función para mostrar el 3D)
+        if (typeof cargarModeloRepoAcutal === 'function') {
+            cargarModeloRepoAcutal(machineId);
+        }
 
     } catch (error) {
-        console.error("Error al sincronizar el modelo:", error);
-        alert("No se pudo cargar el archivo: " + error.message);
+        console.error("Error en Firebase:", error);
+        alert("Error al subir: " + error.message);
     }
 }
 
