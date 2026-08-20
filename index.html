@@ -1004,14 +1004,7 @@ supabase
             document.getElementById('view-alertas').classList.add('active-view');
         }
 
-        function openImageModal(src) { document.getElementById('modal-img-tag').src = src; document.getElementById('img-modal').style.display = 'flex'; }
-        function closeImageModal() { document.getElementById('img-modal').style.display = 'none'; }
-
-        let scene, camera, renderer, grupoMaquina, controls, raycaster, mouse, gltfLoader;
-        let piezaSeleccionadaActual = "";
-        let vistaExplosionada = false;
-        let piezasDetectadas = [];
-        const defaultGLBUrl = "modelos/EXTRACTORA_POLICYTRUS.glb";
+      
 
         function init3D() {
             const container = document.getElementById('canvas-3d');
