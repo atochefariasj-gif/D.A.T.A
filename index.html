@@ -1013,10 +1013,30 @@ const { data: storageData, error: storageError } = await supabaseClient.storage
     .from('modelos-glb')
     .upload(filePathLimpio, archivo);
                 if (storageError) {
-                    console.error("Error al subir a Supabase Storage:", storageError.message);
-                    alert("Error al subir el modelo a la nube.");
-                    return;
-                }
+    console.error("Error al subir a Supabase Storage:", storageError);
+    alert("Error al subir el modelo a la nube.");
+    return;
+}
+
+// 1. Obtener la URL pública del archivo recién subido en Supabase
+const { data: publicUrlData } = supabaseClient.storage
+    .from('modelos-glb')
+    .getPublicUrl(filePathLimpio);
+
+const modeloUrl = publicUrlData.publicUrl;
+
+// 2. Guardar esa URL en tu tabla de la base de datos de Supabase
+// (Asegúrate de ajustar 'maquinas' y las columnas según tu base de datos)
+const { error: dbError } = await supabaseClient
+    .from('maquinas') // o la tabla que utilices para los datos de los activos
+    .update({ modelos_url: modeloUrl }) // campo donde guardas la URL del modelo 3D
+    .eq('nombre', currentMachine); // identificador de la máquina actual
+
+if (dbError) {
+    console.error("Error al actualizar la base de datos:", dbError);
+} else {
+    alert("¡Modelo subido y sincronizado con la nube con éxito!");
+}
 
                 // Guardar referencia en localforage/base de datos local también
                 await localforage.setItem(`glb_machine_${currentLine}_${currentMachineId}`, archivo);
