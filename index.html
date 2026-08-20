@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>D.A.T.A - Control de Activos Industrial</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
@@ -422,10 +421,11 @@
         </div>
     </div>
 
-    <!-- FIREBASE & LOGICA -->
+    <!-- FIREBASE & LOGICA DE SINCRONIZACIÓN -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-storage.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyDH4yJZOodA_bLfZ-13j-69B6lGYlD411E",
@@ -438,12 +438,32 @@
 
         const app = initializeApp(firebaseConfig);
         const dbFirestore = getFirestore(app);
+        const dbStorage = getStorage(app);
         const dbRef = doc(dbFirestore, "sincronizacion", "datos_activos_v2");
 
         window.sincronizarNube = async function(localDb) {
             try {
                 await setDoc(dbRef, { data: JSON.stringify(localDb), timestamp: new Date().toISOString() });
             } catch (e) { console.error("Error nube:", e); }
+        };
+
+        // Exportamos funciones de Storage para usarlas globalmente en el script inferior
+        window.subirArchivoGLBAPowerCloud = async function(linea, maquinaId, fileObject) {
+            const filePath = `models/linea_${encodeURIComponent(linea)}_mach_${maquinaId}.glb`;
+            const storageRef = ref(dbStorage, filePath);
+            await uploadBytes(storageRef, fileObject);
+            const downloadURL = await getDownloadURL(storageRef);
+            return downloadURL;
+        };
+
+        window.obtenerURLModeloGLB = async function(linea, maquinaId) {
+            try {
+                const filePath = `models/linea_${encodeURIComponent(linea)}_mach_${maquinaId}.glb`;
+                const storageRef = ref(dbStorage, filePath);
+                return await getDownloadURL(storageRef);
+            } catch (e) {
+                return null; // Si no hay modelo personalizado en la nube, retorna null para usar el por defecto
+            }
         };
 
         onSnapshot(dbRef, (docSnap) => {
@@ -1000,8 +1020,17 @@
             document.getElementById('input-archivo').addEventListener('change', async function(e) {
                 if (currentRole !== 'admin') return;
                 const archivo = e.target.files[0]; if (!archivo) return;
-                await localforage.setItem(`glb_machine_${currentLine}_${currentMachineId}`, archivo);
-                cargarModeloMaquinaActual(); alert("Modelo 3D guardado.");
+                
+                document.getElementById('btn-explo').innerText = "⏳ Subiendo a la nube...";
+                try {
+                    // Sube el archivo .glb a Firebase Storage compartiéndolo globalmente
+                    await window.subirArchivoGLBAPowerCloud(currentLine, currentMachineId, archivo);
+                    cargarModeloMaquinaActual(); 
+                    alert("¡Modelo 3D subido y sincronizado en la nube con éxito!");
+                } catch(err) {
+                    console.error(err);
+                    alert("Hubo un error al subir el archivo a la nube.");
+                }
             });
 
             let pdX = 0, pdY = 0, moved = false;
@@ -1041,15 +1070,21 @@
             while(grupoMaquina.children.length > 0) grupoMaquina.remove(grupoMaquina.children[0]);
 
             try {
-                const blob = await localforage.getItem(`glb_machine_${currentLine}_${currentMachineId}`);
-                if (blob) {
-                    gltfLoader.load(URL.createObjectURL(blob), (gltf) => procesarModelo(gltf, "Personalizado"), undefined, () => cargarModeloDefecto());
-                } else { cargarModeloDefecto(); }
-            } catch (e) { cargarModeloDefecto(); }
+                // Consulta primero si hay un archivo .glb sincronizado en Firebase Storage
+                const cloudUrl = await window.obtenerURLModeloGLB(currentLine, currentMachineId);
+                if (cloudUrl) {
+                    // Agregamos timestamp para evitar problemas de caché del navegador
+                    gltfLoader.load(cloudUrl + "?v=" + new Date().getTime(), (gltf) => procesarModelo(gltf, "Nube (Sincronizado)"), undefined, () => cargarModeloDefecto());
+                } else { 
+                    cargarModeloDefecto(); 
+                }
+            } catch (e) { 
+                cargarModeloDefecto(); 
+            }
         }
 
         function cargarModeloDefecto() {
-            gltfLoader.load(defaultGLBUrl, (gltf) => procesarModelo(gltf, "POLICYTRUS"), undefined, () => {
+            gltfLoader.load(defaultGLBUrl, (gltf) => procesarModelo(gltf, "POLICYTRUS (Local)"), undefined, () => {
                 document.getElementById('btn-explo').innerText = "💥 Vista Explosionada";
                 document.getElementById('btn-explo').disabled = false;
             });
