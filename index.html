@@ -1002,6 +1002,7 @@
                 
                 // Guardar en Supabase Storage (Bucket: modelos-glb)
                 // Sanitizamos la ruta antes de subirla a Supabase
+                const filePath = `maquinas/${currentMachine}/${Date.now()}_${archivo.name}`;
 const filePathLimpio = sanitizarRuta(filePath);
 
 // Subida a Supabase Storage
