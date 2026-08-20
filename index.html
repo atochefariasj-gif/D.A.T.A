@@ -1001,10 +1001,13 @@
                 const archivo = e.target.files[0]; if (!archivo) return;
                 
                 // Guardar en Supabase Storage (Bucket: modelos-glb)
-                const filePath = `maquinas/${currentLine}_${currentMachineId}_${Date.now()}.glb`;
-                const { data: storageData, error: storageError } = await supabaseClient.storage
-                    .from('modelos-glb')
-                    .upload(filePath, archivo);
+                // Sanitizamos la ruta antes de subirla a Supabase
+const filePathLimpio = sanitizarRuta(filePath);
+
+// Subida a Supabase Storage
+const { data: storageData, error: storageError } = await supabaseClient.storage
+    .from('modelos-glb')
+    .upload(filePathLimpio, archivo);
 
                 if (storageError) {
                     console.error("Error al subir a Supabase Storage:", storageError.message);
@@ -1246,6 +1249,14 @@
             let hits = raycaster.intersectObjects(piezasDetectadas, true);
             if (hits.length > 0 && hits[0].object.name) seleccionarComponente(hits[0].object.name);
         }
+        // Función para eliminar tildes, espacios y caracteres especiales
+function sanitizarRuta(ruta) {
+    return ruta
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "") // Convierte ó -> o, á -> a, etc.
+        .replace(/\s+/g, "_")            // Reemplaza espacios por _
+        .replace(/[^a-zA-Z0-9_\-\./]/g, ""); // Elimina cualquier otro carácter especial
+}
     </script>
 </body>
 </html>
