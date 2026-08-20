@@ -1027,8 +1027,33 @@
             document.getElementById('input-archivo').addEventListener('change', async function(e) {
                 if (currentRole !== 'admin') return;
                 const archivo = e.target.files[0]; if (!archivo) return;
-                await localforage.setItem(`glb_machine_${currentLine}_${currentMachineId}`, archivo);
-                cargarModeloMaquinaActual(); alert("Modelo 3D guardado.");
+                
+                const btnExplo = document.getElementById('btn-explo');
+                btnExplo.innerText = "⏳ Subiendo..."; 
+                btnExplo.disabled = true;
+
+                try {
+                    // Sube el archivo a Firebase Storage usando tu función existente
+                    const downloadUrl = await window.subirArchivoAStorage(archivo, `modelos_3d/${currentMachineId}`);
+                    
+                    // Guarda la URL en la base de datos de la máquina actual
+                    let db = getDatabase();
+                    let mach = db[currentLine].find(m => m.id === currentMachineId);
+                    if (mach) {
+                        mach.model3dUrl = downloadUrl;
+                        saveDatabase(db);
+                    }
+                    
+                    alert("¡Modelo 3D subido y sincronizado con éxito!");
+                    cargarModeloMaquinaActual();
+                } catch (err) {
+                    console.error("Error al subir el modelo 3D:", err);
+                    alert("Hubo un error al subir el archivo a la nube.");
+                    btnExplo.innerText = "💥 Vista Explosionada";
+                    btnExplo.disabled = false;
+                }
+                
+                e.target.value = ''; // Limpiar input
             });
 
             let pdX = 0, pdY = 0, moved = false;
@@ -1067,12 +1092,25 @@
             btnExplo.innerText = "⏳ Cargando..."; btnExplo.disabled = true;
             while(grupoMaquina.children.length > 0) grupoMaquina.remove(grupoMaquina.children[0]);
 
-            try {
-                const blob = await localforage.getItem(`glb_machine_${currentLine}_${currentMachineId}`);
-                if (blob) {
-                    gltfLoader.load(URL.createObjectURL(blob), (gltf) => procesarModelo(gltf, "Personalizado"), undefined, () => cargarModeloDefecto());
-                } else { cargarModeloDefecto(); }
-            } catch (e) { cargarModeloDefecto(); }
+            let db = getDatabase();
+            let mach = db[currentLine].find(m => m.id === currentMachineId);
+            
+            // Si la máquina tiene una URL de modelo en la nube, la usa; si no, usa el defecto
+            const urlModelo = (mach && mach.model3dUrl) ? mach.model3dUrl : defaultGLBUrl;
+
+            gltfLoader.load(urlModelo, (gltf) => {
+                procesarModelo(gltf, mach ? mach.name : "Personalizado");
+            }, undefined, (error) => {
+                console.error("No se pudo cargar el modelo de la nube, usando defecto...", error);
+                if (urlModelo !== defaultGLBUrl) {
+                    gltfLoader.load(defaultGLBUrl, (gltf) => procesarModelo(gltf, "POLICYTRUS"), undefined, () => {
+                        btnExplo.innerText = "💥 Vista Explosionada";
+                        btnExplo.disabled = false;
+                    });
+                } else {
+                    cargarModeloDefecto();
+                }
+            });
         }
 
         function cargarModeloDefecto() {
