@@ -1017,19 +1017,26 @@
             grupoMaquina = new THREE.Group(); scene.add(grupoMaquina);
             cargarModeloMaquinaActual();
 
+            // MODIFICACIÓN: Gestión robusta de errores y restauración de estado del botón y del input
             document.getElementById('input-archivo').addEventListener('change', async function(e) {
                 if (currentRole !== 'admin') return;
-                const archivo = e.target.files[0]; if (!archivo) return;
+                const archivo = e.target.files[0]; 
+                if (!archivo) return;
                 
-                document.getElementById('btn-explo').innerText = "⏳ Subiendo a la nube...";
+                const btnExplo = document.getElementById('btn-explo');
+                const textoOriginal = btnExplo.innerText; 
+                btnExplo.innerText = "⏳ Subiendo a la nube...";
+                
                 try {
-                    // Sube el archivo .glb a Firebase Storage compartiéndolo globalmente
                     await window.subirArchivoGLBAPowerCloud(currentLine, currentMachineId, archivo);
-                    cargarModeloMaquinaActual(); 
+                    await cargarModeloMaquinaActual(); 
                     alert("¡Modelo 3D subido y sincronizado en la nube con éxito!");
                 } catch(err) {
                     console.error(err);
-                    alert("Hubo un error al subir el archivo a la nube.");
+                    alert("Hubo un error al subir el archivo a la nube. Revisa la consola o los permisos.");
+                } finally {
+                    btnExplo.innerText = textoOriginal;
+                    e.target.value = ''; // Limpia el input para permitir reintentar con el mismo archivo
                 }
             });
 
@@ -1070,10 +1077,8 @@
             while(grupoMaquina.children.length > 0) grupoMaquina.remove(grupoMaquina.children[0]);
 
             try {
-                // Consulta primero si hay un archivo .glb sincronizado en Firebase Storage
                 const cloudUrl = await window.obtenerURLModeloGLB(currentLine, currentMachineId);
                 if (cloudUrl) {
-                    // Agregamos timestamp para evitar problemas de caché del navegador
                     gltfLoader.load(cloudUrl + "?v=" + new Date().getTime(), (gltf) => procesarModelo(gltf, "Nube (Sincronizado)"), undefined, () => cargarModeloDefecto());
                 } else { 
                     cargarModeloDefecto(); 
