@@ -1,4 +1,4 @@
-// Reemplaza con tus credenciales reales de tu proyecto de Supabase
+// Credenciales de Supabase
 const SUPABASE_URL = 'https://glgkfuiqwconjjffxgln.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_YxHDEuQiZ06ywaT5Yha68w_DX35lUVO';
 
@@ -362,12 +362,13 @@ async function closeImageModal() {
 }
 
 // ==========================================
-// LÓGICA 3D & VISTA EXPLOSIONADA
+// LÓGICA 3D, VISTA EXPLOSIONADA Y ANIMACIÓN FLUIDA
 // ==========================================
 let scene, camera, renderer, grupoMaquina, controls, raycaster, mouse, gltfLoader;
 let piezaSeleccionadaActual = "";
 let vistaExplosionada = false;
 let piezasDetectadas = [];
+
 let targetCameraPos = null;
 let targetControlsTarget = null;
 
@@ -453,10 +454,14 @@ async function init3D() {
     function animate() {
         requestAnimationFrame(animate);
         
-        // Movimiento fluido de la cámara si hay un destino seleccionado
         if (targetCameraPos && targetControlsTarget) {
             camera.position.lerp(targetCameraPos, 0.08);
             controls.target.lerp(targetControlsTarget, 0.08);
+
+            if (camera.position.distanceTo(targetCameraPos) < 0.05) {
+                targetCameraPos = null;
+                targetControlsTarget = null;
+            }
         }
 
         controls.update();
@@ -471,13 +476,14 @@ async function init3D() {
         renderer.render(scene, camera);
     }
     animate();
+}
 
-async function toggleVistaExplosionada() {
+function toggleVistaExplosionada() {
     vistaExplosionada = !vistaExplosionada;
     const btnExplo = document.getElementById('btn-explo');
     
     if (vistaExplosionada) {
-        btnExplo.innerText = "📦 Desactivar Vista Explosionada";
+        btnExplo.innerText = "📦 Unir Piezas";
     } else {
         btnExplo.innerText = "💥 Activar Vista Explosionada";
     }
@@ -535,7 +541,9 @@ async function procesarModeloCargado(gltf, nombreEquipo) {
     modelo.traverse((child) => {
         if (child.isMesh) {
             piezasDetectadas.push(child);
-            child.name = child.name || `Pieza_${indexPieza}`; 
+            if (!child.name || child.name === "") {
+                child.name = `Pieza_${indexPieza}`;
+            }
 
             const posOrig = child.position.clone();
             const meshBox = new THREE.Box3().setFromObject(child);
@@ -580,7 +588,6 @@ async function seleccionarComponente(nombrePieza) {
     const panel = document.getElementById('panel-info');
     const piezaEncontrada = piezasDetectadas.find(p => p.name === nombrePieza);
 
-    // Si se vuelve a hacer clic en la misma pieza, se deselecciona y se restaura todo
     if (piezaSeleccionadaActual === nombrePieza) {
         panel.classList.add('hidden');
         piezaSeleccionadaActual = null;
@@ -603,20 +610,20 @@ async function seleccionarComponente(nombrePieza) {
         panel.classList.remove('hidden');
         document.getElementById('info-titulo').innerText = nombrePieza;
 
-        // Poner las demás piezas transparentes y la seleccionada en amarillo
+        // Poner transparentes las demás piezas y resaltar en amarillo la seleccionada
         piezasDetectadas.forEach(p => {
             if (p.material) {
                 p.material.transparent = true;
                 if (p.name === nombrePieza) {
-                    p.material.color.setHex(0xfacc15); // Amarillo exacto del video
+                    p.material.color.setHex(0xfacc15); // Amarillo exacto
                     p.material.opacity = 1.0;
                 } else {
-                    p.material.opacity = 0.15; // Las demás translúcidas
+                    p.material.opacity = 0.15; // Translúcidas las demás
                 }
             }
         });
 
-        // Calcular el centro de la pieza para el acercamiento fluido
+        // Configurar destino fluido de la cámara
         const boxPieza = new THREE.Box3().setFromObject(piezaEncontrada);
         const centroPieza = boxPieza.getCenter(new THREE.Vector3());
 
@@ -624,7 +631,6 @@ async function seleccionarComponente(nombrePieza) {
         const offset = camera.position.clone().sub(controls.target).normalize().multiplyScalar(3.5);
         targetCameraPos = centroPieza.clone().add(offset);
 
-        // Cargar datos de reporte de mantenimiento
         const { data: maq } = await dbSupabase.from('maquinas').select('reportes_piezas').eq('id', currentMachineId).single();
         let reportes = maq?.reportes_piezas || {};
         let repInfo = reportes[nombrePieza];
