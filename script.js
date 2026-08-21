@@ -448,7 +448,7 @@ async function init3D() {
         if (!hasMoved) detectarToque(e.clientX, e.clientY);
     });
 
-    function animate() {
+    async function animate() {
         requestAnimationFrame(animate);
         controls.update();
         piezasDetectadas.forEach(pieza => {
@@ -462,7 +462,7 @@ async function init3D() {
     animate();
 }
 
-function toggleVistaExplosionada() {
+async function toggleVistaExplosionada() {
     vistaExplosionada = !vistaExplosionada;
     const btnExplo = document.getElementById('btn-explo');
     
@@ -570,9 +570,16 @@ async function seleccionarComponente(nombrePieza) {
     const panel = document.getElementById('panel-info');
     const piezaEncontrada = piezasDetectadas.find(p => p.name === nombrePieza);
 
+    // Si ya estaba seleccionada, la deseleccionamos y restauramos colores
     if (piezaSeleccionadaActual === nombrePieza) {
         panel.classList.add('hidden');
         piezaSeleccionadaActual = null;
+        piezasDetectadas.forEach(p => {
+            if (p.material && p.userData) {
+                const { data: maqData } = dbSupabase; // mantener color base
+                p.material.color.setHex(p.userData.colorBase);
+            }
+        });
         return;
     }
 
@@ -581,18 +588,25 @@ async function seleccionarComponente(nombrePieza) {
         panel.classList.remove('hidden');
         document.getElementById('info-titulo').innerText = nombrePieza;
 
-        // NUEVO: Calcular el centro de la pieza seleccionada para centrar la órbita de la cámara
+        // Resaltar la pieza seleccionada en amarillo y las demás en color base o tenue
+        piezasDetectadas.forEach(p => {
+            if (p.name === nombrePieza) {
+                p.material.color.setHex(0xfacc15); // Amarillo de selección
+            } else {
+                p.material.color.setHex(p.userData.colorBase);
+            }
+        });
+
+        // Centrar la cámara y los controles de órbita exactamente en la pieza
         const boxPieza = new THREE.Box3().setFromObject(piezaEncontrada);
         const centroPieza = boxPieza.getCenter(new THREE.Vector3());
 
-        // Actualizar el punto de pivote de los controles de la cámara hacia la pieza
         controls.target.copy(centroPieza);
-        
-        // Opcional: Acercar suavemente la cámara manteniendo su dirección relativa
-        const offset = camera.position.clone().sub(controls.target).normalize().multiplyScalar(3);
+        const offset = camera.position.clone().sub(controls.target).normalize().multiplyScalar(4);
         camera.position.copy(centroPieza.clone().add(offset));
         controls.update();
 
+        // Cargar datos de reporte de mantenimiento
         const { data: maq } = await dbSupabase.from('maquinas').select('reportes_piezas').eq('id', currentMachineId).single();
         let reportes = maq?.reportes_piezas || {};
         let repInfo = reportes[nombrePieza];
