@@ -12,7 +12,7 @@ let isEditMode = false;
 let rolPendiente = '';
 
 const PASSWORDS = {
-    'mantenimiento': 'mtto123',
+    'mantenimiento': '123',
     'admin': 'admin123'
 };
 
@@ -580,6 +580,18 @@ async function seleccionarComponente(nombrePieza) {
         piezaSeleccionadaActual = nombrePieza;
         panel.classList.remove('hidden');
         document.getElementById('info-titulo').innerText = nombrePieza;
+
+        // NUEVO: Calcular el centro de la pieza seleccionada para centrar la órbita de la cámara
+        const boxPieza = new THREE.Box3().setFromObject(piezaEncontrada);
+        const centroPieza = boxPieza.getCenter(new THREE.Vector3());
+
+        // Actualizar el punto de pivote de los controles de la cámara hacia la pieza
+        controls.target.copy(centroPieza);
+        
+        // Opcional: Acercar suavemente la cámara manteniendo su dirección relativa
+        const offset = camera.position.clone().sub(controls.target).normalize().multiplyScalar(3);
+        camera.position.copy(centroPieza.clone().add(offset));
+        controls.update();
 
         const { data: maq } = await dbSupabase.from('maquinas').select('reportes_piezas').eq('id', currentMachineId).single();
         let reportes = maq?.reportes_piezas || {};
