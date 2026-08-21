@@ -75,7 +75,6 @@ async function renderMachines() {
         let card = document.createElement('div');
         card.className = 'card-item';
 
-        // Si es admin y el modo edición está activo, mostramos el input para cambiar el nombre
         if (currentRole === 'admin' && isEditMode) {
             card.onclick = (e) => e.stopPropagation();
             card.innerHTML = `
@@ -83,7 +82,6 @@ async function renderMachines() {
                 <input type="text" class="mach-input" data-id="${maq.id}" value="${maq.nombre || ''}" onchange="updateMachineNameInline('${maq.id}', this.value)">
             `;
         } else {
-            // Si no está en modo edición (o es visitante/mantenimiento), al hacer clic entra al detalle
             card.onclick = () => openMachineDetail(maq.id, maq.nombre);
             card.innerHTML = `
                 <span class="card-icon"></span>
@@ -545,8 +543,6 @@ let pointerDownX = 0;
 let pointerDownY = 0;
 let hasMoved = false;
 
-const defaultGLBUrl = "modelos/EXTRACTORA_POLICYTRUS.glb";
-
 async function init3D() {
     const container = document.getElementById('canvas-3d');
     const initW = container.clientWidth > 0 ? container.clientWidth : 300;
@@ -647,23 +643,23 @@ async function cargarModeloMaquinaActual() {
 
     const { data: maq } = await dbSupabase.from('maquinas').select('modelo_url').eq('id', currentMachineId).single();
 
-    if (maq && maq.modelo_url) {
+    if (maq && maq.modelo_url && maq.modelo_url.trim() !== "" && maq.modelo_url !== "EMPTY") {
         gltfLoader.load(maq.modelo_url, (gltf) => {
-            procesarModeloCargado(gltf, "Modelo Personalizado");
-        }, undefined, () => cargarModeloPorDefecto());
+            procesarModeloCargado(gltf, "Modelo Cloud");
+        }, undefined, (err) => {
+            console.error("Error cargando modelo desde Supabase:", err);
+            cargarModeloPorDefecto();
+        });
     } else {
         cargarModeloPorDefecto();
     }
 }
 
 async function cargarModeloPorDefecto() {
-    gltfLoader.load(defaultGLBUrl, (gltf) => {
-        procesarModeloCargado(gltf, "EXTRACTORA POLICYTRUS");
-    }, undefined, () => {
-        const btnExplo = document.getElementById('btn-explo');
-        btnExplo.innerText = "💥 Activar Vista Explosionada";
-        btnExplo.disabled = false;
-    });
+    const btnExplo = document.getElementById('btn-explo');
+    btnExplo.innerText = "💥 Activar Vista Explosionada";
+    btnExplo.disabled = false;
+    document.getElementById('indicador-equipo').innerText = `📍 Vista: Sin modelo 3D`;
 }
 
 async function procesarModeloCargado(gltf, nombreEquipo) {
