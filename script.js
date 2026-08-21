@@ -618,18 +618,33 @@ async function init3D() {
         if (!hasMoved) detectarToque(e.clientX, e.clientY);
     });
 
-    function animate() {
+   async function animate() {
         requestAnimationFrame(animate);
         controls.update();
+        
+        // Animación suave de las piezas hacia su posición original o explosionada
         piezasDetectadas.forEach(pieza => {
-            if (pieza.userData.posOrig && pieza.userData.posExp) {
+            if (pieza.userData && pieza.userData.posOrig && pieza.userData.posExp) {
                 const target = vistaExplosionada ? pieza.userData.posExp : pieza.userData.posOrig;
                 pieza.position.lerp(target, 0.08); 
             }
         });
+        
         renderer.render(scene, camera);
     }
     animate();
+    
+   async function toggleVistaExplosionada() {
+    vistaExplosionada = !vistaExplosionada;
+    const btnExplo = document.getElementById('btn-explo');
+    
+    if (vistaExplosionada) {
+        btnExplo.innerText = "📦 Desactivar Vista Explosionada";
+        btnExplo.classList.add('bg-orange-600'); // Opcional para darle color de activo
+    } else {
+        btnExplo.innerText = "💥 Activar Vista Explosionada";
+        btnExplo.classList.remove('bg-orange-600');
+    }
 }
 
 async function cargarModeloMaquinaActual() {
