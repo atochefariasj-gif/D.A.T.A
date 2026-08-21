@@ -3,33 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>D.A.T.A - Control de Activos Industrial</title>
+    <title>D.A.T.A - Control de Activos</title>
     <link rel="manifest" href="manifest.json">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Librería localForage para IndexedDB (soporta archivos .glb pesados) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/gsap.min.js"></script>
+    <!-- Librería SheetJS para exportar a Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <!-- SDK de Supabase -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         :root {
             --primary-color: #2b2d42;
             --background-color: #edf2f4;
             --card-bg: #ffffff;
             --text-color: #2b2d42;
-            --border-color: #e9ecef;
             --agrimar-green: #2c9a29;
-        }
-        body.dark-theme {
-            --primary-color: #8d99ae;
-            --background-color: #111827;
-            --card-bg: #1f2937;
-            --text-color: #f3f4f6;
-            --border-color: #374151;
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -41,7 +33,6 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            transition: background-color 0.3s, color 0.3s;
         }
         .container {
             background-color: var(--card-bg);
@@ -52,45 +43,83 @@
             max-width: 440px;
             text-align: center;
             position: relative;
-            transition: background-color 0.3s;
         }
-        .theme-toggle {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            background: transparent;
+        .icon-gear {
+            font-size: 50px;
+            margin-bottom: 5px;
+            display: block;
+        }
+        h1 {
+            font-size: 36px;
+            margin: 0;
+            color: var(--primary-color);
+            letter-spacing: 2px;
+        }
+        .subtitle {
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+            letter-spacing: 1px;
+        }
+        .machine-badge {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 13px;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 14px;
+            margin: 12px 0;
             border: none;
-            font-size: 18px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
             cursor: pointer;
-            padding: 5px;
-            border-radius: 50%;
+            transition: all 0.3s;
+            color: white;
         }
-        .theme-toggle:hover { background: rgba(0,0,0,0.05); }
-        .icon-gear { font-size: 50px; margin-bottom: 5px; display: block; }
-        h1 { font-size: 36px; margin: 0; color: var(--primary-color); letter-spacing: 2px; }
-        .subtitle { font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 20px; letter-spacing: 1px; }
-        .machine-badge { background-color: var(--primary-color); color: white; padding: 5px 15px; border-radius: 20px; font-size: 13px; display: inline-block; margin-bottom: 20px; }
-        .btn { display: block; width: 100%; padding: 14px; margin: 12px 0; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; transition: all 0.3s; color: white; }
         .btn:active { transform: scale(0.98); }
+        
         .btn-visitor { background-color: #00b4d8; }      
         .btn-visitor:hover { background-color: #0096c7; }
         .btn-maintenance { background-color: #0077b6; }  
         .btn-maintenance:hover { background-color: #03045e; }
         .btn-admin { background-color: #f77f00; }         
         .btn-admin:hover { background-color: #d66f00; }
-        .admin-toolbar { display: flex; gap: 8px; margin-bottom: 15px; }
-        .btn-action { background-color: var(--primary-color); color: white; font-size: 13px; padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-weight: bold; flex: 1; }
-        .btn-action:hover { opacity: 0.9; }
+        
+        .admin-toolbar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+        .btn-action {
+            background-color: #2b2d42;
+            color: white;
+            font-size: 13px;
+            padding: 10px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+            flex: 1;
+        }
+        .btn-action:hover { background-color: #404360; }
         .btn-toggle-on { background-color: #f77f00 !important; }
 
         .btn-option {
-            background-color: var(--card-bg);
-            color: var(--text-color);
-            border: 2px solid var(--border-color);
+            background-color: #f8f9fa;
+            color: var(--primary-color);
+            border: 2px solid #e9ecef;
             border-radius: 12px;
-            padding: 12px;
-            margin: 8px 0;
-            font-size: 14px;
+            padding: 14px;
+            margin: 10px 0;
+            font-size: 15px;
             font-weight: bold;
             text-align: left;
             cursor: pointer;
@@ -99,8 +128,12 @@
             align-items: center;
             gap: 12px;
         }
-        .btn-option:hover { border-color: #00b4d8; transform: translateY(-2px); }
-        .btn-option span { font-size: 20px; }
+        .btn-option:hover {
+            border-color: #00b4d8;
+            background-color: #f0f8ff;
+            transform: translateY(-2px);
+        }
+        .btn-option span { font-size: 22px; }
 
         .grid-container {
             display: grid;
@@ -112,8 +145,8 @@
             margin-bottom: 15px;
         }
         .card-item {
-            background-color: var(--card-bg);
-            border: 2px solid var(--border-color);
+            background-color: #f8f9fa;
+            border: 2px solid #e9ecef;
             border-radius: 14px;
             padding: 12px 8px;
             text-align: center;
@@ -121,110 +154,421 @@
             transition: all 0.2s ease;
             position: relative;
         }
-        .card-item:hover { border-color: #00b4d8; transform: translateY(-2px); }
-        .card-icon { font-size: 28px; margin-bottom: 5px; display: block; }
-        .card-title { font-size: 11px; font-weight: bold; color: var(--text-color); line-height: 1.2; }
-        
-        .status-dot {
+        .card-item:hover {
+            border-color: #00b4d8;
+            background-color: #f0f8ff;
+            transform: translateY(-2px);
+        }
+        .card-icon {
+            font-size: 28px;
+            margin-bottom: 5px;
+            display: block;
+        }
+        .card-title {
+            font-size: 11px;
+            font-weight: bold;
+            color: var(--primary-color);
+            line-height: 1.2;
+        }
+        .machine-name-input {
+            width: 90%;
+            font-size: 11px;
+            font-weight: bold;
+            text-align: center;
+            border: 1px solid #00b4d8;
+            border-radius: 4px;
+            padding: 2px;
+            background: #fff;
+            outline: none;
+        }
+
+        .kardex-sheet-wrapper {
+            max-height: calc(100vh - 220px);
+            overflow-y: auto;
+            border: 2px solid #2c9a29;
+            border-radius: 8px;
+            background: white;
+            text-align: left;
+            font-size: 11px;
+            margin-bottom: 10px;
+        }
+        .agrimar-header {
+            background: #ffffff;
+            border-bottom: 2px solid #2c9a29;
+            padding: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .agrimar-title-box {
+            background: #ffffff;
+            color: #000;
+            font-weight: bold;
+            padding: 4px 6px;
+            font-size: 10px;
+            text-align: center;
+            border: 1px solid #2c9a29;
+            border-radius: 4px;
+            width: 50%;
+            line-height: 1.2;
+        }
+        .agrimar-title-box input {
+            width: 100%;
+            border: none;
+            background: transparent;
+            text-align: center;
+            font-weight: bold;
+            font-size: 9px;
+            outline: none;
+            color: #000;
+        }
+        .agrimar-title-box input:not([readonly]):focus { background: #e8f5e9; }
+        .agrimar-title-box input[readonly] { cursor: not-allowed; }
+
+        .agrimar-section-title {
+            background: #ffffff;
+            color: #000;
+            font-weight: bold;
+            padding: 4px 8px;
+            font-size: 10px;
+            text-align: center;
+            border-top: 2px solid #000;
+            border-bottom: 2px solid #000;
+            letter-spacing: 0.5px;
+            font-style: italic;
+        }
+        .motor-block-container {
+            border-bottom: 2px solid #000;
+            position: relative;
+        }
+        .motor-block-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f1f3f5;
+            padding: 2px 6px;
+            border-bottom: 1px solid #ccc;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        .form-grid-2 {
+            display: grid;
+            grid-template-columns: 1.2fr 2.8fr;
+            border-bottom: 1px solid #ccc;
+        }
+        .field-box {
+            padding: 2px 4px;
+            border-right: 1px solid #ddd;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+        }
+        .field-box label {
+            font-size: 8px;
+            color: #333;
+            font-weight: bold;
+            font-style: italic;
+        }
+        .field-box input, .field-box span {
+            font-size: 10px;
+            border: none;
+            outline: none;
+            background: transparent;
+            color: #000;
+            padding: 1px 0;
+        }
+        .field-box input:not([readonly]):focus { background: #e8f5e9; }
+        .field-box input[readonly] { color: #555; background: #f9f9f9; cursor: not-allowed; }
+
+        .repuestos-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 10px;
+        }
+        .repuestos-table th {
+            background-color: #ffffff;
+            color: #000;
+            border: 1px solid #000;
+            padding: 4px;
+            text-align: center;
+            font-size: 9px;
+            font-weight: bold;
+        }
+        .repuestos-table td {
+            border: 1px solid #ccc;
+            padding: 2px 3px;
+            text-align: center;
+        }
+        .repuestos-table input {
+            width: 100%;
+            border: none;
+            background: transparent;
+            text-align: center;
+            font-size: 10px;
+            outline: none;
+        }
+        .repuestos-table input:not([readonly]):focus { background: #e8f5e9; }
+        .repuestos-table input[readonly] { color: #555; background: #f9f9f9; cursor: not-allowed; }
+
+        .instructions-gallery-container {
+            width: 100%;
+            height: calc(100vh - 200px);
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            background: #f8f9fa;
+            margin-bottom: 10px;
+            overflow-y: auto;
+            padding: 10px;
+            box-sizing: border-box;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            align-content: start;
+        }
+        .instruction-card {
+            background: #ffffff;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .instruction-card:hover {
+            border-color: #00b4d8;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .instruction-card-thumb {
+            width: 100%;
+            height: 110px;
+            object-fit: cover;
+            background: #000;
+        }
+        .instruction-card-info {
+            padding: 6px;
+            font-size: 10px;
+            font-weight: bold;
+            color: var(--primary-color);
+            background: #fff;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .btn-img-del {
             position: absolute;
-            top: 8px;
-            right: 8px;
-            width: 10px;
-            height: 10px;
+            top: 5px;
+            right: 5px;
+            background: rgba(230, 57, 70, 0.9);
+            color: white;
+            border: none;
             border-radius: 50%;
+            width: 22px;
+            height: 22px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            z-index: 5;
         }
-        .dot-green { background-color: #22c55e; box-shadow: 0 0 6px #22c55e; }
-        .dot-red { background-color: #ef4444; box-shadow: 0 0 6px #ef4444; animation: pulse 1.5s infinite; }
 
-        @keyframes pulse {
-            0% { transform: scale(0.95); opacity: 0.8; }
-            50% { transform: scale(1.2); opacity: 1; }
-            100% { transform: scale(0.95); opacity: 0.8; }
+        .manuals-list-container {
+            width: 100%;
+            height: calc(100vh - 200px);
+            border: 2px solid #e9ecef;
+            border-radius: 12px;
+            background: #f8f9fa;
+            margin-bottom: 10px;
+            overflow-y: auto;
+            padding: 10px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .manual-item-row {
+            background: #ffffff;
+            border: 1px solid #dcdcdc;
+            border-radius: 8px;
+            padding: 10px 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            text-align: left;
+        }
+        .manual-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            overflow: hidden;
+        }
+        .manual-icon { font-size: 24px; }
+        .manual-name {
+            font-size: 12px;
+            font-weight: bold;
+            color: var(--primary-color);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
+        .manual-actions {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .btn-pdf-download {
+            background-color: #0077b6;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .btn-pdf-download:hover { background-color: #03045e; }
+        .btn-pdf-del {
+            background-color: #e63946;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: bold;
+            cursor: pointer;
         }
 
-        .machine-name-input { width: 90%; font-size: 11px; font-weight: bold; text-align: center; border: 1px solid #00b4d8; border-radius: 4px; padding: 2px; background: transparent; color: inherit; outline: none; }
-        
-        .kardex-sheet-wrapper { max-height: calc(100vh - 220px); overflow-y: auto; border: 2px solid #2c9a29; border-radius: 8px; background: white; text-align: left; font-size: 11px; margin-bottom: 10px; color: #000; }
-        .agrimar-header { background: #ffffff; border-bottom: 2px solid #2c9a29; padding: 6px; display: flex; justify-content: space-between; align-items: center; }
-        .agrimar-title-box { background: #ffffff; color: #000; font-weight: bold; padding: 4px 6px; font-size: 10px; text-align: center; border: 1px solid #2c9a29; border-radius: 4px; width: 50%; line-height: 1.2; }
-        .agrimar-title-box input { width: 100%; border: none; background: transparent; text-align: center; font-weight: bold; font-size: 9px; outline: none; color: #000; }
-        .agrimar-section-title { background: #ffffff; color: #000; font-weight: bold; padding: 4px 8px; font-size: 10px; text-align: center; border-top: 2px solid #000; border-bottom: 2px solid #000; font-style: italic; }
-        .motor-block-container { border-bottom: 2px solid #000; position: relative; }
-        .motor-block-header { display: flex; justify-content: space-between; align-items: center; background: #f1f3f5; padding: 2px 6px; border-bottom: 1px solid #ccc; font-size: 10px; font-weight: bold; color: #000; }
-        .form-grid-2 { display: grid; grid-template-columns: 1.2fr 2.8fr; border-bottom: 1px solid #ccc; }
-        .field-box { padding: 2px 4px; border-right: 1px solid #ddd; border-bottom: 1px solid #ddd; display: flex; flex-direction: column; }
-        .field-box label { font-size: 8px; color: #333; font-weight: bold; font-style: italic; }
-        .field-box input { font-size: 10px; border: none; outline: none; background: transparent; color: #000; padding: 1px 0; }
-        .repuestos-table { width: 100%; border-collapse: collapse; font-size: 10px; color: #000; }
-        .repuestos-table th { background-color: #ffffff; color: #000; border: 1px solid #000; padding: 4px; text-align: center; font-size: 9px; font-weight: bold; }
-        .repuestos-table td { border: 1px solid #ccc; padding: 2px 3px; text-align: center; }
-        .repuestos-table input { width: 100%; border: none; background: transparent; text-align: center; font-size: 10px; outline: none; color: #000; }
-
-        .instructions-gallery-container, .manuals-list-container, .bitacora-list-container {
-            width: 100%; height: calc(100vh - 200px); border: 2px solid var(--border-color); border-radius: 12px; background: var(--card-bg); margin-bottom: 10px; overflow-y: auto; padding: 10px; box-sizing: border-box; text-align: left;
+        .image-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
         }
-        .instructions-gallery-container { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-content: start; }
-        .instruction-card { background: var(--card-bg); border: 2px solid var(--border-color); border-radius: 10px; overflow: hidden; position: relative; cursor: pointer; display: flex; flex-direction: column; }
-        .instruction-card-thumb { width: 100%; height: 110px; object-fit: cover; background: #000; }
-        .instruction-card-info { padding: 6px; font-size: 10px; font-weight: bold; color: var(--text-color); background: var(--card-bg); text-align: center; }
-        
-        .manual-item-row { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-        .manual-info { display: flex; align-items: center; gap: 10px; overflow: hidden; }
-        .manual-name { font-size: 12px; font-weight: bold; color: var(--text-color); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px; }
-        
-        .bitacora-item { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; margin-bottom: 8px; font-size: 11px; }
-        
-        .image-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.85); z-index: 10000; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
-        .image-modal-content { position: relative; max-width: 95%; max-height: 90%; display: flex; flex-direction: column; align-items: center; }
-        .modal-close-btn { position: absolute; top: -40px; right: 0; background: #e63946; color: white; border: none; border-radius: 50%; width: 34px; height: 34px; font-size: 16px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-
-        #view-kardex.fullscreen-mode, #view-instructions.fullscreen-mode, #view-manuals.fullscreen-mode, #view-visual3d.fullscreen-mode, #view-bitacora.fullscreen-mode, #view-alertas.fullscreen-mode {
-            position: fixed !important; top: 0 !important; left: 0 !important; width: 100vw !important; height: 100vh !important; max-width: 100% !important; z-index: 9999 !important; background: var(--card-bg) !important; padding: 15px !important; box-sizing: border-box !important; border-radius: 0 !important; text-align: left;
+        .image-modal-content {
+            position: relative;
+            max-width: 95%;
+            max-height: 90%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
-        #view-visual3d.fullscreen-mode { background: #111827 !important; }
-        #view-visual3d.fullscreen-mode > div:first-child { height: calc(100vh - 60px) !important; }
+        .image-modal-content img {
+            max-width: 100%;
+            max-height: 80vh;
+            border-radius: 8px;
+            object-fit: contain;
+            box-shadow: 0 5px 25px rgba(0,0,0,0.5);
+        }
+        .modal-close-btn {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            background: #e63946;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 34px;
+            height: 34px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #view-kardex.fullscreen-mode,
+        #view-instructions.fullscreen-mode,
+        #view-manuals.fullscreen-mode,
+        #view-visual3d.fullscreen-mode {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            max-width: 100% !important;
+            z-index: 9999 !important;
+            background: #ffffff !important;
+            padding: 15px !important;
+            box-sizing: border-box !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+            text-align: left;
+        }
+        #view-visual3d.fullscreen-mode {
+            background: #111827 !important;
+        }
+        #view-visual3d.fullscreen-mode > div:first-child {
+            height: calc(100vh - 60px) !important;
+        }
 
         .view-section { display: none; }
         .active-view { display: block; }
-        .back-btn { background: var(--border-color); border: none; color: var(--text-color); font-weight: bold; padding: 10px 20px; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 5px; }
+        .back-btn { background: #e9ecef; border: none; color: #495057; font-weight: bold; padding: 10px 20px; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 5px; }
+        .back-btn:hover { background-color: #dee2e6; }
     </style>
 </head>
 <body>
 
     <div class="container" id="main-app-container">
-        <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn">🌙</button>
-
-        <!-- MENU PRINCIPAL -->
         <div id="main-menu" class="view-section active-view">
             <span class="icon-gear">⚙️</span>
             <h1>D.A.T.A</h1>
             <div class="subtitle">Dosier de Activos y Tarjetas de Andamiaje</div>
             
-            <div id="machine-indicator" class="machine-badge">ID QR: Planta Central</div>
+            <div id="machine-indicator" class="machine-badge">ID QR: Cargando...</div>
             
             <button class="btn btn-visitor" onclick="selectRole('visitante')">👤 Visitante</button>
             <button class="btn btn-maintenance" onclick="solicitarPassword('mantenimiento')">🔧 Mantenimiento</button>
             <button class="btn btn-admin" onclick="solicitarPassword('admin')">🛡️ Administrador</button>
-            
-            <button onclick="abrirAlertasGlobales()" class="w-full mt-2 py-2 bg-red-600/20 border border-red-500 text-red-400 font-bold rounded-lg text-xs flex items-center justify-center gap-1.5 shadow">
-                🚨 Ver Alertas Activas en Planta
-            </button>
         </div>
 
-        <!-- SELECCION DE LINEAS -->
         <div id="view-lines" class="view-section">
             <h2 id="lines-header-title" style="margin-top: 0; font-size: 18px;">Líneas de Proceso</h2>
-            <p style="font-size: 12px; opacity: 0.7; margin-bottom: 10px;">Selecciona una línea:</p>
+            <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Selecciona una línea:</p>
             
-            <div class="grid-container" id="lines-grid-container"></div>
+            <div class="grid-container">
+                <div class="card-item" onclick="openLine('Jugo de Limón Sutil', '🍋')">
+                    <span class="card-icon">🍋</span>
+                    <div class="card-title">Jugo de Limón Sutil</div>
+                </div>
+                <div class="card-item" onclick="openLine('Destilado Aceite de Limón', '🟡')">
+                    <span class="card-icon">🟡</span>
+                    <div class="card-title">Destilado Aceite de Limón</div>
+                </div>
+                <div class="card-item" onclick="openLine('Jugo Naranja / Tahití', '🍊')">
+                    <span class="card-icon">🍊</span>
+                    <div class="card-title">Jugo Naranja / Tahití</div>
+                </div>
+                <div class="card-item" onclick="openLine('Línea de Empaque', '📦')">
+                    <span class="card-icon">📦</span>
+                    <div class="card-title">Línea de Empaque</div>
+                </div>
+            </div>
 
             <button class="back-btn" onclick="goBack('main')">⬅ Volver al Menú</button>
         </div>
 
-        <!-- SELECCION DE MAQUINAS -->
         <div id="view-machines" class="view-section">
-            <h2 id="line-title" style="margin-top: 0; font-size: 16px;">Línea</h2>
-            <p style="font-size: 12px; opacity: 0.7; margin-bottom: 10px;">Lista de máquinas:</p>
+            <h2 id="line-title" style="color: #2b2d42; margin-top: 0; font-size: 16px;">Línea</h2>
+            <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Lista de máquinas:</p>
             
             <div id="admin-toolbar" class="admin-toolbar" style="display:none;">
                 <button class="btn-action" onclick="addNewMachine()">➕ Agregar</button>
@@ -232,187 +576,245 @@
             </div>
             
             <div class="grid-container" id="machines-grid-container"></div>
+
             <button class="back-btn" onclick="goBack('lines')">⬅ Volver a Líneas</button>
         </div>
 
-        <!-- OPCIONES DE MAQUINA -->
         <div id="view-machine-detail" class="view-section">
             <h2 id="selected-machine-title" style="color: #00b4d8; margin-top: 0; font-size: 18px;">Máquina</h2>
-            <p style="font-size: 12px; opacity: 0.7; margin-bottom: 12px;">Selecciona una opción:</p>
+            <p style="font-size: 12px; color: #666; margin-bottom: 15px;">Selecciona una opción:</p>
             
-            <div class="btn-option" onclick="openOption('Kardex')"><span>📋</span> <div><strong>Datos de Kárdex</strong></div></div>
-            <div class="btn-option" onclick="openOption('Instrucciones')"><span>📖</span> <div><strong>Instrucciones de Uso</strong></div></div>
-            <div class="btn-option" onclick="openOption('Manuales')"><span>📚</span> <div><strong>Manuales Técnicos</strong></div></div>
-            <div class="btn-option" onclick="openOption('Visual3D')"><span>🧊</span> <div><strong>Visual 3D & Reportes</strong></div></div>
-            <div class="btn-option" onclick="openOption('Bitacora')"><span>📝</span> <div><strong>Bitácora de Turnos</strong></div></div>
-            
-            <div id="admin-qr-btn-container" style="display:none;" class="mt-2">
-                <button onclick="generarQRActivo()" class="w-full py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white font-bold text-xs shadow flex items-center justify-center gap-1.5">
-                    🖨️ Generar Código QR de este Activo
-                </button>
+            <div class="btn-option" onclick="openOption('Kardex')">
+                <span>📋</span> <div><strong>Datos de Kárdex</strong></div>
+            </div>
+            <div class="btn-option" onclick="openOption('Instrucciones')">
+                <span>📖</span> <div><strong>Instrucciones de Uso</strong></div>
+            </div>
+            <div class="btn-option" onclick="openOption('Manuales')">
+                <span>📚</span> <div><strong>Manuales</strong></div>
+            </div>
+            <div class="btn-option" onclick="openOption('Visual3D')">
+                <span>🧊</span> <div><strong>Visual 3D</strong></div>
             </div>
 
-            <button class="back-btn" onclick="volverDesdeDetalle()">⬅ Volver</button>
+            <button class="back-btn" onclick="goBack('machines')">⬅ Volver a Máquinas</button>
         </div>
 
-        <!-- KARDEX -->
         <div id="view-kardex" class="view-section">
-            <h2 style="margin-top: 0; font-size: 14px; margin-bottom: 5px;">📋 Kárdex de Mantenimiento</h2>
-            <p id="kardex-subtitle" style="font-size: 11px; opacity: 0.7; margin-bottom: 8px;"></p>
+            <h2 style="color: #2b2d42; margin-top: 0; font-size: 14px; margin-bottom: 5px;">📋 Kárdex de Mantenimiento</h2>
+            <p id="kardex-subtitle" style="font-size: 11px; color: #666; margin-bottom: 8px;"></p>
+
             <div class="kardex-sheet-wrapper">
                 <div class="agrimar-header">
-                    <div style="font-weight: bold; color: #2c9a29; font-size: 11px;">agromar<br><span style="font-size: 7px; color:#555;">industrial</span></div>
-                    <div class="agrimar-title-box"><input type="text" id="k-area" placeholder="AREA..." oninput="updateMeta('area', this.value)"></div>
-                    <div style="font-size: 8px; text-align: right; color:#000;"><b>CODIGO:</b> <input type="text" id="k-codigo" style="width: 50px;" oninput="updateMeta('codigo', this.value)"></div>
+                    <div style="font-weight: bold; color: #2c9a29; font-size: 11px; text-align: left;">agromar<br><span style="font-size: 7px; color:#555;">industrial</span></div>
+                    <div class="agrimar-title-box">
+                        <input type="text" id="k-area" placeholder="AREA..." oninput="updateMeta('area', this.value)">
+                    </div>
+                    <div style="font-size: 8px; text-align: right; line-height: 1.2;">
+                        <b>CODIGO:</b> <input type="text" id="k-codigo" style="width: 55px; border-bottom: 1px solid #999; font-size:8px;" oninput="updateMeta('codigo', this.value)"><br>
+                        <b>F.EMISIÓN:</b> <input type="date" id="k-femision" style="width: 75px; font-size:8px;" oninput="updateMeta('femision', this.value)">
+                    </div>
                 </div>
-                <div style="padding: 4px; background: #fff; border-bottom: 2px solid #000; color: #000;"><span style="font-weight: bold; font-size: 9px;">MAQUINA: </span><span id="k-maquina-lbl" style="font-weight: bold; font-size: 11px;">-</span></div>
+
+                <div style="border-bottom: 2px solid #000; padding: 4px; display: flex; align-items: center; background: #fff;">
+                    <span style="font-size: 9px; font-weight: bold; width: 35%;">NOMBRE DE MAQUINA :</span>
+                    <span id="k-maquina-lbl" style="font-weight: bold; font-size: 11px; color: #000;">-</span>
+                </div>
+
                 <div class="agrimar-section-title">DESCRIPCION DE EQUIPO</div>
-                <div class="form-grid-2"><div class="field-box"><label>MARCA</label></div><div class="field-box"><input type="text" id="k-eq-marca" oninput="updateMeta('eq_marca', this.value)"></div></div>
-                <div class="form-grid-2"><div class="field-box"><label>CAPACIDAD</label></div><div class="field-box"><input type="text" id="k-eq-capacidad" oninput="updateMeta('eq_capacidad', this.value)"></div></div>
+                <div class="form-grid-2"><div class="field-box"><label>MARCA:</label></div><div class="field-box"><input type="text" id="k-eq-marca" placeholder="Marca..." oninput="updateMeta('eq_marca', this.value)"></div></div>
+                <div class="form-grid-2"><div class="field-box"><label>CAPACIDAD:</label></div><div class="field-box"><input type="text" id="k-eq-capacidad" placeholder="Ej. 12 TN/H" oninput="updateMeta('eq_capacidad', this.value)"></div></div>
+                <div class="form-grid-2"><div class="field-box"><label>MATERIAL:</label></div><div class="field-box"><input type="text" id="k-eq-material" placeholder="Ej. ACERO" oninput="updateMeta('eq_material', this.value)"></div></div>
+                <div class="form-grid-2"><div class="field-box"><label>Nº SERIE:</label></div><div class="field-box"><input type="text" id="k-eq-serie" placeholder="Nº Serie..." oninput="updateMeta('eq_serie', this.value)"></div></div>
+                <div class="form-grid-2" style="border-bottom: 2px solid #000;"><div class="field-box"><label>MODELO:</label></div><div class="field-box"><input type="text" id="k-eq-modelo" placeholder="Modelo..." oninput="updateMeta('eq_modelo', this.value)"></div></div>
+
                 <div class="agrimar-section-title">DATOS DEL MOTOR</div>
                 <div id="motors-container"></div>
-                <button id="add-motor-btn" class="btn btn-admin" style="display: none; margin: 4px auto; padding: 4px; font-size: 10px; width: 95%;" onclick="addMotorBlock()">➕ Motor</button>
-                <div class="agrimar-section-title">REPUESTOS</div>
+                <button id="add-motor-btn" class="btn btn-admin" style="display: none; margin: 6px auto; padding: 6px; font-size: 11px; width: 95%;" onclick="addMotorBlock()">➕ Agregar otro Bloque de Motor</button>
+
+                <div class="agrimar-section-title">DESCRIPCION DE LOS REPUESTOS</div>
                 <table class="repuestos-table">
-                    <thead><tr><th>ITEM</th><th>CATEGORIA</th><th>DESCRIPCION</th><th>UM</th><th>CANT</th><th id="th-action" style="display:none;">X</th></tr></thead>
+                    <thead>
+                        <tr>
+                            <th style="width: 8%;">ITEM</th>
+                            <th style="width: 27%;">CATEGORIA</th>
+                            <th style="width: 38%;">DESCRIPCION</th>
+                            <th style="width: 12%;">UM</th>
+                            <th style="width: 10%;">Cantidad</th>
+                            <th id="th-action" style="width: 5%; display:none;">X</th>
+                        </tr>
+                    </thead>
                     <tbody id="kardex-tbody"></tbody>
                 </table>
             </div>
-            <button id="add-row-btn" class="btn btn-admin" style="display: none; margin-bottom: 6px; padding: 8px;" onclick="addKardexRow()">➕ Fila Repuesto</button>
+
+            <button id="add-row-btn" class="btn btn-admin" style="display: none; margin-bottom: 6px; padding: 10px;" onclick="addKardexRow()">➕ Agregar Fila de Repuesto</button>
             <button class="back-btn" onclick="salirKardex()">⬅ Volver a Opciones</button>
         </div>
 
-        <!-- INSTRUCCIONES -->
         <div id="view-instructions" class="view-section">
-            <h2 style="margin-top: 0; font-size: 16px; margin-bottom: 5px;">📖 Instrucciones</h2>
-            <p id="inst-subtitle" style="font-size: 11px; opacity: 0.7; margin-bottom: 10px;"></p>
-            <div id="admin-img-upload" style="display: none; margin-bottom: 10px; text-align: left; background: var(--card-bg); padding: 8px; border-radius: 8px; border: 1px dashed #f77f00;">
+            <h2 style="color: #2b2d42; margin-top: 0; font-size: 16px; margin-bottom: 5px;">📖 Instrucciones de Uso</h2>
+            <p id="inst-subtitle" style="font-size: 11px; color: #666; margin-bottom: 10px;"></p>
+
+            <div id="admin-img-upload" style="display: none; margin-bottom: 10px; text-align: left; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px dashed #f77f00;">
+                <label style="font-size: 11px; font-weight: bold; display: block; margin-bottom: 5px; color: #f77f00;">Subir Instrucciones:</label>
                 <input type="file" id="img-file-input" accept="image/*" multiple style="font-size: 11px; width: 100%;" onchange="uploadInstructionImages(event)">
             </div>
+
             <div class="instructions-gallery-container" id="instructions-gallery-wrapper"></div>
-            <button class="back-btn" onclick="salirInstrucciones()">⬅ Volver</button>
+            <button class="back-btn" onclick="salirInstrucciones()">⬅ Volver a Opciones</button>
         </div>
 
-        <!-- MANUALES -->
         <div id="view-manuals" class="view-section">
-            <h2 style="margin-top: 0; font-size: 16px; margin-bottom: 5px;">📚 Manuales Técnicos</h2>
-            <p id="man-subtitle" style="font-size: 11px; opacity: 0.7; margin-bottom: 10px;"></p>
-            <div id="admin-pdf-upload" style="display: none; margin-bottom: 10px; text-align: left; background: var(--card-bg); padding: 8px; border-radius: 8px; border: 1px dashed #f77f00;">
+            <h2 style="color: #2b2d42; margin-top: 0; font-size: 16px; margin-bottom: 5px;">📚 Manuales Técnicos</h2>
+            <p id="man-subtitle" style="font-size: 11px; color: #666; margin-bottom: 10px;"></p>
+
+            <div id="admin-pdf-upload" style="display: none; margin-bottom: 10px; text-align: left; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px dashed #f77f00;">
+                <label style="font-size: 11px; font-weight: bold; display: block; margin-bottom: 5px; color: #f77f00;">Subir Manuales PDF:</label>
                 <input type="file" id="pdf-file-input" accept=".pdf" multiple style="font-size: 11px; width: 100%;" onchange="uploadManualsPdf(event)">
             </div>
+
             <div class="manuals-list-container" id="manuals-list-wrapper"></div>
-            <button class="back-btn" onclick="salirManuales()">⬅ Volver</button>
+            <button class="back-btn" onclick="salirManuales()">⬅ Volver a Opciones</button>
         </div>
 
-        <!-- BITACORA DE TURNOS -->
-        <div id="view-bitacora" class="view-section">
-            <h2 style="margin-top: 0; font-size: 16px; margin-bottom: 5px;">📝 Bitácora de Turnos</h2>
-            <p id="bitacora-subtitle" style="font-size: 11px; opacity: 0.7; margin-bottom: 10px;"></p>
-            <div style="margin-bottom: 10px; text-align: left; background: var(--card-bg); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color);">
-                <label style="font-size: 11px; font-weight: bold; display: block; margin-bottom: 4px;">Nueva Nota de Turno:</label>
-                <textarea id="txt-nueva-nota" class="w-full h-16 p-2 bg-gray-900/10 border border-gray-500/30 rounded text-xs outline-none resize-none mb-2" placeholder="Escribe observaciones, ajustes o novedades..."></textarea>
-                <button onclick="guardarNotaBitacora()" class="py-1.5 px-4 bg-blue-600 hover:bg-blue-500 rounded text-white font-bold text-xs shadow transition">Publicar Nota</button>
-            </div>
-            <div class="bitacora-list-container" id="bitacora-list-wrapper"></div>
-            <button class="back-btn" onclick="salirBitacora()">⬅ Volver</button>
-        </div>
-
-        <!-- VISUAL 3D -->
         <div id="view-visual3d" class="view-section" style="width: 100%;">
             <div style="display: flex; flex-direction: column; height: 480px; width: 100%; background: #111827; border-radius: 12px; overflow: hidden; text-align: left; position: relative;" id="visual3d-wrapper-box">
+                
                 <div style="display: flex; flex-direction: row; width: 100%; height: 100%; position: relative;">
+                    
                     <div class="w-2/5 h-full bg-gray-800 p-3 flex flex-col justify-between border-r border-gray-700 z-10 text-gray-100">
                         <div class="flex flex-col flex-shrink-0">
-                            <button id="btn-explo" class="w-full mb-2 py-2 bg-purple-600 hover:bg-purple-500 rounded-md text-white font-bold text-xs shadow transition opacity-50 cursor-not-allowed" disabled>⏳ Cargando...</button>
-                            <div id="contenedor-importar-3d" class="mb-3 hidden">
-                                <label for="input-archivo" class="w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-md text-white font-bold text-xs shadow transition flex items-center justify-center cursor-pointer">📂 Importar .glb</label>
+                            <button id="btn-explo" class="w-full mb-2 py-2 bg-purple-600 hover:bg-purple-500 rounded-md text-white font-bold text-xs shadow transition opacity-50 cursor-not-allowed" disabled>
+                                ⏳ Cargando modelo...
+                            </button>
+
+                            <div id="contenedor-importar-3d" class="mb-3">
+                                <label for="input-archivo" class="w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-md text-white font-bold text-xs shadow transition flex items-center justify-center cursor-pointer">
+                                    📂 Importar Ensamblaje (.glb)
+                                </label>
+                                
                                 <input type="file" id="input-archivo" accept=".glb,.gltf" class="hidden">
+                                
                             </div>
-                            <div id="contenedor-admin-reportes-btn" class="mb-2 hidden">
-                                <button onclick="abrirModalVerReportes()" class="w-full py-2 bg-amber-600 hover:bg-amber-500 rounded-md text-white font-bold text-xs shadow transition flex items-center justify-center gap-1">📋 Ver Reportes</button>
+
+                            <div id="contenedor-admin-reportes-btn" class="mb-2" style="display: none;">
+                                <button onclick="abrirModalVerReportes()" class="w-full py-2 bg-amber-600 hover:bg-amber-500 rounded-md text-white font-bold text-xs shadow transition flex items-center justify-center gap-1">
+                                    📋 Ver Reportes de Estado
+                                </button>
                             </div>
+
                             <div>
-                                <h2 class="text-xs font-semibold uppercase text-gray-400 mb-1">Partes</h2>
-                                <input type="text" id="buscador-piezas" placeholder="Buscar..." class="w-full p-1.5 bg-gray-900 text-white rounded border border-gray-600 text-xs outline-none">
+                                <h2 class="text-xs font-semibold uppercase text-gray-400 mb-1">Desglose de Partes</h2>
+                                <div class="py-1">
+                                    <input type="text" id="buscador-piezas" placeholder="Buscar pieza..." class="w-full p-1.5 bg-gray-900 text-white rounded border border-gray-600 focus:border-blue-500 outline-none text-xs">
+                                </div>
                             </div>
                         </div>
+                        
                         <div class="flex-1 overflow-y-auto my-1 pr-1 space-y-1 text-xs" id="lista-partes"></div>
+
                         <div class="flex-shrink-0 pt-2 border-t border-gray-700">
-                            <button onclick="centrarVistaGeneral()" class="w-full p-1.5 bg-blue-600 hover:bg-blue-500 rounded text-[10px] font-bold text-white shadow">🎯 Centrar Vista</button>
+                            <h2 class="text-[10px] font-semibold uppercase text-gray-400 mb-1">Vistas Rápidas</h2>
+                            <div class="grid grid-cols-2 gap-1 mb-1">
+                                <button onclick="fijarCamara('frontal')" class="p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-[10px] text-white">Frontal</button>
+                                <button onclick="fijarCamara('superior')" class="p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-[10px] text-white">Superior</button>
+                                <button onclick="fijarCamara('lateral')" class="p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-[10px] text-white">Lateral</button>
+                                <button onclick="fijarCamara('iso')" class="p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-[10px] text-white">Isométrica</button>
+                            </div>
+                            <button onclick="centrarVistaGeneral()" class="w-full p-1.5 bg-blue-600 hover:bg-blue-500 rounded text-[10px] font-bold text-white shadow transition">
+                                🎯 Centrar Vista
+                            </button>
                         </div>
                     </div>
+
                     <div class="w-3/5 h-full relative flex-1 bg-gray-900" id="canvas-3d">
-                        <div id="indicador-equipo" class="absolute top-3 left-3 bg-gray-900/80 border border-gray-700 px-2.5 py-1 rounded-md text-[10px] font-medium text-blue-400 z-10">📍 Cargando...</div>
-                        <div id="panel-info" class="hidden absolute top-3 right-3 w-56 p-3 bg-gray-900/95 border border-gray-700 rounded-lg shadow-xl text-white z-10 text-xs">
-                            <h2 id="info-titulo" class="font-bold text-blue-400 mb-1">Pieza</h2>
-                            <p class="text-[10px] text-gray-300 mb-2">Estado: <span id="info-estado" class="text-green-400 font-bold">Operativo</span></p>
-                            <p id="info-motivo-box" class="text-[10px] text-red-400 hidden mb-2">Motivo: <span id="info-motivo-txt"></span></p>
-                            <div id="panel-acciones-pieza" class="flex flex-col gap-1.5"></div>
+                        <div id="indicador-equipo" class="absolute top-3 left-3 bg-gray-900/80 border border-gray-700 px-2.5 py-1 rounded-md text-[10px] font-medium text-blue-400 pointer-events-none z-10">
+                            📍 Vista: Iniciando...
+                        </div>
+                        <div id="panel-info" class="hidden absolute top-3 right-3 w-56 p-3 bg-gray-900/95 border border-gray-700 rounded-lg shadow-xl text-white backdrop-blur-sm z-10 text-xs">
+                            <h2 id="info-titulo" class="font-bold text-blue-400 mb-1">Nombre de Pieza</h2>
+                            <p id="info-descripcion" class="text-[10px] text-gray-300 mb-2">Detalles técnicos.</p>
+                            
+                            <div class="border-t border-gray-700 pt-2 mb-2 flex flex-col gap-1.5">
+                                <p>Estado: <span id="info-estado" class="text-green-400 font-bold">Operativo</span></p>
+                                <p id="info-motivo-box" class="text-[10px] text-red-400 hidden">Motivo: <span id="info-motivo-txt"></span></p>
+                            </div>
+
+                            <div id="panel-acciones-pieza" class="flex flex-col gap-1.5">
+                                <!-- Botones inyectados dinámicamente según rol -->
+                            </div>
                         </div>
                     </div>
+
                 </div>
             </div>
+
             <button class="back-btn" style="margin-top: 10px;" onclick="salirVisual3D()">⬅ Volver a Opciones</button>
         </div>
-
-        <!-- ALERTAS GLOBALES DE PLANTA -->
-        <div id="view-alertas" class="view-section">
-            <h2 style="margin-top: 0; font-size: 16px; margin-bottom: 5px;">🚨 Panel de Alertas en Planta</h2>
-            <p style="font-size: 11px; opacity: 0.7; margin-bottom: 10px;">Todas las piezas reportadas en mantenimiento actualmente:</p>
-            <div class="bitacora-list-container" id="alertas-list-wrapper"></div>
-            <button class="back-btn" onclick="goBack('main')">⬅ Volver al Menú</button>
-        </div>
     </div>
 
-    <!-- MODAL GENERAR CODIGO QR -->
-    <div class="image-modal" id="modal-qr-generado">
-        <div class="image-modal-content" style="background: #1f2937; padding: 25px; border-radius: 12px; width: 300px; text-align: center;" onclick="event.stopPropagation()">
-            <button class="modal-close-btn" onclick="cerrarModalQR()">✕</button>
-            <h3 class="text-white text-sm font-bold mb-2">Etiqueta QR de Activo</h3>
-            <p class="text-gray-300 text-[11px] mb-3" id="lbl-qr-maquina-nombre">Máquina</p>
-            <div id="qr-code-box" style="background: white; padding: 15px; border-radius: 8px; display: inline-block; margin-bottom: 12px;"></div>
-            <p class="text-[10px] text-gray-400 break-all mb-3" id="lbl-qr-url"></p>
-            <button onclick="window.print()" class="w-full py-2 bg-green-600 hover:bg-green-500 rounded text-white font-bold text-xs shadow">🖨️ Imprimir Etiqueta</button>
-        </div>
-    </div>
-
-    <!-- MODAL MOTIVO REPORTE CON FIRMA -->
+    <!-- MODAL PARA CUESTIONARIO DE REPORTE DE MANTENIMIENTO -->
     <div class="image-modal" id="modal-motivo-reporte">
         <div class="image-modal-content" style="background: #1f2937; padding: 20px; border-radius: 12px; width: 320px; text-align: left;" onclick="event.stopPropagation()">
             <button class="modal-close-btn" onclick="cerrarModalMotivo()">✕</button>
             <h3 class="text-white text-sm font-bold mb-2">Reportar Mantenimiento</h3>
-            <p class="text-gray-300 text-[11px] mb-2" id="lbl-pieza-a-reportar">Pieza: </p>
-            <label class="text-gray-400 text-[10px] block mb-1">Nombre / Responsable (Firma):</label>
-            <input type="text" id="txt-responsable-input" class="w-full p-2 bg-gray-900 text-white rounded border border-gray-600 text-xs mb-2" placeholder="Ej. Carlos Pérez (Técnico)">
-            <label class="text-gray-400 text-[10px] block mb-1">Motivo de falla:</label>
-            <textarea id="txt-motivo-input" class="w-full h-20 p-2 bg-gray-900 text-white rounded border border-gray-600 text-xs mb-3 resize-none" placeholder="Describa..."></textarea>
-            <button onclick="guardarReporteMantenimiento()" class="w-full py-2 bg-red-600 hover:bg-red-500 rounded text-white font-bold text-xs shadow">Enviar Reporte</button>
+            <p class="text-gray-300 text-[11px] mb-3" id="lbl-pieza-a-reportar">Pieza: </p>
+            
+            <label class="text-gray-400 text-[10px] block mb-1 font-semibold">Motivo del reporte:</label>
+            <textarea id="txt-motivo-input" class="w-full h-24 p-2 bg-gray-900 text-white rounded border border-gray-600 focus:border-red-500 outline-none text-xs mb-3 resize-none" placeholder="Describa la falla o motivo..."></textarea>
+            
+            <div class="flex gap-2">
+                <button onclick="guardarReporteMantenimiento()" class="flex-1 py-2 bg-red-600 hover:bg-red-500 rounded text-white font-bold text-xs shadow transition">Enviar Reporte</button>
+                <button onclick="cerrarModalMotivo()" class="py-2 px-3 bg-gray-700 hover:bg-gray-600 rounded text-white text-xs font-semibold">Cancelar</button>
+            </div>
         </div>
     </div>
 
-    <!-- MODAL VER REPORTES -->
+    <!-- MODAL PARA VER REPORTES (SOLO ADMIN) -->
     <div class="image-modal" id="modal-ver-reportes">
         <div class="image-modal-content" style="background: #1f2937; padding: 20px; border-radius: 12px; width: 420px; max-height: 80vh; text-align: left;" onclick="event.stopPropagation()">
             <button class="modal-close-btn" onclick="cerrarModalVerReportes()">✕</button>
             <div class="flex justify-between items-center mb-2">
-                <h3 class="text-white text-sm font-bold">📋 Reportes de Estado</h3>
-                <button onclick="exportarReportesExcel()" class="py-1 px-2.5 bg-green-600 hover:bg-green-500 rounded text-white font-bold text-[11px]">📊 Excel</button>
+                <h3 class="text-white text-sm font-bold flex items-center gap-1">📋 Historial de Reportes de Estado</h3>
+                <button onclick="exportarReportesExcel()" class="py-1 px-2.5 bg-green-600 hover:bg-green-500 rounded text-white font-bold text-[11px] shadow transition flex items-center gap-1">
+                    📊 Exportar Excel
+                </button>
             </div>
+            <p class="text-gray-400 text-[11px] mb-3">Haz clic en un reporte para ubicar y enfocar la pieza en el modelo 3D.</p>
+            
+            <!-- Tabla oculta auxiliar utilizada para estructurar perfectamente la exportación a Excel -->
             <table id="tabla-reportes-excel" style="display:none;">
-                <thead><tr><th>Máquina</th><th>Pieza</th><th>Estado</th><th>Motivo</th><th>Responsable</th><th>Fecha</th></tr></thead>
+                <thead>
+                    <tr>
+                        <th>Componente / Pieza</th>
+                        <th>Estado</th>
+                        <th>Motivo del Reporte</th>
+                        <th>Fecha y Hora</th>
+                    </tr>
+                </thead>
                 <tbody id="tbody-reportes-excel"></tbody>
             </table>
-            <div id="lista-reportes-container" class="flex flex-col gap-2 overflow-y-auto max-h-[50vh]"></div>
+
+            <div id="lista-reportes-container" class="flex flex-col gap-2 overflow-y-auto max-h-[50vh] pr-1">
+                <!-- Se cargan los reportes dinámicamente -->
+            </div>
         </div>
     </div>
 
-    <!-- MODAL PASSWORD -->
+    <!-- MODAL PARA CONTRASEÑA -->
     <div class="image-modal" id="modal-password">
         <div class="image-modal-content" style="background: #1f2937; padding: 20px; border-radius: 12px; width: 300px; text-align: left;" onclick="event.stopPropagation()">
             <button class="modal-close-btn" onclick="cerrarModalPassword()">✕</button>
-            <h3 class="text-white text-sm font-bold mb-2" id="modal-password-title">Contraseña</h3>
-            <input type="password" id="input-password-val" class="w-full p-2 bg-gray-900 text-white rounded border border-gray-600 text-xs mb-3" placeholder="Clave...">
-            <button onclick="verificarPassword()" class="w-full py-2 bg-blue-600 hover:bg-blue-500 rounded text-white font-bold text-xs shadow">Ingresar</button>
+            <h3 class="text-white text-sm font-bold mb-2" id="modal-password-title">Ingrese Contraseña</h3>
+            <p class="text-gray-300 text-[11px] mb-3">Acceso restringido para este rol.</p>
+            
+            <input type="password" id="input-password-val" class="w-full p-2 bg-gray-900 text-white rounded border border-gray-600 focus:border-blue-500 outline-none text-xs mb-3" placeholder="Contraseña...">
+            
+            <div class="flex gap-2">
+                <button onclick="verificarPassword()" class="flex-1 py-2 bg-blue-600 hover:bg-blue-500 rounded text-white font-bold text-xs shadow transition">Ingresar</button>
+                <button onclick="cerrarModalPassword()" class="py-2 px-3 bg-gray-700 hover:bg-gray-600 rounded text-white text-xs font-semibold">Cancelar</button>
+            </div>
         </div>
     </div>
 
@@ -423,188 +825,87 @@
         </div>
     </div>
 
-    <!-- LOGICA SUPABASE -->
     <script>
-        // Inicialización del Cliente de Supabase
-        const SUPABASE_URL = 'https://rutxbcxqrqgidrniggte.supabase.co/rest/v1/';
-        const SUPABASE_ANON_KEY = 'sb_publishable_QDGp8xnqOirYEHlEv7Y5lg_ufe2TebO'; // Reemplaza por tu clave pública de Supabase
-        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-        const DB_KEY = "data_control_activos_db_v4";
+      const SUPABASE_URL = 'https://glgkfuiqwconjjffxgln.supabase.co';
+      const SUPABASE_ANON_KEY = 'sb_publishable_YxHDEuQiZ06ywaT5Yha68w_DX35lUVO';
+      const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const DB_KEY = "data_control_activos_db_v3";
         let currentRole = 'visitante';
         let currentLine = '';
         let currentMachineId = null;
         let isEditMode = false;
         let rolPendiente = '';
 
-        let qrContextoLinea = null;
-        let qrContextoMaquinaId = null;
+        const PASSWORDS = {
+            'mantenimiento': 'mantenimiento123',
+            'admin': 'admin123'
+        };
 
-        const PASSWORDS = { 'mantenimiento': 'mantenimiento123', 'admin': 'admin123' };
-
-        function toggleTheme() {
-            document.body.classList.toggle('dark-theme');
-            const isDark = document.body.classList.contains('dark-theme');
-            document.getElementById('theme-btn').innerText = isDark ? '☀️' : '🌙';
-            localStorage.setItem("data_theme_dark", isDark);
+        function solicitarPassword(rol) {
+            rolPendiente = rol;
+            document.getElementById('modal-password-title').innerText = `Contraseña para ${rol.toUpperCase()}`;
+            document.getElementById('input-password-val').value = '';
+            document.getElementById('modal-password').style.display = 'flex';
         }
 
-        if (localStorage.getItem("data_theme_dark") === "true") {
-            document.body.classList.add('dark-theme');
-            document.getElementById('theme-btn').innerText = '☀️';
+        function cerrarModalPassword() {
+            document.getElementById('modal-password').style.display = 'none';
+        }
+
+        function verificarPassword() {
+            let passInput = document.getElementById('input-password-val').value;
+            if (passInput === PASSWORDS[rolPendiente]) {
+                cerrarModalPassword();
+                selectRole(rolPendiente);
+            } else {
+                alert("Contraseña incorrecta");
+            }
         }
 
         const defaultDatabase = {
             "Jugo de Limón Sutil": [
                 {
                     id: 1, name: "Máquina 01",
-                    meta: { area: "LÍNEA EXTRACCIÓN", codigo: "ML-01", eq_marca: "AGRIMAR", eq_capacidad: "12 TN/H" },
-                    motors: [{ marca: 'Siemens', hp: '15', kw: '11', rpm: '1750', voltios: '440V', amperios: '12A' }],
-                    kardex: [{ item: 1, categoria: "Rodamiento", desc: "Roller 6205", um: "Pza", cant: 2 }],
-                    instructionImages: [], manualsPdf: [], bitacora: [], reportesPiezas: {}
+                    meta: { area: "AREA: LÍNEA EXTRACCION JUGO DE LIMON", codigo: "ML-01", femision: "2026-01-10", eq_marca: "AGRIMAR", eq_capacidad: "12 TN/H", eq_material: "Acero Inox 304", eq_serie: "S-9921", eq_modelo: "EX-100" },
+                    motors: [{ tipo: "Principal", cos: "0.85", hz: "60", color: "Verde", rpm: "1750", kg: "45", modelo: "M-50", amperios: "12A", marca: "Siemens", reg: "R-1", hp: "15", nm: "65", voltios: "440V", n: "4", ip: "IP55", kw: "11", ipin: "F", i: "25A" }],
+                    kardex: [{ item: 1, categoria: "Rodamiento", desc: "Roller bearing 6205", um: "Pza", cant: 2 }],
+                    instructionImages: [], manualsPdf: [],
+                    reportesPiezas: {} 
                 }
-            ],
-            "Destilado Aceite de Limón": [],
-            "Jugo Naranja / Tahití": [],
-            "Línea de Empaque": []
+            ]
         };
 
         function getDatabase() {
             let data = localStorage.getItem(DB_KEY);
-            if (!data) { saveDatabase(defaultDatabase); return defaultDatabase; }
+            if (!data) {
+                saveDatabase(defaultDatabase);
+                return defaultDatabase;
+            }
             return JSON.parse(data);
         }
 
         function saveDatabase(db) {
             localStorage.setItem(DB_KEY, JSON.stringify(db));
-            sincronizarConSupabase(db);
-        }
-
-        // Sincronización con Supabase (reemplazo de Firebase Firestore)
-        async function sincronizarConSupabase(db) {
-            try {
-                // Ejemplo asumiendo que guardas el JSON global en una tabla llamada 'configuracion'
-                const { error } = await supabaseClient
-                    .from('configuracion')
-                    .upsert({ id: 1, payload: db, updated_at: new Date().toISOString() });
-                
-                if (error) console.error("Error al sincronizar con Supabase:", error.message);
-            } catch (e) { 
-                console.error("Excepción en sincronización Supabase:", e); 
-            }
-        }
-
-        window.addEventListener('DOMContentLoaded', async () => {
-            // Cargar datos iniciales desde Supabase si existen
-            try {
-                const { data, error } = await supabaseClient
-                    .from('configuracion')
-                    .select('payload')
-                    .eq('id', 1)
-                    .single();
-                
-                if (data && data.payload) {
-                    localStorage.setItem(DB_KEY, JSON.stringify(data.payload));
-                }
-            } catch (err) {
-                console.log("Usando base de datos local predeterminada.");
-            }
-
-            const params = new URLSearchParams(window.location.search);
-            const qLine = params.get('linea');
-            const qMachId = params.get('maquina');
-
-            if (qLine && qMachId) {
-                let db = getDatabase();
-                if (db[qLine]) {
-                    let mach = db[qLine].find(m => m.id == qMachId);
-                    if (mach) {
-                        qrContextoLinea = qLine;
-                        qrContextoMaquinaId = Number(qMachId);
-                        currentLine = qLine;
-                        currentMachineId = Number(qMachId);
-                        document.getElementById('machine-indicator').innerText = `QR: ${mach.name} (${qLine})`;
-                    }
-                }
-            }
-        });
-
-        function solicitarPassword(rol) {
-            rolPendiente = rol;
-            document.getElementById('modal-password-title').innerText = `Contraseña ${rol.toUpperCase()}`;
-            document.getElementById('input-password-val').value = '';
-            document.getElementById('modal-password').style.display = 'flex';
-        }
-        function cerrarModalPassword() { document.getElementById('modal-password').style.display = 'none'; }
-        function verificarPassword() {
-            if (document.getElementById('input-password-val').value === PASSWORDS[rolPendiente]) {
-                cerrarModalPassword(); selectRole(rolPendiente);
-            } else { alert("Contraseña incorrecta"); }
         }
 
         function selectRole(role) {
             currentRole = role;
             document.getElementById('main-menu').classList.remove('active-view');
-
-            if (qrContextoLinea && qrContextoMaquinaId) {
-                let db = getDatabase();
-                let mach = db[qrContextoLinea].find(m => m.id === qrContextoMaquinaId);
-                if (mach) {
-                    currentLine = qrContextoLinea;
-                    currentMachineId = qrContextoMaquinaId;
-                    openMachineDetail(mach.id, mach.name);
-                    return;
-                }
-            }
-
             document.getElementById('view-lines').classList.add('active-view');
-            renderLines();
-        }
-
-        function lineaTieneFallas(db, lineName) {
-            if (!db[lineName]) return false;
-            for (let mach of db[lineName]) {
-                if (mach.reportesPiezas && Object.keys(mach.reportesPiezas).length > 0) return true;
-            }
-            return false;
-        }
-
-        function maquinaTieneFallas(mach) {
-            return mach.reportesPiezas && Object.keys(mach.reportesPiezas).length > 0;
-        }
-
-        function renderLines() {
-            let db = getDatabase();
-            let container = document.getElementById('lines-grid-container');
-            container.innerHTML = '';
-            
-            const lineasInfo = [
-                { name: 'Jugo de Limón Sutil', icon: '🍋' },
-                { name: 'Destilado Aceite de Limón', icon: '🟡' },
-                { name: 'Jugo Naranja / Tahití', icon: '🍊' },
-                { name: 'Línea de Empaque', icon: '📦' }
-            ];
-
-            lineasInfo.forEach(l => {
-                let hasFalla = lineaTieneFallas(db, l.name);
-                let card = document.createElement('div');
-                card.className = 'card-item';
-                card.onclick = () => openLine(l.name, l.icon);
-                card.innerHTML = `
-                    <span class="status-dot ${hasFalla ? 'dot-red' : 'dot-green'}"></span>
-                    <span class="card-icon">${l.icon}</span>
-                    <div class="card-title">${l.name}</div>
-                `;
-                container.appendChild(card);
-            });
         }
 
         function openLine(lineName, icon) {
             currentLine = lineName;
-            document.getElementById('line-title').innerText = `${icon} ${lineName}`;
+            document.getElementById('lines-header-title').innerText = `${icon} ${lineName}`;
             document.getElementById('view-lines').classList.remove('active-view');
             document.getElementById('view-machines').classList.add('active-view');
-            document.getElementById('admin-toolbar').style.display = (currentRole === 'admin') ? 'flex' : 'none';
+            
+            let toolbar = document.getElementById('admin-toolbar');
+            if (currentRole === 'admin') {
+                toolbar.style.display = 'flex';
+            } else {
+                toolbar.style.display = 'none';
+            }
             renderMachines();
         }
 
@@ -612,24 +913,22 @@
             let db = getDatabase();
             let container = document.getElementById('machines-grid-container');
             container.innerHTML = '';
+            
             if (!db[currentLine]) db[currentLine] = [];
             
-            db[currentLine].forEach((mach) => {
-                let hasFalla = maquinaTieneFallas(mach);
+            db[currentLine].forEach((mach, idx) => {
                 let card = document.createElement('div');
                 card.className = 'card-item';
                 
                 if (isEditMode && currentRole === 'admin') {
                     card.onclick = (e) => e.stopPropagation();
                     card.innerHTML = `
-                        <span class="status-dot ${hasFalla ? 'dot-red' : 'dot-green'}"></span>
                         <span class="card-icon">⚙️</span>
                         <input type="text" class="machine-name-input" id="mach-input-${mach.id}" value="${mach.name}" onclick="event.stopPropagation()">
                     `;
                 } else {
                     card.onclick = () => openMachineDetail(mach.id, mach.name);
                     card.innerHTML = `
-                        <span class="status-dot ${hasFalla ? 'dot-red' : 'dot-green'}"></span>
                         <span class="card-icon">⚙️</span>
                         <div class="card-title">${mach.name}</div>
                     `;
@@ -641,103 +940,128 @@
         function openMachineDetail(id, name) {
             currentMachineId = id;
             document.getElementById('selected-machine-title').innerText = name;
-            document.getElementById('admin-qr-btn-container').style.display = (currentRole === 'admin') ? 'block' : 'none';
+            document.getElementById('view-machines').classList.remove('active-view');
             document.getElementById('view-machine-detail').classList.add('active-view');
-            document.querySelectorAll('.view-section').forEach(el => { if(el.id !== 'view-machine-detail') el.classList.remove('active-view'); });
-        }
-
-        function generarQRActivo() {
-            let db = getDatabase();
-            let mach = db[currentLine].find(m => m.id === currentMachineId);
-            if (!mach) return;
-
-            document.getElementById('lbl-qr-maquina-nombre').innerText = `${currentLine} ➔ ${mach.name}`;
-            
-            let baseUrl = window.location.origin + window.location.pathname;
-            let targetUrl = `${baseUrl}?linea=${encodeURIComponent(currentLine)}&maquina=${currentMachineId}`;
-            
-            document.getElementById('lbl-qr-url').innerText = targetUrl;
-            
-            let box = document.getElementById('qr-code-box');
-            box.innerHTML = '';
-            
-            new QRCode(box, {
-                text: targetUrl,
-                width: 180,
-                height: 180,
-                colorDark : "#000000",
-                colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.H
-            });
-
-            document.getElementById('modal-qr-generado').style.display = 'flex';
-        }
-
-        function cerrarModalQR() {
-            document.getElementById('modal-qr-generado').style.display = 'none';
-        }
-
-        function volverDesdeDetalle() {
-            if (qrContextoLinea && qrContextoMaquinaId) {
-                document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
-                document.getElementById('main-menu').classList.add('active-view');
-            } else {
-                goBack('machines');
-            }
         }
 
         function openOption(opt) {
             document.getElementById('view-machine-detail').classList.remove('active-view');
-            if (opt === 'Kardex') { document.getElementById('view-kardex').classList.add('active-view', 'fullscreen-mode'); loadKardexData(); }
-            else if (opt === 'Instrucciones') { document.getElementById('view-instructions').classList.add('active-view', 'fullscreen-mode'); loadInstructionsData(); }
-            else if (opt === 'Manuales') { document.getElementById('view-manuals').classList.add('active-view', 'fullscreen-mode'); loadManualsData(); }
-            else if (opt === 'Bitacora') { document.getElementById('view-bitacora').classList.add('active-view', 'fullscreen-mode'); loadBitacoraData(); }
-            else if (opt === 'Visual3D') {
-                document.getElementById('view-visual3d').classList.add('active-view', 'fullscreen-mode');
-                document.getElementById('visual3d-wrapper-box').style.height = 'calc(100vh - 65px)';
-                document.getElementById('contenedor-importar-3d').style.display = (currentRole === 'admin') ? 'block' : 'none';
-                document.getElementById('contenedor-admin-reportes-btn').style.display = (currentRole === 'admin') ? 'block' : 'none';
-                if (!window.is3DInitialized) { init3D(); window.is3DInitialized = true; }
-                else { cargarModeloMaquinaActual(); setTimeout(redimensionarCanvas3D, 50); }
+            
+            if (opt === 'Kardex') {
+                const view = document.getElementById('view-kardex');
+                view.classList.add('active-view', 'fullscreen-mode');
+                loadKardexData();
+            } else if (opt === 'Instrucciones') {
+                const view = document.getElementById('view-instructions');
+                view.classList.add('active-view', 'fullscreen-mode');
+                loadInstructionsData();
+            } else if (opt === 'Manuales') {
+                const view = document.getElementById('view-manuals');
+                view.classList.add('active-view', 'fullscreen-mode');
+                loadManualsData();
+            } else if (opt === 'Visual3D') {
+                const vista3D = document.getElementById('view-visual3d');
+                vista3D.classList.add('active-view', 'fullscreen-mode');
+                
+                const innerBox = document.getElementById('visual3d-wrapper-box');
+                if(innerBox) innerBox.style.height = 'calc(100vh - 65px)';
+
+                const contenedorImportar = document.getElementById('contenedor-importar-3d');
+                const contenedorAdminBtn = document.getElementById('contenedor-admin-reportes-btn');
+
+                if (currentRole === 'admin') {
+                    contenedorImportar.style.display = 'block';
+                    contenedorAdminBtn.style.display = 'block';
+                } else {
+                    contenedorImportar.style.display = 'none';
+                    contenedorAdminBtn.style.display = 'none';
+                }
+
+                if (!window.is3DInitialized) {
+                    init3D();
+                    window.is3DInitialized = true;
+                } else {
+                    cargarModeloMaquinaActual();
+                    setTimeout(redimensionarCanvas3D, 50);
+                }
             }
         }
 
-        function salirKardex() { document.getElementById('view-kardex').classList.remove('fullscreen-mode'); goBack('detail'); }
-        function salirInstrucciones() { document.getElementById('view-instructions').classList.remove('fullscreen-mode'); goBack('detail'); }
-        function salirManuales() { document.getElementById('view-manuals').classList.remove('fullscreen-mode'); goBack('detail'); }
-        function salirBitacora() { document.getElementById('view-bitacora').classList.remove('fullscreen-mode'); goBack('detail'); }
-        function salirVisual3D() { document.getElementById('view-visual3d').classList.remove('fullscreen-mode'); goBack('detail'); }
+        function salirKardex() {
+            document.getElementById('view-kardex').classList.remove('fullscreen-mode');
+            goBack('detail');
+        }
+
+        function salirInstrucciones() {
+            document.getElementById('view-instructions').classList.remove('fullscreen-mode');
+            goBack('detail');
+        }
+
+        function salirManuales() {
+            document.getElementById('view-manuals').classList.remove('fullscreen-mode');
+            goBack('detail');
+        }
+
+        function salirVisual3D() {
+            const vista3D = document.getElementById('view-visual3d');
+            vista3D.classList.remove('fullscreen-mode');
+            
+            const innerBox = document.getElementById('visual3d-wrapper-box');
+            if(innerBox) innerBox.style.height = '480px';
+
+            goBack('detail');
+        }
 
         function redimensionarCanvas3D() {
             const container = document.getElementById('canvas-3d');
             if (container && renderer && camera) {
-                camera.aspect = container.clientWidth / container.clientHeight;
+                const w = container.clientWidth;
+                const h = container.clientHeight;
+                camera.aspect = w / h;
                 camera.updateProjectionMatrix();
-                renderer.setSize(container.clientWidth, container.clientHeight);
+                renderer.setSize(w, h);
             }
         }
 
         function goBack(target) {
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
-            if (target === 'main') document.getElementById('main-menu').classList.add('active-view');
-            else if (target === 'lines') document.getElementById('view-lines').classList.add('active-view');
-            else if (target === 'machines') document.getElementById('view-machines').classList.add('active-view');
-            else if (target === 'detail') document.getElementById('view-machine-detail').classList.add('active-view');
+            if (target === 'main') {
+                document.getElementById('main-menu').classList.add('active-view');
+            } else if (target === 'lines') {
+                document.getElementById('view-lines').classList.add('active-view');
+            } else if (target === 'machines') {
+                document.getElementById('view-machines').classList.add('active-view');
+            } else if (target === 'detail') {
+                document.getElementById('view-machine-detail').classList.add('active-view');
+            }
         }
 
         function toggleEditMode() {
             let db = getDatabase();
-            if (isEditMode && db[currentLine]) {
-                db[currentLine].forEach(mach => {
-                    let inp = document.getElementById(`mach-input-${mach.id}`);
-                    if (inp && inp.value.trim()) mach.name = inp.value.trim();
-                });
-                saveDatabase(db);
+            if (isEditMode) {
+                if (db[currentLine]) {
+                    db[currentLine].forEach(mach => {
+                        let inputEl = document.getElementById(`mach-input-${mach.id}`);
+                        if (inputEl) {
+                            let nuevoNombre = inputEl.value.trim();
+                            if (nuevoNombre !== "") {
+                                mach.name = nuevoNombre;
+                            }
+                        }
+                    });
+                    saveDatabase(db);
+                }
             }
+
             isEditMode = !isEditMode;
             let btn = document.getElementById('toggle-edit-btn');
-            btn.classList.toggle('btn-toggle-on', isEditMode);
-            btn.innerText = isEditMode ? "💾 Guardar Nombres" : "✏️ Editar Nombres";
+            if (isEditMode) {
+                btn.classList.add('btn-toggle-on');
+                btn.innerText = "💾 Guardar Nombres";
+            } else {
+                btn.classList.remove('btn-toggle-on');
+                btn.innerText = "✏️ Editar Nombres";
+            }
             renderMachines();
         }
 
@@ -745,9 +1069,14 @@
             let db = getDatabase();
             if (!db[currentLine]) db[currentLine] = [];
             let newId = db[currentLine].length > 0 ? Math.max(...db[currentLine].map(m => m.id)) + 1 : 1;
+            let newName = `Máquina ${newId < 10 ? '0' + newId : newId}`;
+            
             db[currentLine].push({
-                id: newId, name: `Máquina ${newId < 10 ? '0' + newId : newId}`,
-                meta: { area: currentLine }, motors: [], kardex: [], instructionImages: [], manualsPdf: [], bitacora: [], reportesPiezas: {}
+                id: newId, name: newName,
+                meta: { area: "AREA: LÍNEA EXTRACCION" },
+                motors: [{ marca: '', hp: '', kw: '', rpm: '', voltios: '', amperios: '' }],
+                kardex: [], instructionImages: [], manualsPdf: [],
+                reportesPiezas: {}
             });
             saveDatabase(db);
             renderMachines();
@@ -757,16 +1086,39 @@
             let db = getDatabase();
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (!mach) return;
+
             document.getElementById('kardex-subtitle').innerText = `Activo: ${mach.name}`;
             document.getElementById('k-maquina-lbl').innerText = mach.name;
-            let isAdmin = (currentRole === 'admin');
             
-            ['k-area', 'k-codigo', 'k-eq-marca', 'k-eq-capacidad'].forEach(id => { document.getElementById(id).readOnly = !isAdmin; });
+            let isAdmin = (currentRole === 'admin');
+
+            let kArea = document.getElementById('k-area');
+            let kCodigo = document.getElementById('k-codigo');
+            let kFemision = document.getElementById('k-femision');
+            let kEqMarca = document.getElementById('k-eq-marca');
+            let kEqCapacidad = document.getElementById('k-eq-capacidad');
+            let kEqMaterial = document.getElementById('k-eq-material');
+            let kEqSerie = document.getElementById('k-eq-serie');
+            let kEqModelo = document.getElementById('k-eq-modelo');
+
+            kArea.readOnly = !isAdmin;
+            kCodigo.readOnly = !isAdmin;
+            kFemision.readOnly = !isAdmin;
+            kEqMarca.readOnly = !isAdmin;
+            kEqCapacidad.readOnly = !isAdmin;
+            kEqMaterial.readOnly = !isAdmin;
+            kEqSerie.readOnly = !isAdmin;
+            kEqModelo.readOnly = !isAdmin;
+
             let meta = mach.meta || {};
-            document.getElementById('k-area').value = meta.area || '';
-            document.getElementById('k-codigo').value = meta.codigo || '';
-            document.getElementById('k-eq-marca').value = meta.eq_marca || '';
-            document.getElementById('k-eq-capacidad').value = meta.eq_capacidad || '';
+            kArea.value = meta.area || 'AREA: LÍNEA EXTRACCION JUGO DE LIMON';
+            kCodigo.value = meta.codigo || '';
+            kFemision.value = meta.femision || '';
+            kEqMarca.value = meta.eq_marca || '';
+            kEqCapacidad.value = meta.eq_capacidad || '';
+            kEqMaterial.value = meta.eq_material || '';
+            kEqSerie.value = meta.eq_serie || '';
+            kEqModelo.value = meta.eq_modelo || '';
 
             document.getElementById('add-row-btn').style.display = isAdmin ? 'block' : 'none';
             document.getElementById('add-motor-btn').style.display = isAdmin ? 'block' : 'none';
@@ -780,7 +1132,11 @@
             if (currentRole !== 'admin') return;
             let db = getDatabase();
             let mach = db[currentLine].find(m => m.id === currentMachineId);
-            if (mach) { if (!mach.meta) mach.meta = {}; mach.meta[field] = val; saveDatabase(db); }
+            if (mach) {
+                if (!mach.meta) mach.meta = {};
+                mach.meta[field] = val;
+                saveDatabase(db);
+            }
         }
 
         function renderMotors(motors, isAdmin) {
@@ -790,462 +1146,827 @@
                 let div = document.createElement('div');
                 div.className = 'motor-block-container';
                 div.innerHTML = `
-                    <div class="motor-block-header"><span>MOTOR Nº ${idx + 1}</span> ${isAdmin && motors.length>1 ? `<button onclick="removeMotorBlock(${idx})" style="color:red; background:none; border:none; cursor:pointer;">X</button>`:''}</div>
-                    <div style="display:grid; grid-template-columns: repeat(3, 1fr);">
+                    <div class="motor-block-header">
+                        <span>MOTOR Nº ${idx + 1}</span>
+                        ${isAdmin && motors.length > 1 ? `<button class="btn-row-del" onclick="removeMotorBlock(${idx})">Eliminar Motor</button>` : ''}
+                    </div>
+                    <div class="form-grid-motor-1" style="display:grid; grid-template-columns: repeat(3, 1fr);">
                         <div class="field-box"><label>MARCA</label><input type="text" ${!isAdmin?'readonly':''} value="${m.marca||''}" oninput="updateMotor(${idx},'marca',this.value)"></div>
                         <div class="field-box"><label>HP</label><input type="text" ${!isAdmin?'readonly':''} value="${m.hp||''}" oninput="updateMotor(${idx},'hp',this.value)"></div>
                         <div class="field-box"><label>KW</label><input type="text" ${!isAdmin?'readonly':''} value="${m.kw||''}" oninput="updateMotor(${idx},'kw',this.value)"></div>
-                    </div>`;
+                        <div class="field-box"><label>RPM</label><input type="text" ${!isAdmin?'readonly':''} value="${m.rpm||''}" oninput="updateMotor(${idx},'rpm',this.value)"></div>
+                        <div class="field-box"><label>VOLTIOS</label><input type="text" ${!isAdmin?'readonly':''} value="${m.voltios||''}" oninput="updateMotor(${idx},'voltios',this.value)"></div>
+                        <div class="field-box"><label>AMP</label><input type="text" ${!isAdmin?'readonly':''} value="${m.amperios||''}" oninput="updateMotor(${idx},'amperios',this.value)"></div>
+                    </div>
+                `;
                 container.appendChild(div);
             });
         }
+
         function addMotorBlock() {
             if (currentRole !== 'admin') return;
-            let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
-            if (mach) { if (!mach.motors) mach.motors = []; mach.motors.push({}); saveDatabase(db); loadKardexData(); }
+            let db = getDatabase();
+            let mach = db[currentLine].find(m => m.id === currentMachineId);
+            if(mach) {
+                if(!mach.motors) mach.motors = [];
+                mach.motors.push({ marca: '', hp: '', kw: '', rpm: '', voltios: '', amperios: '' });
+                saveDatabase(db);
+                loadKardexData();
+            }
         }
+
         function removeMotorBlock(idx) {
             if (currentRole !== 'admin') return;
-            let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
-            if (mach) { mach.motors.splice(idx, 1); saveDatabase(db); loadKardexData(); }
+            let db = getDatabase();
+            let mach = db[currentLine].find(m => m.id === currentMachineId);
+            if(mach && mach.motors) {
+                mach.motors.splice(idx, 1);
+                saveDatabase(db);
+                loadKardexData();
+            }
         }
+
         function updateMotor(idx, field, val) {
             if (currentRole !== 'admin') return;
-            let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
-            if (mach && mach.motors[idx]) { mach.motors[idx][field] = val; saveDatabase(db); }
+            let db = getDatabase();
+            let mach = db[currentLine].find(m => m.id === currentMachineId);
+            if(mach && mach.motors && mach.motors[idx]) {
+                mach.motors[idx][field] = val;
+                saveDatabase(db);
+            }
         }
 
         function renderKardexRows(kardex, isAdmin) {
-            let tbody = document.getElementById('kardex-tbody'); tbody.innerHTML = '';
+            let tbody = document.getElementById('kardex-tbody');
+            tbody.innerHTML = '';
             kardex.forEach((row, idx) => {
                 let tr = document.createElement('tr');
-                tr.innerHTML = `<td>${idx+1}</td><td><input type="text" ${!isAdmin?'readonly':''} value="${row.categoria||''}" oninput="updateKardex(${idx},'categoria',this.value)"></td><td><input type="text" ${!isAdmin?'readonly':''} value="${row.desc||''}" oninput="updateKardex(${idx},'desc',this.value)"></td><td><input type="text" ${!isAdmin?'readonly':''} value="${row.um||''}" oninput="updateKardex(${idx},'um',this.value)"></td><td><input type="number" ${!isAdmin?'readonly':''} value="${row.cant||''}" oninput="updateKardex(${idx},'cant',this.value)"></td>${isAdmin?`<td><button onclick="removeKardexRow(${idx})" style="color:red; background:none; border:none; cursor:pointer;">X</button></td>`:''}`;
+                tr.innerHTML = `
+                    <td>${idx + 1}</td>
+                    <td><input type="text" ${!isAdmin?'readonly':''} value="${row.categoria||''}" oninput="updateKardex(${idx},'categoria',this.value)"></td>
+                    <td><input type="text" ${!isAdmin?'readonly':''} value="${row.desc||''}" oninput="updateKardex(${idx},'desc',this.value)"></td>
+                    <td><input type="text" ${!isAdmin?'readonly':''} value="${row.um||''}" oninput="updateKardex(${idx},'um',this.value)"></td>
+                    <td><input type="number" ${!isAdmin?'readonly':''} value="${row.cant||''}" oninput="updateKardex(${idx},'cant',this.value)"></td>
+                    ${isAdmin ? `<td><button class="btn-row-del" onclick="removeKardexRow(${idx})">X</button></td>` : ''}
+                `;
                 tbody.appendChild(tr);
             });
         }
+
         function addKardexRow() {
             if (currentRole !== 'admin') return;
-            let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
-            if (mach) { if (!mach.kardex) mach.kardex = []; mach.kardex.push({ categoria: '', desc: '', um: 'Pza', cant: 1 }); saveDatabase(db); loadKardexData(); }
+            let db = getDatabase();
+            let mach = db[currentLine].find(m => m.id === currentMachineId);
+            if(mach) {
+                if(!mach.kardex) mach.kardex = [];
+                mach.kardex.push({ categoria: '', desc: '', um: 'Pza', cant: 1 });
+                saveDatabase(db);
+                loadKardexData();
+            }
         }
+
         function removeKardexRow(idx) {
             if (currentRole !== 'admin') return;
-            let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
-            if (mach) { mach.kardex.splice(idx, 1); saveDatabase(db); loadKardexData(); }
+            let db = getDatabase();
+            let mach = db[currentLine].find(m => m.id === currentMachineId);
+            if(mach && mach.kardex) {
+                mach.kardex.splice(idx, 1);
+                saveDatabase(db);
+                loadKardexData();
+            }
         }
+
         function updateKardex(idx, field, val) {
             if (currentRole !== 'admin') return;
-            let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
-            if (mach && mach.kardex[idx]) { mach.kardex[idx][field] = val; saveDatabase(db); }
+            let db = getDatabase();
+            let mach = db[currentLine].find(m => m.id === currentMachineId);
+            if(mach && mach.kardex && mach.kardex[idx]) {
+                mach.kardex[idx][field] = val;
+                saveDatabase(db);
+            }
         }
 
         function loadInstructionsData() {
-            let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
+            let db = getDatabase();
+            let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (!mach) return;
+
             document.getElementById('inst-subtitle').innerText = `Activo: ${mach.name}`;
-            document.getElementById('admin-img-upload').style.display = (currentRole === 'admin') ? 'block' : 'none';
-            let wrapper = document.getElementById('instructions-gallery-wrapper'); wrapper.innerHTML = '';
+            let isAdmin = (currentRole === 'admin');
+            document.getElementById('admin-img-upload').style.display = isAdmin ? 'block' : 'none';
+
+            let wrapper = document.getElementById('instructions-gallery-wrapper');
+            wrapper.innerHTML = '';
+            
             let images = mach.instructionImages || [];
-            if (images.length === 0) { wrapper.innerHTML = `<span style="opacity: 0.5; font-size: 11px; grid-column: span 2; padding: 20px;">Sin instrucciones.</span>`; return; }
-            images.forEach((img, idx) => {
-                let card = document.createElement('div'); card.className = 'instruction-card';
-                card.innerHTML = `${currentRole==='admin'?`<button onclick="event.stopPropagation(); removeInstructionImage(${idx})" style="position:absolute; top:5px; right:5px; background:red; color:#fff; border:none; border-radius:50%; width:20px; height:20px; font-size:9px; cursor:pointer;">✕</button>`:''}<img src="${img}" class="instruction-card-thumb" onclick="openImageModal('${img}')"><div class="instruction-card-info">Paso ${idx+1}</div>`;
+            if (images.length === 0) {
+                wrapper.innerHTML = `<span style="color: #888; font-size: 11px; grid-column: span 2; padding: 20px;">No hay instrucciones registradas.</span>`;
+                return;
+            }
+
+            images.forEach((imgData, idx) => {
+                let card = document.createElement('div');
+                card.className = 'instruction-card';
+                card.innerHTML = `
+                    ${isAdmin ? `<button class="btn-img-del" onclick="event.stopPropagation(); removeInstructionImage(${idx})">✕</button>` : ''}
+                    <img src="${imgData}" class="instruction-card-thumb" onclick="openImageModal('${imgData}')">
+                    <div class="instruction-card-info">Paso ${idx + 1}</div>
+                `;
                 wrapper.appendChild(card);
             });
         }
-        function uploadInstructionImages(e) {
+
+        function uploadInstructionImages(event) {
             if (currentRole !== 'admin') return;
-            let files = e.target.files; if (!files.length) return;
-            let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
+            let files = event.target.files;
+            if (!files.length) return;
+            
+            let db = getDatabase();
+            let mach = db[currentLine].find(m => m.id === currentMachineId);
+            if (!mach) return;
+
             let processed = 0;
             Array.from(files).forEach(file => {
                 let reader = new FileReader();
-                reader.onload = function(evt) {
+                reader.onload = function(e) {
                     if (!mach.instructionImages) mach.instructionImages = [];
-                    mach.instructionImages.push(evt.target.result);
+                    mach.instructionImages.push(e.target.result);
                     processed++;
-                    if (processed === files.length) { saveDatabase(db); loadInstructionsData(); }
+                    if (processed === files.length) {
+                        saveDatabase(db);
+                        loadInstructionsData();
+                        event.target.value = '';
+                    }
                 };
                 reader.readAsDataURL(file);
             });
         }
+
         function removeInstructionImage(idx) {
             if (currentRole !== 'admin') return;
-            let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
-            mach.instructionImages.splice(idx, 1); saveDatabase(db); loadInstructionsData();
+            let db = getDatabase();
+            let mach = db[currentLine].find(m => m.id === currentMachineId);
+            if (mach && mach.instructionImages) {
+                mach.instructionImages.splice(idx, 1);
+                saveDatabase(db);
+                loadInstructionsData();
+            }
         }
 
         function loadManualsData() {
-            let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
+            let db = getDatabase();
+            let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (!mach) return;
+
             document.getElementById('man-subtitle').innerText = `Activo: ${mach.name}`;
-            document.getElementById('admin-pdf-upload').style.display = (currentRole === 'admin') ? 'block' : 'none';
-            let wrapper = document.getElementById('manuals-list-wrapper'); wrapper.innerHTML = '';
+            let isAdmin = (currentRole === 'admin');
+            document.getElementById('admin-pdf-upload').style.display = isAdmin ? 'block' : 'none';
+
+            let wrapper = document.getElementById('manuals-list-wrapper');
+            wrapper.innerHTML = '';
+
             let manuals = mach.manualsPdf || [];
-            if (manuals.length === 0) { wrapper.innerHTML = `<span style="opacity: 0.5; font-size: 11px; padding: 20px;">Sin manuales PDF.</span>`; return; }
+            if (manuals.length === 0) {
+                wrapper.innerHTML = `<span style="color: #888; font-size: 11px; padding: 20px;">No hay manuales PDF cargados.</span>`;
+                return;
+            }
+
             manuals.forEach((man, idx) => {
-                let row = document.createElement('div'); row.className = 'manual-item-row';
-                row.innerHTML = `<div class="manual-info"><span>📄</span><span class="manual-name">${man.name}</span></div><div style="display:flex; gap:6px;"><a href="${man.data}" download="${man.name}" style="background:#0077b6; color:#fff; padding:4px 8px; border-radius:4px; font-size:10px; text-decoration:none; font-weight:bold;">📥 Descargar</a>${currentRole==='admin'?`<button onclick="removeManualPdf(${idx})" style="background:red; color:#fff; border:none; border-radius:4px; padding:4px 6px; font-size:10px; cursor:pointer;">Eliminar</button>`:''}</div>`;
+                let row = document.createElement('div');
+                row.className = 'manual-item-row';
+                row.innerHTML = `
+                    <div class="manual-info">
+                        <span class="manual-icon">📄</span>
+                        <span class="manual-name" title="${man.name}">${man.name}</span>
+                    </div>
+                    <div class="manual-actions">
+                        <a href="${man.data}" download="${man.name}" class="btn-pdf-download">📥 Ver / Descargar</a>
+                        ${isAdmin ? `<button class="btn-pdf-del" onclick="removeManualPdf(${idx})">Eliminar</button>` : ''}
+                    </div>
+                `;
                 wrapper.appendChild(row);
             });
         }
-        function uploadManualsPdf(e) {
+
+        function uploadManualsPdf(event) {
             if (currentRole !== 'admin') return;
-            let files = e.target.files; if (!files.length) return;
-            let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
+            let files = event.target.files;
+            if (!files.length) return;
+
+            let db = getDatabase();
+            let mach = db[currentLine].find(m => m.id === currentMachineId);
+            if (!mach) return;
+
             let processed = 0;
             Array.from(files).forEach(file => {
                 let reader = new FileReader();
-                reader.onload = function(evt) {
+                reader.onload = function(e) {
                     if (!mach.manualsPdf) mach.manualsPdf = [];
-                    mach.manualsPdf.push({ name: file.name, data: evt.target.result });
+                    mach.manualsPdf.push({ name: file.name, data: e.target.result });
                     processed++;
-                    if (processed === files.length) { saveDatabase(db); loadManualsData(); }
+                    if (processed === files.length) {
+                        saveDatabase(db);
+                        loadManualsData();
+                        event.target.value = '';
+                    }
                 };
                 reader.readAsDataURL(file);
             });
         }
+
         function removeManualPdf(idx) {
             if (currentRole !== 'admin') return;
-            let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
-            mach.manualsPdf.splice(idx, 1); saveDatabase(db); loadManualsData();
-        }
-
-        function loadBitacoraData() {
-            let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
-            if (!mach) return;
-            document.getElementById('bitacora-subtitle').innerText = `Activo: ${mach.name}`;
-            let wrapper = document.getElementById('bitacora-list-wrapper'); wrapper.innerHTML = '';
-            let notas = mach.bitacora || [];
-            if (notas.length === 0) { wrapper.innerHTML = `<span style="opacity: 0.5; font-size: 11px; padding: 20px;">No hay notas en la bitácora de este activo.</span>`; return; }
-            notas.slice().reverse().forEach((n) => {
-                let card = document.createElement('div'); card.className = 'bitacora-item';
-                card.innerHTML = `<div class="flex justify-between font-bold text-[10px] opacity-70 mb-1"><span>👤 ${n.autor} (${n.rol})</span><span>${n.fecha}</span></div><p class="text-xs">${n.texto}</p>`;
-                wrapper.appendChild(card);
-            });
-        }
-        function guardarNotaBitacora() {
-            let txt = document.getElementById('txt-nueva-nota').value.trim();
-            if (!txt) { alert("Escribe una nota."); return; }
-            let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
-            if (mach) {
-                if (!mach.bitacora) mach.bitacora = [];
-                let ahora = new Date();
-                mach.bitacora.push({
-                    texto: txt,
-                    autor: currentRole === 'admin' ? 'Administrador' : currentRole === 'mantenimiento' ? 'Técnico de Mantenimiento' : 'Visitante',
-                    rol: currentRole.toUpperCase(),
-                    fecha: ahora.toLocaleDateString() + ' ' + ahora.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                });
-                saveDatabase(db);
-                document.getElementById('txt-nueva-nota').value = '';
-                loadBitacoraData();
-            }
-        }
-
-        function abrirAlertasGlobales() {
             let db = getDatabase();
-            let wrapper = document.getElementById('alertas-list-wrapper'); wrapper.innerHTML = '';
-            let totalAlertas = 0;
-
-            for (let linea in db) {
-                db[linea].forEach(mach => {
-                    if (mach.reportesPiezas) {
-                        for (let pieza in mach.reportesPiezas) {
-                            totalAlertas++;
-                            let rep = mach.reportesPiezas[pieza];
-                            let card = document.createElement('div'); card.className = 'bitacora-item border-l-4 border-l-red-500';
-                            card.innerHTML = `<div class="font-bold text-red-400 text-xs mb-1">Línea: ${linea} ➔ ${mach.name}</div><div class="font-semibold text-xs mb-1">⚙️ Pieza: ${pieza}</div><p class="text-[11px] opacity-90">Motivo: ${rep.motivo}</p><div class="text-[10px] opacity-60 mt-1 flex justify-between"><span>👤 ${rep.responsable || 'Sistema'}</span><span>${rep.fecha}</span></div>`;
-                            wrapper.appendChild(card);
-                        }
-                    }
-                });
+            let mach = db[currentLine].find(m => m.id === currentMachineId);
+            if (mach && mach.manualsPdf) {
+                mach.manualsPdf.splice(idx, 1);
+                saveDatabase(db);
+                loadManualsData();
             }
-
-            if (totalAlertas === 0) {
-                wrapper.innerHTML = `<p class="text-center opacity-60 text-xs py-6">🎉 ¡Excelente! No hay piezas reportadas en mantenimiento en toda la planta.</p>`;
-            }
-
-            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
-            document.getElementById('view-alertas').classList.add('active-view');
         }
 
-        function openImageModal(src) { document.getElementById('modal-img-tag').src = src; document.getElementById('img-modal').style.display = 'flex'; }
-        function closeImageModal() { document.getElementById('img-modal').style.display = 'none'; }
+        function openImageModal(src) {
+            document.getElementById('modal-img-tag').src = src;
+            document.getElementById('img-modal').style.display = 'flex';
+        }
 
+        function closeImageModal() {
+            document.getElementById('img-modal').style.display = 'none';
+        }
+
+        // ==========================================
+        // LÓGICA 3D (REPORTES, ESTADOS Y VISTA EXPLOSIONADA)
+        // ==========================================
         let scene, camera, renderer, grupoMaquina, controls, raycaster, mouse, gltfLoader;
         let piezaSeleccionadaActual = "";
         let vistaExplosionada = false;
         let piezasDetectadas = [];
-        // Se eliminó por completo defaultGLBUrl estático para evitar interferencias y forzar uso de Supabase Storage / LocalForage.
+
+        let pointerDownX = 0;
+        let pointerDownY = 0;
+        let hasMoved = false;
+
+        const defaultGLBUrl = "modelos/EXTRACTORA_POLICYTRUS.glb";
 
         function init3D() {
             const container = document.getElementById('canvas-3d');
-            scene = new THREE.Scene(); scene.background = new THREE.Color(0x111827);
-            camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 100);
+            const initW = container.clientWidth > 0 ? container.clientWidth : 300;
+            const initH = container.clientHeight > 0 ? container.clientHeight : 480;
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x111827);
+
+            camera = new THREE.PerspectiveCamera(50, initW / initH, 0.1, 100);
             camera.position.set(5, 5, 8);
+
             renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setSize(initW, initH);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.outputEncoding = THREE.sRGBEncoding;
             container.appendChild(renderer.domElement);
+
             controls = new THREE.OrbitControls(camera, renderer.domElement);
             controls.enableDamping = true;
-            raycaster = new THREE.Raycaster(); mouse = new THREE.Vector2(); gltfLoader = new THREE.GLTFLoader();
+
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+            gltfLoader = new THREE.GLTFLoader();
 
             scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-            const dirLight = new THREE.DirectionalLight(0xffffff, 1); dirLight.position.set(10, 20, 10); scene.add(dirLight);
-            grupoMaquina = new THREE.Group(); scene.add(grupoMaquina);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+            dirLight.position.set(10, 20, 10);
+            scene.add(dirLight);
+            
+            const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+            fillLight.position.set(-10, -10, -10);
+            scene.add(fillLight);
+
+            grupoMaquina = new THREE.Group();
+            scene.add(grupoMaquina);
+
             cargarModeloMaquinaActual();
 
-            document.getElementById('input-archivo').addEventListener('change', async function(e) {
-                if (currentRole !== 'admin') return;
-                const archivo = e.target.files[0]; if (!archivo) return;
-                
-                // Guardar en Supabase Storage (Bucket: modelos-glb)
-                const filePath = `maquinas/${currentLine}_${currentMachineId}_${Date.now()}.glb`;
-                const { data: storageData, error: storageError } = await supabaseClient.storage
-                    .from('modelos-glb')
-                    .upload(filePath, archivo);
-
-                if (storageError) {
-                    console.error("Error al subir a Supabase Storage:", storageError.message);
-                    alert("Error al subir el modelo a la nube.");
-                    return;
-                }
-
-                // Guardar referencia en localforage/base de datos local también
-                await localforage.setItem(`glb_machine_${currentLine}_${currentMachineId}`, archivo);
-                cargarModeloMaquinaActual(); 
-                alert("Modelo 3D guardado y subido con éxito a Supabase.");
-            });
-
-            let pdX = 0, pdY = 0, moved = false;
-            renderer.domElement.addEventListener('pointerdown', (e) => { pdX = e.clientX; pdY = e.clientY; moved = false; });
-            renderer.domElement.addEventListener('pointermove', (e) => { if (Math.abs(e.clientX - pdX) > 5 || Math.abs(e.clientY - pdY) > 5) moved = true; });
-            renderer.domElement.addEventListener('pointerup', (e) => { if (!moved) detectarToque(e.clientX, e.clientY); });
-
-            function animate() {
-                requestAnimationFrame(animate); controls.update();
-                piezasDetectadas.forEach(p => {
-                    if (p.userData.posOrig && p.userData.posExp) {
-                        p.position.lerp(vistaExplosionada ? p.userData.posExp : p.userData.posOrig, 0.08);
+            const inputArchivo = document.getElementById('input-archivo');
+            if (inputArchivo) {
+                inputArchivo.addEventListener('change', async function(e) {
+                    if (currentRole !== 'admin') return;
+                    const archivo = e.target.files[0];
+                    if (!archivo) return;
+                    
+                    try {
+                        await localforage.setItem(`glb_machine_${currentLine}_${currentMachineId}`, archivo);
+                        cargarModeloMaquinaActual();
+                        alert("¡Modelo 3D detallado guardado correctamente!");
+                    } catch (err) {
+                        console.error("Error al guardar archivo en IndexedDB:", err);
+                        alert("Hubo un error al guardar el archivo 3D.");
                     }
                 });
+            }
+
+            renderer.domElement.addEventListener('pointerdown', (e) => {
+                pointerDownX = e.clientX;
+                pointerDownY = e.clientY;
+                hasMoved = false;
+            });
+
+            renderer.domElement.addEventListener('pointermove', (e) => {
+                const deltaX = Math.abs(e.clientX - pointerDownX);
+                const deltaY = Math.abs(e.clientY - pointerDownY);
+                if (deltaX > 5 || deltaY > 5) {
+                    hasMoved = true;
+                }
+            });
+
+            renderer.domElement.addEventListener('pointerup', (e) => {
+                if (!hasMoved) {
+                    detectarToque(e.clientX, e.clientY);
+                }
+            });
+
+            function animate() {
+                requestAnimationFrame(animate);
+                controls.update();
+                
+                piezasDetectadas.forEach(pieza => {
+                    if (pieza.userData.posOrig && pieza.userData.posExp) {
+                        const target = vistaExplosionada ? pieza.userData.posExp : pieza.userData.posOrig;
+                        pieza.position.lerp(target, 0.08); 
+                    }
+                });
+
                 renderer.render(scene, camera);
             }
             animate();
 
-            document.getElementById('btn-explo').addEventListener('click', () => {
+            new ResizeObserver(() => {
+                redimensionarCanvas3D();
+            }).observe(container);
+
+            const btnExplo = document.getElementById('btn-explo');
+            btnExplo.addEventListener('click', () => {
+                if(btnExplo.disabled) return;
                 vistaExplosionada = !vistaExplosionada;
-                let btn = document.getElementById('btn-explo');
-                btn.innerText = vistaExplosionada ? "🔧 Unir Piezas" : "💥 Vista Explosionada";
-                btn.className = vistaExplosionada ? "w-full mb-2 py-2 bg-green-600 hover:bg-green-500 rounded text-white font-bold text-xs shadow" : "w-full mb-2 py-2 bg-purple-600 hover:bg-purple-500 rounded text-white font-bold text-xs shadow";
+                btnExplo.innerText = vistaExplosionada ? "🔧 Unir Piezas" : "💥 Activar Vista Explosionada";
+                btnExplo.className = vistaExplosionada 
+                    ? "w-full mb-2 py-2 bg-green-600 hover:bg-green-500 rounded-md text-white font-bold text-xs shadow transition" 
+                    : "w-full mb-2 py-2 bg-purple-600 hover:bg-purple-500 rounded-md text-white font-bold text-xs shadow transition";
             });
 
             document.getElementById('buscador-piezas').addEventListener('input', function(e) {
-                let term = e.target.value.toLowerCase();
-                document.querySelectorAll('.item-partes').forEach(item => {
-                    item.style.display = item.innerText.toLowerCase().includes(term) ? 'flex' : 'none';
+                const termino = e.target.value.toLowerCase();
+                const items = document.querySelectorAll('.item-partes'); 
+                items.forEach(item => {
+                    const nombre = item.innerText.toLowerCase();
+                    if (nombre.includes(termino)) {
+                        item.classList.remove('hidden');
+                    } else {
+                        item.classList.add('hidden');
+                    }
                 });
             });
         }
 
         async function cargarModeloMaquinaActual() {
             const btnExplo = document.getElementById('btn-explo');
-            btnExplo.innerText = "⏳ Cargando..."; btnExplo.disabled = true;
-            while(grupoMaquina.children.length > 0) grupoMaquina.remove(grupoMaquina.children[0]);
+            const lista = document.getElementById('lista-partes');
+            const indicador = document.getElementById('indicador-equipo');
+            
+            btnExplo.innerText = "⏳ Cargando modelo...";
+            btnExplo.disabled = true;
+            btnExplo.classList.add("opacity-50", "cursor-not-allowed");
+
+            while(grupoMaquina.children.length > 0) {
+                grupoMaquina.remove(grupoMaquina.children[0]);
+            }
 
             try {
-                // Intentar cargar primero localmente desde localforage
-                const blob = await localforage.getItem(`glb_machine_${currentLine}_${currentMachineId}`);
-                if (blob) {
-                    gltfLoader.load(URL.createObjectURL(blob), (gltf) => procesarModelo(gltf, "Personalizado"), undefined, () => mostrarModeloVacio());
+                const blobModelo = await localforage.getItem(`glb_machine_${currentLine}_${currentMachineId}`);
+                
+                if (blobModelo) {
+                    const urlObjeto = URL.createObjectURL(blobModelo);
+                    gltfLoader.load(urlObjeto, (gltf) => {
+                        procesarModeloCargado(gltf, "Modelo Personalizado");
+                        URL.revokeObjectURL(urlObjeto);
+                    }, undefined, (err) => {
+                        console.error("Error al cargar GLB personalizado:", err);
+                        cargarModeloPorDefecto();
+                    });
                 } else {
-                    mostrarModeloVacio();
+                    cargarModeloPorDefecto();
                 }
-            } catch (e) { 
-                mostrarModeloVacio(); 
+            } catch (err) {
+                console.error("Error leyendo IndexedDB:", err);
+                cargarModeloPorDefecto();
             }
         }
 
-        function mostrarModeloVacio() {
-            document.getElementById('btn-explo').innerText = "💥 Vista Explosionada";
-            document.getElementById('btn-explo').disabled = true;
-            document.getElementById('indicador-equipo').innerText = "📍 Sin Modelo 3D (Importar)";
+        function cargarModeloPorDefecto() {
+            gltfLoader.load(defaultGLBUrl, (gltf) => {
+                procesarModeloCargado(gltf, "EXTRACTORA POLICYTRUS");
+            }, undefined, (err) => {
+                console.warn("No se encontró el modelo por defecto local, escena vacía lista para importar.");
+                const btnExplo = document.getElementById('btn-explo');
+                btnExplo.innerText = "💥 Activar Vista Explosionada";
+                btnExplo.disabled = false;
+                btnExplo.classList.remove("opacity-50", "cursor-not-allowed");
+            });
+            // Asegúrate de tener un input de tipo file en tu HTML original
+// <input type="file" id="btn-file-input">
+
+document.getElementById('tu-boton-subir-en-interfaz').addEventListener('click', async () => {
+    const input = document.getElementById('btn-file-input');
+    const archivo = input.files[0];
+
+    if (!archivo) return alert('Selecciona un archivo');
+
+    // Mismo proceso que ya funciona:
+    const { data: storageData, error: storageError } = await _supabase.storage
+        .from('modelos-glb')
+        .upload(`modelo_${Date.now()}_${archivo.name}`, archivo);
+
+    if (storageError) return alert('Error: ' + storageError.message);
+
+    const { data: { publicUrl } } = _supabase.storage
+        .from('modelos-glb')
+        .getPublicUrl(`modelo_${Date.now()}_${archivo.name}`);
+
+    // Insertar en tabla 'modelos'
+    await _supabase.from('modelos').insert([{ nombre: archivo.name, url: publicUrl }]);
+    
+    alert('¡Subido y guardado!');
+});
         }
 
-        function procesarModelo(gltf, nombreEq) {
+        function procesarModeloCargado(gltf, nombreEquipo) {
             const modelo = gltf.scene;
-            const center = new THREE.Box3().setFromObject(modelo).getCenter(new THREE.Vector3());
-            modelo.position.sub(center);
-            piezasDetectadas = []; let lista = document.getElementById('lista-partes'); lista.innerHTML = "";
-            let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
+            const boxCentro = new THREE.Box3().setFromObject(modelo);
+            const center = boxCentro.getCenter(new THREE.Vector3());
+            modelo.position.sub(center); 
+
+            piezasDetectadas = [];
+            const lista = document.getElementById('lista-partes');
+            lista.innerHTML = "";
+            let indexPieza = 1;
+
+            let db = getDatabase();
+            let mach = db[currentLine].find(m => m.id === currentMachineId);
             let reportes = mach && mach.reportesPiezas ? mach.reportesPiezas : {};
 
-            let idx = 1;
             modelo.traverse((child) => {
                 if (child.isMesh) {
                     piezasDetectadas.push(child);
-                    let nombre = child.name || `Pieza_${idx}`;
-                    const posOrig = child.position.clone();
-                    const dir = new THREE.Box3().setFromObject(child).getCenter(new THREE.Vector3()).sub(center).normalize();
-                    if(dir.lengthSq() === 0) dir.set(0, 1, 0);
                     
-                    child.userData = { posOrig: posOrig, posExp: posOrig.clone().add(dir.multiplyScalar(2)), colorBase: child.material.color ? child.material.color.getHex() : 0x888888 };
-                    let rep = reportes[nombre] && reportes[nombre].estado === 'mantenimiento';
+                    let nombreLimpio = child.name;
+                    if (nombreLimpio.toLowerCase().includes("sólido") && child.parent && child.parent.name !== "Scene") {
+                        nombreLimpio = child.parent.name;
+                    }
+                    child.name = nombreLimpio || `Pieza_${indexPieza}`; 
 
-                    child.material = new THREE.MeshStandardMaterial({ color: rep ? 0xef4444 : child.userData.colorBase, roughness: 0.5, transparent: true, opacity: 1.0 });
+                    const posOrig = child.position.clone();
+                    const meshBox = new THREE.Box3().setFromObject(child);
+                    const meshCenter = meshBox.getCenter(new THREE.Vector3());
+                    const direccionExplosion = meshCenter.clone().sub(center).normalize();
+                    
+                    if(direccionExplosion.lengthSq() === 0) direccionExplosion.set(0, 1, 0);
+                    const posExp = posOrig.clone().add(direccionExplosion.multiplyScalar(2));
 
-                    let btn = document.createElement('button');
+                    let colorOriginal = child.material.color ? child.material.color.getHex() : 0x888888;
+                    let tieneReporte = reportes[child.name] && reportes[child.name].estado === 'mantenimiento';
+
+                    child.userData = { 
+                        posOrig: posOrig, 
+                        posExp: posExp,
+                        colorBase: colorOriginal 
+                    };
+
+                    child.material = new THREE.MeshStandardMaterial({ 
+                        color: tieneReporte ? 0xef4444 : colorOriginal,
+                        roughness: 0.5,
+                        metalness: 0.1,
+                        transparent: true,
+                        opacity: 1.0
+                    });
+
+                    const btn = document.createElement('button');
                     btn.className = "item-partes w-full text-left p-1.5 rounded hover:bg-gray-700 text-gray-300 text-xs flex justify-between items-center";
-                    btn.innerHTML = `<span>⚙️ ${nombre}</span> ${rep ? '<span class="text-[9px] bg-red-600 text-white px-1 rounded">Mantenimiento</span>' : ''}`;
-                    btn.onclick = () => seleccionarComponente(nombre);
+                    btn.setAttribute('data-pieza', child.name);
+                    btn.innerHTML = `<span>⚙️ ${child.name}</span> ${tieneReporte ? '<span class="text-[9px] bg-red-600 text-white px-1 rounded">Mantenimiento</span>' : ''}`;
+                    btn.onclick = () => seleccionarComponente(child.name);
                     lista.appendChild(btn);
-                    idx++;
+
+                    indexPieza++;
                 }
             });
+
             grupoMaquina.add(modelo);
-            document.getElementById('indicador-equipo').innerText = `📍 ${nombreEq}`;
-            document.getElementById('btn-explo').innerText = "💥 Vista Explosionada";
-            document.getElementById('btn-explo').disabled = false;
-            document.getElementById('btn-explo').classList.remove("opacity-50", "cursor-not-allowed");
+
+            const indicador = document.getElementById('indicador-equipo');
+            if(indicador) indicador.innerText = `📍 Vista: ${nombreEquipo}`;
+
+            const btnExplo = document.getElementById('btn-explo');
+            btnExplo.innerText = "💥 Activar Vista Explosionada";
+            btnExplo.disabled = false;
+            btnExplo.classList.remove("opacity-50", "cursor-not-allowed");
+            
             centrarVistaGeneral();
         }
 
-        function seleccionarComponente(nombre) {
-            const panel = document.getElementById('panel-info');
-            const pieza = piezasDetectadas.find(p => p.name === nombre);
-            if (piezaSeleccionadaActual === nombre) {
-                actualizarOpacidad(null); panel.classList.add('hidden'); piezaSeleccionadaActual = null; return;
+        function fijarCamara(vista) {
+            const posiciones = {
+                frontal:  { x: 0, y: 0, z: 8 },
+                superior: { x: 0, y: 8, z: 0 },
+                lateral:  { x: 8, y: 0, z: 0 },
+                iso:      { x: 5, y: 5, z: 5 }
+            };
+            const pos = posiciones[vista];
+            camera.position.set(pos.x, pos.y, pos.z);
+            controls.target.set(0, 0, 0);
+            controls.update();
+        }
+
+        function centrarVistaGeneral() {
+            if (piezaSeleccionadaActual) {
+                actualizarOpacidadYColoresEnEscena(null);
+                document.getElementById('panel-info').classList.add('hidden');
+                piezaSeleccionadaActual = null;
             }
-            if (pieza) {
-                piezaSeleccionadaActual = nombre;
-                enfocarPieza(pieza); actualizarOpacidad(nombre);
-                let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
-                let rep = mach && mach.reportesPiezas ? mach.reportesPiezas[nombre] : null;
+
+            gsap.to(controls.target, { x: 0, y: 0, z: 0, duration: 0.8, ease: "power2.inOut" });
+            gsap.to(camera.position, {
+                x: 5, y: 5, z: 8, duration: 0.8, ease: "power2.inOut",
+                onUpdate: () => { controls.update(); }
+            });
+        }
+
+        function actualizarOpacidadYColoresEnEscena(piezaDestacadaNombre) {
+            let db = getDatabase();
+            let mach = db[currentLine].find(m => m.id === currentMachineId);
+            let reportes = mach && mach.reportesPiezas ? mach.reportesPiezas : {};
+
+            piezasDetectadas.forEach(pieza => {
+                let reportada = reportes[pieza.name] && reportes[pieza.name].estado === 'mantenimiento';
+                let colorBaseReal = reportada ? 0xef4444 : pieza.userData.colorBase;
+
+                if (!piezaDestacadaNombre) {
+                    pieza.material.transparent = false;
+                    pieza.material.opacity = 1.0;
+                    pieza.material.color.setHex(colorBaseReal);
+                } else {
+                    const esSeleccionada = (pieza.name === piezaDestacadaNombre);
+                    pieza.material.transparent = true;
+                    pieza.material.opacity = esSeleccionada ? 1.0 : 0.2;
+                    pieza.material.color.setHex(esSeleccionada ? 0xeab308 : colorBaseReal);
+                }
+            });
+        }
+
+        function seleccionarComponente(nombrePieza) {
+            const panel = document.getElementById('panel-info');
+            const piezaEncontrada = piezasDetectadas.find(p => p.name === nombrePieza);
+
+            if (piezaSeleccionadaActual === nombrePieza) {
+                actualizarOpacidadYColoresEnEscena(null);
+                panel.classList.add('hidden');
+                controls.target.set(0, 0, 0);
+                controls.update();
+                piezaSeleccionadaActual = null;
+                return;
+            }
+
+            if (piezaEncontrada) {
+                piezaSeleccionadaActual = nombrePieza;
+                enfocarPieza(piezaEncontrada);
+                actualizarOpacidadYColoresEnEscena(nombrePieza);
+
+                let db = getDatabase();
+                let mach = db[currentLine].find(m => m.id === currentMachineId);
+                let reportes = mach && mach.reportesPiezas ? mach.reportesPiezas : {};
+                let repInfo = reportes[nombrePieza];
 
                 panel.classList.remove('hidden');
-                document.getElementById('info-titulo').innerText = nombre;
-                let lblEst = document.getElementById('info-estado');
-                let boxMot = document.getElementById('info-motivo-box');
-                let acc = document.getElementById('panel-acciones-pieza'); acc.innerHTML = '';
+                document.getElementById('info-titulo').innerText = nombrePieza;
+                document.getElementById('info-descripcion').innerText = "Componente seleccionado del sistema.";
 
-                if (rep && rep.estado === 'mantenimiento') {
-                    lblEst.innerText = "Mantenimiento"; lblEst.className = "text-red-400 font-bold";
-                    boxMot.classList.remove('hidden');
-                    document.getElementById('info-motivo-txt').innerText = `${rep.motivo} (Por: ${rep.responsable || 'N/D'})`;
+                const lblEstado = document.getElementById('info-estado');
+                const boxMotivo = document.getElementById('info-motivo-box');
+                const txtMotivo = document.getElementById('info-motivo-txt');
+                const contenedorAcciones = document.getElementById('panel-acciones-pieza');
+                contenedorAcciones.innerHTML = '';
+
+                if (repInfo && repInfo.estado === 'mantenimiento') {
+                    lblEstado.innerText = "Requiere Mantenimiento";
+                    lblEstado.className = "text-red-400 font-bold";
+                    boxMotivo.classList.remove('hidden');
+                    txtMotivo.innerText = repInfo.motivo + ` (${repInfo.fecha})`;
                 } else {
-                    lblEst.innerText = "Operativo"; lblEst.className = "text-green-400 font-bold";
-                    boxMot.classList.add('hidden');
+                    lblEstado.innerText = "Operativo";
+                    lblEstado.className = "text-green-400 font-bold";
+                    boxMotivo.classList.add('hidden');
                 }
 
-                if (currentRole === 'mantenimiento' && (!rep || rep.estado !== 'mantenimiento')) {
-                    acc.innerHTML = `<button onclick="abrirModalMotivo('${nombre}')" class="w-full py-1 bg-red-600 rounded text-white font-bold text-[11px]">⚠️ Reportar</button>`;
-                } else if (currentRole === 'admin') {
-                    if (rep && rep.estado === 'mantenimiento') {
-                        acc.innerHTML = `<button onclick="marcarOperativa('${nombre}')" class="w-full py-1 bg-green-600 rounded text-white font-bold text-[11px]">✅ Operativa</button>`;
+                if (currentRole === 'mantenimiento') {
+                    if (!repInfo || repInfo.estado !== 'mantenimiento') {
+                        contenedorAcciones.innerHTML = `
+                            <button onclick="abrirModalMotivoReporte('${nombrePieza}')" class="w-full py-1.5 bg-red-600 hover:bg-red-500 rounded text-white font-bold text-[11px] shadow transition">
+                                ⚠️ Requiere Mantenimiento
+                            </button>
+                        `;
                     } else {
-                        acc.innerHTML = `<button onclick="abrirModalMotivo('${nombre}')" class="w-full py-1 bg-red-600 rounded text-white font-bold text-[11px]">⚠️ Reportar</button>`;
+                        contenedorAcciones.innerHTML = `
+                            <span class="text-[10px] text-red-300 italic text-center">Ya reportado en mantenimiento.</span>
+                        `;
+                    }
+                } else if (currentRole === 'admin') {
+                    if (repInfo && repInfo.estado === 'mantenimiento') {
+                        contenedorAcciones.innerHTML = `
+                            <button onclick="marcarPiezaOperativa('${nombrePieza}')" class="w-full py-1.5 bg-green-600 hover:bg-green-500 rounded text-white font-bold text-[11px] shadow transition">
+                                ✅ Marcar como Operativa
+                            </button>
+                        `;
+                    } else {
+                        contenedorAcciones.innerHTML = `
+                            <button onclick="abrirModalMotivoReporte('${nombrePieza}')" class="w-full py-1.5 bg-red-600 hover:bg-red-500 rounded text-white font-bold text-[11px] shadow transition">
+                                ⚠️ Requiere Mantenimiento
+                            </button>
+                        `;
                     }
                 }
             }
         }
 
-        function actualizarOpacidad(destacada) {
-            let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
-            let repes = mach && mach.reportesPiezas ? mach.reportesPiezas : {};
-            piezasDetectadas.forEach(p => {
-                let rep = repes[p.name] && repes[p.name].estado === 'mantenimiento';
-                let color = rep ? 0xef4444 : p.userData.colorBase;
-                if (!destacada) { p.material.opacity = 1.0; p.material.color.setHex(color); }
-                else {
-                    let sel = (p.name === destacada);
-                    p.material.opacity = sel ? 1.0 : 0.2;
-                    p.material.color.setHex(sel ? 0xeab308 : color);
-                }
-            });
-        }
-
-        function abrirModalMotivo(nombre) {
-            document.getElementById('lbl-pieza-a-reportar').innerText = `Pieza: ${nombre}`;
-            document.getElementById('txt-responsable-input').value = currentRole === 'admin' ? 'Administrador' : 'Técnico de Turno';
+        function abrirModalMotivoReporte(nombrePieza) {
+            document.getElementById('lbl-pieza-a-reportar').innerText = `Pieza: ${nombrePieza}`;
             document.getElementById('txt-motivo-input').value = '';
             document.getElementById('modal-motivo-reporte').style.display = 'flex';
         }
-        function cerrarModalMotivo() { document.getElementById('modal-motivo-reporte').style.display = 'none'; }
+
+        function cerrarModalMotivo() {
+            document.getElementById('modal-motivo-reporte').style.display = 'none';
+        }
 
         function guardarReporteMantenimiento() {
             let motivo = document.getElementById('txt-motivo-input').value.trim();
-            let resp = document.getElementById('txt-responsable-input').value.trim() || 'Personal de Planta';
-            if (!motivo) { alert("Ingresa el motivo."); return; }
+            if (!motivo) {
+                alert("Por favor ingresa el motivo del reporte.");
+                return;
+            }
+
             let ahora = new Date();
-            let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
+            let fechaHoraStr = ahora.toLocaleDateString() + ' ' + ahora.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+            let db = getDatabase();
+            let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (mach) {
                 if (!mach.reportesPiezas) mach.reportesPiezas = {};
                 mach.reportesPiezas[piezaSeleccionadaActual] = {
-                    estado: 'mantenimiento', motivo: motivo, responsable: resp,
-                    fecha: ahora.toLocaleDateString() + ' ' + ahora.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    estado: 'mantenimiento',
+                    motivo: motivo,
+                    fecha: fechaHoraStr
                 };
                 saveDatabase(db);
             }
-            cerrarModalMotivo(); cargarModeloMaquinaActual();
-            setTimeout(() => seleccionarComponente(piezaSeleccionadaActual), 100);
+
+            cerrarModalMotivo();
+            cargarModeloMaquinaActual(); 
+            setTimeout(() => {
+                seleccionarComponente(piezaSeleccionadaActual);
+            }, 100);
         }
 
-        function marcarOperativa(nombre) {
-            let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
-            if (mach && mach.reportesPiezas) { delete mach.reportesPiezas[nombre]; saveDatabase(db); }
+        function marcarPiezaOperativa(nombrePieza) {
+            let db = getDatabase();
+            let mach = db[currentLine].find(m => m.id === currentMachineId);
+            if (mach && mach.reportesPiezas) {
+                delete mach.reportesPiezas[nombrePieza];
+                saveDatabase(db);
+            }
+
             cargarModeloMaquinaActual();
-            setTimeout(() => seleccionarComponente(nombre), 100);
+            setTimeout(() => {
+                seleccionarComponente(nombrePieza);
+            }, 100);
         }
 
         function abrirModalVerReportes() {
-            let db = getDatabase(); let mach = db[currentLine].find(m => m.id === currentMachineId);
-            let repes = mach && mach.reportesPiezas ? mach.reportesPiezas : {};
-            let cont = document.getElementById('lista-reportes-container'); cont.innerHTML = '';
-            let tbody = document.getElementById('tbody-reportes-excel'); tbody.innerHTML = '';
-            
-            let keys = Object.keys(repes);
-            if (keys.length === 0) { cont.innerHTML = `<p class="text-gray-400 text-xs py-4 text-center">Sin reportes activos en esta máquina.</p>`; }
-            else {
-                keys.forEach(p => {
-                    let r = repes[p];
-                    cont.innerHTML += `<div class="bg-gray-900 border border-gray-700 rounded p-2.5 mb-2 cursor-pointer" onclick="cerrarModalVerReportes(); seleccionarComponente('${p}');"><div class="font-bold text-blue-400 text-xs">⚙️ ${p}</div><p class="text-[11px] text-gray-200">Motivo: ${r.motivo}</p><div class="text-[9px] text-gray-400 mt-1">Por: ${r.responsable} | ${r.fecha}</div></div>`;
-                    tbody.innerHTML += `<tr><td>${mach.name}</td><td>${p}</td><td>Mantenimiento</td><td>${r.motivo}</td><td>${r.responsable}</td><td>${r.fecha}</td></tr>`;
+            let db = getDatabase();
+            let mach = db[currentLine].find(m => m.id === currentMachineId);
+            let reportes = mach && mach.reportesPiezas ? mach.reportesPiezas : {};
+
+            let contenedor = document.getElementById('lista-reportes-container');
+            let tbodyExcel = document.getElementById('tbody-reportes-excel');
+            contenedor.innerHTML = '';
+            tbodyExcel.innerHTML = '';
+
+            let keys = Object.keys(reportes);
+            if (keys.length === 0) {
+                contenedor.innerHTML = `<p class="text-gray-400 text-xs py-4 text-center">No hay reportes de mantenimiento activos.</p>`;
+            } else {
+                keys.forEach(piezaName => {
+                    let rep = reportes[piezaName];
+                    
+                    let card = document.createElement('div');
+                    card.className = "bg-gray-900 border border-gray-700 hover:border-blue-500 rounded p-2.5 cursor-pointer transition flex flex-col gap-1";
+                    card.onclick = () => {
+                        cerrarModalVerReportes();
+                        seleccionarComponente(piezaName);
+                    };
+                    card.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-blue-400 text-xs">⚙️ ${piezaName}</span>
+                            <span class="text-[9px] text-gray-400">${rep.fecha}</span>
+                        </div>
+                        <p class="text-[11px] text-gray-200"><strong>Motivo:</strong> ${rep.motivo}</p>
+                    `;
+                    contenedor.appendChild(card);
+
+                    let tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${piezaName}</td>
+                        <td>Requiere Mantenimiento</td>
+                        <td>${rep.motivo}</td>
+                        <td>${rep.fecha}</td>
+                    `;
+                    tbodyExcel.appendChild(tr);
                 });
             }
+
             document.getElementById('modal-ver-reportes').style.display = 'flex';
         }
-        function cerrarModalVerReportes() { document.getElementById('modal-ver-reportes').style.display = 'none'; }
+
+        function cerrarModalVerReportes() {
+            document.getElementById('modal-ver-reportes').style.display = 'none';
+        }
 
         function exportarReportesExcel() {
+            const tabla = document.getElementById('tabla-reportes-excel');
+            const tbody = document.getElementById('tbody-reportes-excel');
+
+            if (!tbody || tbody.children.length === 0) {
+                alert("No hay reportes disponibles para exportar.");
+                return;
+            }
+
             try {
-                XLSX.writeFile(XLSX.utils.table_to_book(document.getElementById('tabla-reportes-excel'), { sheet: "Reportes" }), 'Reportes_Mantenimiento.xlsx');
-            } catch(e) { alert("Error al exportar."); }
-        }
-
-        function centrarVistaGeneral() {
-            if (piezaSeleccionadaActual) { actualizarOpacidad(null); document.getElementById('panel-info').classList.add('hidden'); piezaSeleccionadaActual = null; }
-            gsap.to(controls.target, { x: 0, y: 0, z: 0, duration: 0.8 });
-            gsap.to(camera.position, { x: 5, y: 5, z: 8, duration: 0.8, onUpdate: () => controls.update() });
-        }
-
-        function enfocarPieza(obj) {
-            const box = new THREE.Box3().setFromObject(obj);
-            const center = box.getCenter(new THREE.Vector3());
-            const dist = Math.max(box.getSize(new THREE.Vector3()).x * 1.5, 3);
-            gsap.to(controls.target, { x: center.x, y: center.y, z: center.z, duration: 0.8 });
-            const dir = new THREE.Vector3().copy(camera.position).sub(controls.target).normalize();
-            gsap.to(camera.position, { x: center.x + dir.x * dist, y: center.y + dir.y * dist, z: center.z + dir.z * dist, duration: 0.8, onUpdate: () => controls.update() });
+                const workbook = XLSX.utils.table_to_book(tabla, { sheet: "Reportes Visual 3D" });
+                XLSX.writeFile(workbook, 'Reportes_Visual3D_Administrador.xlsx');
+            } catch (err) {
+                console.error("Error al exportar a Excel:", err);
+                alert("Ocurrió un error al generar el archivo de Excel.");
+            }
         }
 
         function detectarToque(x, y) {
-            const rect = renderer.domElement.getBoundingClientRect();
-            mouse.x = ((x - rect.left) / rect.width) * 2 - 1;
-            mouse.y = -((y - rect.top) / rect.height) * 2 + 1;
-            raycaster.setFromCamera(mouse, camera);
-            let hits = raycaster.intersectObjects(piezasDetectadas, true);
-            if (hits.length > 0 && hits[0].object.name) seleccionarComponente(hits[0].object.name);
+            try {
+                const rect = renderer.domElement.getBoundingClientRect();
+                mouse.x = ((x - rect.left) / rect.width) * 2 - 1;
+                mouse.y = -((y - rect.top) / rect.height) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+
+                const intersects = raycaster.intersectObjects(piezasDetectadas, true);
+                if (intersects.length > 0) {
+                    let objetoSeleccionado = intersects[0].object;
+                    if (objetoSeleccionado.name) {
+                        seleccionarComponente(objetoSeleccionado.name);
+                    }
+                }
+            } catch (err) {
+                console.error("Error en selección:", err);
+            }
         }
+
+        function enfocarPieza(objeto) {
+            const box = new THREE.Box3().setFromObject(objeto);
+            const size = new THREE.Vector3();
+            box.getSize(size);
+            const center = new THREE.Vector3();
+            box.getCenter(center);
+
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const fov = camera.fov * (Math.PI / 180);
+            let cameraDistance = Math.abs(maxDim / Math.sin(fov / 2)) * 1; 
+
+            gsap.to(controls.target, { x: center.x, y: center.y, z: center.z, duration: 0.8, ease: "power2.inOut" });
+
+            const direction = new THREE.Vector3().copy(camera.position).sub(controls.target).normalize();
+            const newPosition = new THREE.Vector3().copy(center).add(direction.multiplyScalar(cameraDistance));
+
+            gsap.to(camera.position, {
+                x: newPosition.x, y: newPosition.y, z: newPosition.z, duration: 0.8, ease: "power2.inOut",
+                onUpdate: () => { controls.update(); }
+            });
+        }
+        async function cargarModelosDeSupabase() {
+    const { data: modelos, error } = await _supabase.from('modelos').select('*');
+    
+    if (modelos) {
+        modelos.forEach(modelo => {
+            console.log("Cargando modelo:", modelo.url);
+            // AQUÍ LLAMAS A TU FUNCIÓN QUE CARGA EL MODELO EN TU VISOR 3D
+            // Ejemplo: visor3d.load(modelo.url);
+        });
+    }
+}
     </script>
 </body>
 </html>
