@@ -12,7 +12,7 @@ let isEditMode = false;
 let rolPendiente = '';
 
 const PASSWORDS = {
-    'mantenimiento': '123',
+    'mantenimiento': 'mantenimiento123',
     'admin': 'admin123'
 };
 
@@ -514,16 +514,6 @@ async function cargarModeloMaquinaActual() {
     }
 }
 
-async function cargarModeloPorDefecto() {
-    const btnExplo = document.getElementById('btn-explo');
-    if(btnExplo) {
-        btnExplo.innerText = "💥 Activar Vista Explosionada";
-        btnExplo.disabled = false;
-    }
-    let indicador = document.getElementById('indicador-equipo');
-    if(indicador) indicador.innerText = `📍 Vista: Sin modelo 3D`;
-}
-
 async function procesarModeloCargado(gltf, nombreEquipo) {
     const modelo = gltf.scene;
     const boxCentro = new THREE.Box3().setFromObject(modelo);
@@ -541,6 +531,12 @@ async function procesarModeloCargado(gltf, nombreEquipo) {
     modelo.traverse((child) => {
         if (child.isMesh) {
             piezasDetectadas.push(child);
+            
+            // HERENCIA DE NOMBRE DE INVENTOR: Si el mesh no tiene nombre, toma el del padre
+            if ((!child.name || child.name === "") && child.parent && child.parent.name) {
+                child.name = child.parent.name;
+            }
+            
             if (!child.name || child.name === "") {
                 child.name = `Pieza_${indexPieza}`;
             }
