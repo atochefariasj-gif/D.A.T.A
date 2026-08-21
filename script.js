@@ -12,7 +12,7 @@ let isEditMode = false;
 let rolPendiente = '';
 
 const PASSWORDS = {
-    'mantenimiento': 'mantenimiento123',
+    'mantenimiento': 'mtto123',
     'admin': 'admin123'
 };
 
