@@ -368,6 +368,8 @@ let scene, camera, renderer, grupoMaquina, controls, raycaster, mouse, gltfLoade
 let piezaSeleccionadaActual = "";
 let vistaExplosionada = false;
 let piezasDetectadas = [];
+let targetCameraPos = null;
+let targetControlsTarget = null;
 
 let pointerDownX = 0;
 let pointerDownY = 0;
@@ -448,19 +450,27 @@ async function init3D() {
         if (!hasMoved) detectarToque(e.clientX, e.clientY);
     });
 
-    async function animate() {
+    function animate() {
         requestAnimationFrame(animate);
+        
+        // Movimiento fluido de la cámara si hay un destino seleccionado
+        if (targetCameraPos && targetControlsTarget) {
+            camera.position.lerp(targetCameraPos, 0.08);
+            controls.target.lerp(targetControlsTarget, 0.08);
+        }
+
         controls.update();
+        
         piezasDetectadas.forEach(pieza => {
             if (pieza.userData && pieza.userData.posOrig && pieza.userData.posExp) {
                 const target = vistaExplosionada ? pieza.userData.posExp : pieza.userData.posOrig;
                 pieza.position.lerp(target, 0.08); 
             }
         });
+        
         renderer.render(scene, camera);
     }
     animate();
-}
 
 async function toggleVistaExplosionada() {
     vistaExplosionada = !vistaExplosionada;
@@ -570,14 +580,19 @@ async function seleccionarComponente(nombrePieza) {
     const panel = document.getElementById('panel-info');
     const piezaEncontrada = piezasDetectadas.find(p => p.name === nombrePieza);
 
-    // Si ya estaba seleccionada, la deseleccionamos y restauramos colores
+    // Si se vuelve a hacer clic en la misma pieza, se deselecciona y se restaura todo
     if (piezaSeleccionadaActual === nombrePieza) {
         panel.classList.add('hidden');
         piezaSeleccionadaActual = null;
+        targetCameraPos = null;
+        targetControlsTarget = null;
+
         piezasDetectadas.forEach(p => {
-            if (p.material && p.userData) {
-                const { data: maqData } = dbSupabase; // mantener color base
-                p.material.color.setHex(p.userData.colorBase);
+            if (p.material) {
+                p.material.transparent = true;
+                p.material.opacity = 1.0;
+                let colorBase = p.userData.colorBase || 0x888888;
+                p.material.color.setHex(colorBase);
             }
         });
         return;
@@ -588,23 +603,26 @@ async function seleccionarComponente(nombrePieza) {
         panel.classList.remove('hidden');
         document.getElementById('info-titulo').innerText = nombrePieza;
 
-        // Resaltar la pieza seleccionada en amarillo y las demás en color base o tenue
+        // Poner las demás piezas transparentes y la seleccionada en amarillo
         piezasDetectadas.forEach(p => {
-            if (p.name === nombrePieza) {
-                p.material.color.setHex(0xfacc15); // Amarillo de selección
-            } else {
-                p.material.color.setHex(p.userData.colorBase);
+            if (p.material) {
+                p.material.transparent = true;
+                if (p.name === nombrePieza) {
+                    p.material.color.setHex(0xfacc15); // Amarillo exacto del video
+                    p.material.opacity = 1.0;
+                } else {
+                    p.material.opacity = 0.15; // Las demás translúcidas
+                }
             }
         });
 
-        // Centrar la cámara y los controles de órbita exactamente en la pieza
+        // Calcular el centro de la pieza para el acercamiento fluido
         const boxPieza = new THREE.Box3().setFromObject(piezaEncontrada);
         const centroPieza = boxPieza.getCenter(new THREE.Vector3());
 
-        controls.target.copy(centroPieza);
-        const offset = camera.position.clone().sub(controls.target).normalize().multiplyScalar(4);
-        camera.position.copy(centroPieza.clone().add(offset));
-        controls.update();
+        targetControlsTarget = centroPieza.clone();
+        const offset = camera.position.clone().sub(controls.target).normalize().multiplyScalar(3.5);
+        targetCameraPos = centroPieza.clone().add(offset);
 
         // Cargar datos de reporte de mantenimiento
         const { data: maq } = await dbSupabase.from('maquinas').select('reportes_piezas').eq('id', currentMachineId).single();
