@@ -921,6 +921,7 @@ async function renderMachines() {
             card.innerHTML = `
                 <span class="card-icon"></span>
                 <input type="text" value="${maq.nombre}" onchange="updateMachineName(${maq.id}, this.value)">
+                <input type="text" class="mach-input" data-id="${maq.id}" value="${maq.nombre}">
             `;
         } else {
             card.onclick = () => openMachineDetail(maq.id, maq.nombre);
@@ -1032,31 +1033,46 @@ async function renderMachines() {
             }
         }
 
-        async function toggleEditMode() {
-            // Como es asíncrono, la función donde lo uses debe ser async
-const { data: maquinaActual, error } = await dbSupabase
-    .from('maquinas')
-    .select('*')
-    .eq('id', currentMachineId)
-    .single();
+async function toggleEditMode() {
+    // 1. Si vamos a cerrar la edición, primero guardamos los cambios
+    if (isEditMode) {
+        // Obtenemos todos los inputs que están en la pantalla
+        const inputs = document.querySelectorAll('.mach-input');
+        
+        for (const input of inputs) {
+            const id = input.getAttribute('data-id'); // Asegúrate de que el input tenga data-id="${maq.id}"
+            const nuevoNombre = input.value.trim();
 
-if (error) {
-    console.error("Error al cargar la máquina:", error);
-}
-            if (isEditMode) {
-                if (db[currentLine]) {
-                    db[currentLine].forEach(mach => {
-                        let inputEl = document.getElementById(`mach-input-${mach.id}`);
-                        if (inputEl) {
-                            let nuevoNombre = inputEl.value.trim();
-                            if (nuevoNombre !== "") {
-                                mach.name = nuevoNombre;
-                            }
-                        }
-                    });
-                    saveDatabase(db);
-                }
+            if (nuevoNombre) {
+                // Actualizamos cada máquina en Supabase
+                const { error } = await dbSupabase
+                    .from('maquinas')
+                    .update({ nombre: nuevoNombre })
+                    .eq('id', id);
+
+                if (error) console.error("Error al actualizar:", error.message);
             }
+        }
+    }
+
+    // 2. Cambiamos el estado de edición
+    isEditMode = !isEditMode;
+
+    // 3. Cambiamos el texto del botón
+    const btn = document.getElementById('toggle-edit-btn');
+    if (btn) {
+        if (isEditMode) {
+            btn.classList.add('btn-toggle-on');
+            btn.innerText = "Guardar Nombres";
+        } else {
+            btn.classList.remove('btn-toggle-on');
+            btn.innerText = "Editar Nombres";
+        }
+    }
+
+    // 4. Recargamos la vista para mostrar inputs o solo texto
+    renderMachines();
+}
 
             isEditMode = !isEditMode;
             let btn = document.getElementById('toggle-edit-btn');
