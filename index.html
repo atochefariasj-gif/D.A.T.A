@@ -1526,7 +1526,7 @@ if (error) {
 
             const inputArchivo = document.getElementById('input-archivo');
             if (inputArchivo) {
-                inputArchivo.addEventListener('change', async async function(e) {
+                inputArchivo.addEventListener('change', async function(e) {
                     if (currentRole !== 'admin') return;
                     const archivo = e.target.files[0];
                     if (!archivo) return;
@@ -1605,7 +1605,7 @@ if (error) {
             });
         }
 
-        async async function cargarModeloMaquinaActual() {
+        async function cargarModeloMaquinaActual() {
             const btnExplo = document.getElementById('btn-explo');
             const lista = document.getElementById('lista-partes');
             const indicador = document.getElementById('indicador-equipo');
@@ -2009,7 +2009,7 @@ if (error) {
                 onUpdate: () => { controls.update(); }
             });
         }
-        async async function cargarMaquinas() {
+        async function cargarMaquinas() {
     const { data, error } = await dbSupabase
         .from('maquinas')
         .select('*');
@@ -2022,7 +2022,7 @@ if (error) {
     // Aquí actualizas tu interfaz (por ejemplo, renderizar los botones de las máquinas)
     console.log('Máquinas desde Supabase:', data);
 }
-async async function actualizarNombreMaquina(idMaquina, nuevoNombre) {
+async function actualizarNombreMaquina(idMaquina, nuevoNombre) {
     const { data, error } = await dbSupabase
         .from('maquinas')
         .update({ nombre: nuevoNombre })
@@ -2034,7 +2034,7 @@ async async function actualizarNombreMaquina(idMaquina, nuevoNombre) {
         console.log('Nombre actualizado correctamente en la nube');
     }
 }
-async async function subirArchivoMaquina(idMaquina, archivo, tipoColumna) {
+ async function subirArchivoMaquina(idMaquina, archivo, tipoColumna) {
     const nombreRuta = `maquina_${idMaquina}/${archivo.name}`;
     
     // 1. Subir archivo al Storage (ejemplo usando el bucket 'modelos-3d')
