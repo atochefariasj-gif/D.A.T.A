@@ -59,7 +59,6 @@ async function openLine(lineName, icon) {
 }
 
 async function renderMachines() {
-    // Filtramos opcionalmente por línea si tu tabla tiene esa columna, o traemos todas
     const { data: maquinas, error } = await dbSupabase
         .from('maquinas')
         .select('*');
@@ -76,13 +75,15 @@ async function renderMachines() {
         let card = document.createElement('div');
         card.className = 'card-item';
 
-        if (currentRole === 'admin') {
+        // Si es admin y el modo edición está activo, mostramos el input para cambiar el nombre
+        if (currentRole === 'admin' && isEditMode) {
             card.onclick = (e) => e.stopPropagation();
             card.innerHTML = `
                 <span class="card-icon"></span>
                 <input type="text" class="mach-input" data-id="${maq.id}" value="${maq.nombre || ''}" onchange="updateMachineNameInline('${maq.id}', this.value)">
             `;
         } else {
+            // Si no está en modo edición (o es visitante/mantenimiento), al hacer clic entra al detalle
             card.onclick = () => openMachineDetail(maq.id, maq.nombre);
             card.innerHTML = `
                 <span class="card-icon"></span>
