@@ -528,18 +528,23 @@ async function procesarModeloCargado(gltf, nombreEquipo) {
     const { data: maq } = await dbSupabase.from('maquinas').select('reportes_piezas').eq('id', currentMachineId).single();
     let reportes = maq?.reportes_piezas || {};
 
-    modelo.traverse((child) => {
+modelo.traverse((child) => {
         if (child.isMesh) {
+            
+            // 1. OBTENER Y HEREDAR EL NOMBRE ORIGINAL CORRECTAMENTE
+            let nombreReal = child.name;
+            if (!nombreReal || nombreReal === "" || nombreReal.includes("Mesh") || nombreReal.includes("Object")) {
+                if (child.parent && child.parent.name && child.parent.name !== "Scene") {
+                    nombreReal = child.parent.name;
+                } else if (child.parent && child.parent.parent && child.parent.parent.name !== "Scene") {
+                    nombreReal = child.parent.parent.name;
+                }
+            }
+            
+            // Asignar el nombre limpio y definitivo al mesh
+            child.name = nombreReal && nombreReal !== "" ? nombreReal : `Pieza_${indexPieza}`;
+            
             piezasDetectadas.push(child);
-            
-            // HERENCIA DE NOMBRE DE INVENTOR: Si el mesh no tiene nombre, toma el del padre
-            if ((!child.name || child.name === "") && child.parent && child.parent.name) {
-                child.name = child.parent.name;
-            }
-            
-            if (!child.name || child.name === "") {
-                child.name = `Pieza_${indexPieza}`;
-            }
 
             const posOrig = child.position.clone();
             const meshBox = new THREE.Box3().setFromObject(child);
@@ -558,11 +563,16 @@ async function procesarModeloCargado(gltf, nombreEquipo) {
                 roughness: 0.5, metalness: 0.1, transparent: true, opacity: 1.0
             });
 
+            // 2. CREAR EL BOTÓN USANDO YA EL NOMBRE CORRECTO
             if(lista) {
                 const btn = document.createElement('button');
                 btn.className = "item-partes w-full text-left p-1.5 rounded hover:bg-gray-700 text-gray-300 text-xs flex justify-between items-center";
-                btn.innerHTML = `<span>⚙️ ${child.name}</span> ${tieneReporte ? '<span class="text-[9px] bg-red-600 text-white px-1 rounded">Mantenimiento</span>' : ''}`;
-                btn.onclick = () => seleccionarComponente(child.name);
+                
+                // FORZAR EL NOMBRE DIRECTAMENTE DE LA CONSOLA
+                let nombreMostrado = child.name || (child.parent ? child.parent.name : `Pieza_${indexPieza}`);
+                
+                btn.innerHTML = `<span>⚙️ ${nombreMostrado}</span> ${tieneReporte ? '<span class="text-[9px] bg-red-600 text-white px-1 rounded">Mantenimiento</span>' : ''}`;
+                btn.onclick = () => seleccionarComponente(nombreMostrado);
                 lista.appendChild(btn);
             }
             indexPieza++;
