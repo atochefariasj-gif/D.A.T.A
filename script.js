@@ -591,13 +591,13 @@ async function init3D() {
             if (!archivo) return;
             
             let fileName = `glb_${currentMachineId}_${Date.now()}.glb`;
-            let { error } = await dbSupabase.storage.from('modelos_3d').upload(fileName, archivo);
+            let { error } = await dbSupabase.storage.from('modelos-glb').upload(fileName, archivo);
             if (error) {
                 alert("Error al subir modelo 3D: " + error.message);
                 return;
             }
 
-            let { data: pubUrl } = dbSupabase.storage.from('modelos_3d').getPublicUrl(fileName);
+            let { data: pubUrl } = dbSupabase.storage.from('modelos-glb').getPublicUrl(fileName);
             if (pubUrl?.publicUrl) {
                 await dbSupabase.from('maquinas').update({ modelo_url: pubUrl.publicUrl }).eq('id', currentMachineId);
                 cargarModeloMaquinaActual();
