@@ -2083,6 +2083,19 @@ async function actualizarNombreMaquina(idMaquina, nuevoNombre) {
         alert('¡Archivo subido y sincronizado en la nube con éxito!');
     }
 }
+async function updateMachineName(id, nuevoNombre) {
+    try {
+        const { error } = await dbSupabase
+            .from('maquinas')
+            .update({ nombre: nuevoNombre })
+            .eq('id', id);
+
+        if (error) throw error;
+        console.log(`Máquina ${id} actualizada a: ${nuevoNombre}`);
+    } catch (error) {
+        console.error("Error al actualizar el nombre:", error.message);
+    }
+}
     </script>
 </body>
 </html>
