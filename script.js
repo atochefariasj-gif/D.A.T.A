@@ -12,7 +12,7 @@ let isEditMode = false;
 let rolPendiente = '';
 
 const PASSWORDS = {
-    'mantenimiento': 'mtto123',
+    'mantenimiento': 'mantenimiento123',
     'admin': 'admin123'
 };
 
@@ -236,31 +236,6 @@ async function toggleEditMode() {
     renderMachines();
 }
 
-async function addNewMachine() {
-    if (currentRole !== 'admin') {
-        alert("Solo el administrador puede agregar máquinas.");
-        return;
-    }
-
-    const nuevaMaquina = {
-        nombre: "Nueva Máquina",
-        linea: currentLine,
-        meta: {},
-        motors: [],
-        kardex: [],
-        instruction_images: [],
-        manuals_pdf: [],
-        reportes_piezas: {}
-    };
-
-    const { error } = await dbSupabase.from('maquinas').insert([nuevaMaquina]);
-    if (error) {
-        alert("Error al crear máquina: " + error.message);
-    } else {
-        renderMachines();
-    }
-}
-
 async function loadKardexData() {
     const { data: maq, error } = await dbSupabase
         .from('maquinas')
@@ -296,14 +271,6 @@ async function loadKardexData() {
     renderKardexRows(maq.kardex || [], isAdmin);
 }
 
-async function updateMeta(field, val) {
-    if (currentRole !== 'admin') return;
-    const { data: maq } = await dbSupabase.from('maquinas').select('meta').eq('id', currentMachineId).single();
-    let meta = maq?.meta || {};
-    meta[field] = val;
-    await dbSupabase.from('maquinas').update({ meta }).eq('id', currentMachineId);
-}
-
 async function renderMotors(motors, isAdmin) {
     let container = document.getElementById('motors-container');
     container.innerHTML = '';
@@ -326,79 +293,6 @@ async function renderMotors(motors, isAdmin) {
         `;
         container.appendChild(div);
     });
-}
-
-async function addMotorBlock() {
-    if (currentRole !== 'admin') return;
-    const { data: maq } = await dbSupabase.from('maquinas').select('motors').eq('id', currentMachineId).single();
-    let motors = maq?.motors || [];
-    motors.push({ marca: '', hp: '', kw: '', rpm: '', voltios: '', amperios: '' });
-    await dbSupabase.from('maquinas').update({ motors }).eq('id', currentMachineId);
-    loadKardexData();
-}
-
-async function removeMotorBlock(idx) {
-    if (currentRole !== 'admin') return;
-    const { data: maq } = await dbSupabase.from('maquinas').select('motors').eq('id', currentMachineId).single();
-    let motors = maq?.motors || [];
-    motors.splice(idx, 1);
-    await dbSupabase.from('maquinas').update({ motors }).eq('id', currentMachineId);
-    loadKardexData();
-}
-
-async function updateMotor(idx, field, val) {
-    if (currentRole !== 'admin') return;
-    const { data: maq } = await dbSupabase.from('maquinas').select('motors').eq('id', currentMachineId).single();
-    let motors = maq?.motors || [];
-    if (motors[idx]) {
-        motors[idx][field] = val;
-        await dbSupabase.from('maquinas').update({ motors }).eq('id', currentMachineId);
-    }
-}
-
-async function renderKardexRows(kardex, isAdmin) {
-    let tbody = document.getElementById('kardex-tbody');
-    tbody.innerHTML = '';
-    kardex.forEach((row, idx) => {
-        let tr = document.createElement('tr');
-        tr.innerHTML = `
-            <td>${idx + 1}</td>
-            <td><input type="text" ${!isAdmin?'readonly':''} value="${row.categoria||''}" oninput="updateKardex(${idx},'categoria',this.value)"></td>
-            <td><input type="text" ${!isAdmin?'readonly':''} value="${row.desc||''}" oninput="updateKardex(${idx},'desc',this.value)"></td>
-            <td><input type="text" ${!isAdmin?'readonly':''} value="${row.um||''}" oninput="updateKardex(${idx},'um',this.value)"></td>
-            <td><input type="number" ${!isAdmin?'readonly':''} value="${row.cant||''}" oninput="updateKardex(${idx},'cant',this.value)"></td>
-            ${isAdmin ? `<td><button class="btn-row-del" onclick="removeKardexRow(${idx})">X</button></td>` : ''}
-        `;
-        tbody.appendChild(tr);
-    });
-}
-
-async function addKardexRow() {
-    if (currentRole !== 'admin') return;
-    const { data: maq } = await dbSupabase.from('maquinas').select('kardex').eq('id', currentMachineId).single();
-    let kardex = maq?.kardex || [];
-    kardex.push({ categoria: '', desc: '', um: 'Pza', cant: 1 });
-    await dbSupabase.from('maquinas').update({ kardex }).eq('id', currentMachineId);
-    loadKardexData();
-}
-
-async function removeKardexRow(idx) {
-    if (currentRole !== 'admin') return;
-    const { data: maq } = await dbSupabase.from('maquinas').select('kardex').eq('id', currentMachineId).single();
-    let kardex = maq?.kardex || [];
-    kardex.splice(idx, 1);
-    await dbSupabase.from('maquinas').update({ kardex }).eq('id', currentMachineId);
-    loadKardexData();
-}
-
-async function updateKardex(idx, field, val) {
-    if (currentRole !== 'admin') return;
-    const { data: maq } = await dbSupabase.from('maquinas').select('kardex').eq('id', currentMachineId).single();
-    let kardex = maq?.kardex || [];
-    if (kardex[idx]) {
-        kardex[idx][field] = val;
-        await dbSupabase.from('maquinas').update({ kardex }).eq('id', currentMachineId);
-    }
 }
 
 async function loadInstructionsData() {
@@ -425,37 +319,6 @@ async function loadInstructionsData() {
         `;
         wrapper.appendChild(card);
     });
-}
-
-async function uploadInstructionImages(event) {
-    if (currentRole !== 'admin') return;
-    let files = event.target.files;
-    if (!files.length) return;
-
-    const { data: maq } = await dbSupabase.from('maquinas').select('instruction_images').eq('id', currentMachineId).single();
-    let images = maq?.instruction_images || [];
-
-    for (let file of files) {
-        let fileName = `inst_${currentMachineId}_${Date.now()}_${file.name}`;
-        let { data, error } = await dbSupabase.storage.from('instrucciones').upload(fileName, file);
-        if (!error) {
-            let { data: pubUrl } = dbSupabase.storage.from('instrucciones').getPublicUrl(fileName);
-            if (pubUrl?.publicUrl) images.push(pubUrl.publicUrl);
-        }
-    }
-
-    await dbSupabase.from('maquinas').update({ instruction_images: images }).eq('id', currentMachineId);
-    loadInstructionsData();
-    event.target.value = '';
-}
-
-async function removeInstructionImage(idx) {
-    if (currentRole !== 'admin') return;
-    const { data: maq } = await dbSupabase.from('maquinas').select('instruction_images').eq('id', currentMachineId).single();
-    let images = maq?.instruction_images || [];
-    images.splice(idx, 1);
-    await dbSupabase.from('maquinas').update({ instruction_images: images }).eq('id', currentMachineId);
-    loadInstructionsData();
 }
 
 async function loadManualsData() {
@@ -489,39 +352,6 @@ async function loadManualsData() {
     });
 }
 
-async function uploadManualsPdf(event) {
-    if (currentRole !== 'admin') return;
-    let files = event.target.files;
-    if (!files.length) return;
-
-    const { data: maq } = await dbSupabase.from('maquinas').select('manuals_pdf').eq('id', currentMachineId).single();
-    let manuals = maq?.manuals_pdf || [];
-
-    for (let file of files) {
-        let fileName = `pdf_${currentMachineId}_${Date.now()}_${file.name}`;
-        let { data, error } = await dbSupabase.storage.from('manuales').upload(fileName, file);
-        if (!error) {
-            let { data: pubUrl } = dbSupabase.storage.from('manuales').getPublicUrl(fileName);
-            if (pubUrl?.publicUrl) {
-                manuals.push({ name: file.name, url: pubUrl.publicUrl });
-            }
-        }
-    }
-
-    await dbSupabase.from('maquinas').update({ manuals_pdf: manuals }).eq('id', currentMachineId);
-    loadManualsData();
-    event.target.value = '';
-}
-
-async function removeManualPdf(idx) {
-    if (currentRole !== 'admin') return;
-    const { data: maq } = await dbSupabase.from('maquinas').select('manuals_pdf').eq('id', currentMachineId).single();
-    let manuals = maq?.manuals_pdf || [];
-    manuals.splice(idx, 1);
-    await dbSupabase.from('maquinas').update({ manuals_pdf: manuals }).eq('id', currentMachineId);
-    loadManualsData();
-}
-
 async function openImageModal(src) {
     document.getElementById('modal-img-tag').src = src;
     document.getElementById('img-modal').style.display = 'flex';
@@ -532,7 +362,7 @@ async function closeImageModal() {
 }
 
 // ==========================================
-// LÓGICA 3D (SUPABASE STORAGE & DB)
+// LÓGICA 3D & VISTA EXPLOSIONADA
 // ==========================================
 let scene, camera, renderer, grupoMaquina, controls, raycaster, mouse, gltfLoader;
 let piezaSeleccionadaActual = "";
@@ -618,39 +448,37 @@ async function init3D() {
         if (!hasMoved) detectarToque(e.clientX, e.clientY);
     });
 
-   async function animate() {
+    function animate() {
         requestAnimationFrame(animate);
         controls.update();
-        
-        // Animación suave de las piezas hacia su posición original o explosionada
         piezasDetectadas.forEach(pieza => {
             if (pieza.userData && pieza.userData.posOrig && pieza.userData.posExp) {
                 const target = vistaExplosionada ? pieza.userData.posExp : pieza.userData.posOrig;
                 pieza.position.lerp(target, 0.08); 
             }
         });
-        
         renderer.render(scene, camera);
     }
     animate();
-    
-   async function toggleVistaExplosionada() {
+}
+
+function toggleVistaExplosionada() {
     vistaExplosionada = !vistaExplosionada;
     const btnExplo = document.getElementById('btn-explo');
     
     if (vistaExplosionada) {
         btnExplo.innerText = "📦 Desactivar Vista Explosionada";
-        btnExplo.classList.add('bg-orange-600'); // Opcional para darle color de activo
     } else {
         btnExplo.innerText = "💥 Activar Vista Explosionada";
-        btnExplo.classList.remove('bg-orange-600');
     }
 }
 
 async function cargarModeloMaquinaActual() {
     const btnExplo = document.getElementById('btn-explo');
-    btnExplo.innerText = "⏳ Cargando modelo...";
-    btnExplo.disabled = true;
+    if(btnExplo) {
+        btnExplo.innerText = "⏳ Cargando modelo...";
+        btnExplo.disabled = true;
+    }
 
     while(grupoMaquina.children.length > 0) {
         grupoMaquina.remove(grupoMaquina.children[0]);
@@ -672,9 +500,12 @@ async function cargarModeloMaquinaActual() {
 
 async function cargarModeloPorDefecto() {
     const btnExplo = document.getElementById('btn-explo');
-    btnExplo.innerText = "💥 Activar Vista Explosionada";
-    btnExplo.disabled = false;
-    document.getElementById('indicador-equipo').innerText = `📍 Vista: Sin modelo 3D`;
+    if(btnExplo) {
+        btnExplo.innerText = "💥 Activar Vista Explosionada";
+        btnExplo.disabled = false;
+    }
+    let indicador = document.getElementById('indicador-equipo');
+    if(indicador) indicador.innerText = `📍 Vista: Sin modelo 3D`;
 }
 
 async function procesarModeloCargado(gltf, nombreEquipo) {
@@ -685,7 +516,7 @@ async function procesarModeloCargado(gltf, nombreEquipo) {
 
     piezasDetectadas = [];
     const lista = document.getElementById('lista-partes');
-    lista.innerHTML = "";
+    if(lista) lista.innerHTML = "";
     let indexPieza = 1;
 
     const { data: maq } = await dbSupabase.from('maquinas').select('reportes_piezas').eq('id', currentMachineId).single();
@@ -713,21 +544,26 @@ async function procesarModeloCargado(gltf, nombreEquipo) {
                 roughness: 0.5, metalness: 0.1, transparent: true, opacity: 1.0
             });
 
-            const btn = document.createElement('button');
-            btn.className = "item-partes w-full text-left p-1.5 rounded hover:bg-gray-700 text-gray-300 text-xs flex justify-between items-center";
-            btn.innerHTML = `<span>⚙️ ${child.name}</span> ${tieneReporte ? '<span class="text-[9px] bg-red-600 text-white px-1 rounded">Mantenimiento</span>' : ''}`;
-            btn.onclick = () => seleccionarComponente(child.name);
-            lista.appendChild(btn);
+            if(lista) {
+                const btn = document.createElement('button');
+                btn.className = "item-partes w-full text-left p-1.5 rounded hover:bg-gray-700 text-gray-300 text-xs flex justify-between items-center";
+                btn.innerHTML = `<span>⚙️ ${child.name}</span> ${tieneReporte ? '<span class="text-[9px] bg-red-600 text-white px-1 rounded">Mantenimiento</span>' : ''}`;
+                btn.onclick = () => seleccionarComponente(child.name);
+                lista.appendChild(btn);
+            }
             indexPieza++;
         }
     });
 
     grupoMaquina.add(modelo);
-    document.getElementById('indicador-equipo').innerText = `📍 Vista: ${nombreEquipo}`;
+    let indicador = document.getElementById('indicador-equipo');
+    if(indicador) indicador.innerText = `📍 Vista: ${nombreEquipo}`;
 
     const btnExplo = document.getElementById('btn-explo');
-    btnExplo.innerText = "💥 Activar Vista Explosionada";
-    btnExplo.disabled = false;
+    if(btnExplo) {
+        btnExplo.innerText = "💥 Activar Vista Explosionada";
+        btnExplo.disabled = false;
+    }
 }
 
 async function seleccionarComponente(nombrePieza) {
