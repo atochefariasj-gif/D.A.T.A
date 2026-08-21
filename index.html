@@ -898,7 +898,16 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         }
 
         function renderMachines() {
-            let db = getDatabase();
+            // Como es asíncrono, la función donde lo uses debe ser async
+const { data: maquinaActual, error } = await dbSupabase
+    .from('maquinas')
+    .select('*')
+    .eq('id', currentMachineId)
+    .single();
+
+if (error) {
+    console.error("Error al cargar la máquina:", error);
+}
             let container = document.getElementById('machines-grid-container');
             container.innerHTML = '';
             
@@ -1025,7 +1034,16 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         }
 
         function toggleEditMode() {
-            let db = getDatabase();
+            // Como es asíncrono, la función donde lo uses debe ser async
+const { data: maquinaActual, error } = await dbSupabase
+    .from('maquinas')
+    .select('*')
+    .eq('id', currentMachineId)
+    .single();
+
+if (error) {
+    console.error("Error al cargar la máquina:", error);
+}
             if (isEditMode) {
                 if (db[currentLine]) {
                     db[currentLine].forEach(mach => {
@@ -1054,7 +1072,16 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         }
 
         function addNewMachine() {
-            let db = getDatabase();
+            // Como es asíncrono, la función donde lo uses debe ser async
+const { data: maquinaActual, error } = await dbSupabase
+    .from('maquinas')
+    .select('*')
+    .eq('id', currentMachineId)
+    .single();
+
+if (error) {
+    console.error("Error al cargar la máquina:", error);
+}
             if (!db[currentLine]) db[currentLine] = [];
             let newId = db[currentLine].length > 0 ? Math.max(...db[currentLine].map(m => m.id)) + 1 : 1;
             let newName = `Máquina ${newId < 10 ? '0' + newId : newId}`;
@@ -1071,7 +1098,16 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         }
 
         function loadKardexData() {
-            let db = getDatabase();
+            // Como es asíncrono, la función donde lo uses debe ser async
+const { data: maquinaActual, error } = await dbSupabase
+    .from('maquinas')
+    .select('*')
+    .eq('id', currentMachineId)
+    .single();
+
+if (error) {
+    console.error("Error al cargar la máquina:", error);
+}
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (!mach) return;
 
@@ -1118,7 +1154,16 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         function updateMeta(field, val) {
             if (currentRole !== 'admin') return;
-            let db = getDatabase();
+            // Como es asíncrono, la función donde lo uses debe ser async
+const { data: maquinaActual, error } = await dbSupabase
+    .from('maquinas')
+    .select('*')
+    .eq('id', currentMachineId)
+    .single();
+
+if (error) {
+    console.error("Error al cargar la máquina:", error);
+}
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (mach) {
                 if (!mach.meta) mach.meta = {};
@@ -1153,7 +1198,16 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         function addMotorBlock() {
             if (currentRole !== 'admin') return;
-            let db = getDatabase();
+            // Como es asíncrono, la función donde lo uses debe ser async
+const { data: maquinaActual, error } = await dbSupabase
+    .from('maquinas')
+    .select('*')
+    .eq('id', currentMachineId)
+    .single();
+
+if (error) {
+    console.error("Error al cargar la máquina:", error);
+}
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if(mach) {
                 if(!mach.motors) mach.motors = [];
@@ -1165,7 +1219,16 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         function removeMotorBlock(idx) {
             if (currentRole !== 'admin') return;
-            let db = getDatabase();
+            // Como es asíncrono, la función donde lo uses debe ser async
+const { data: maquinaActual, error } = await dbSupabase
+    .from('maquinas')
+    .select('*')
+    .eq('id', currentMachineId)
+    .single();
+
+if (error) {
+    console.error("Error al cargar la máquina:", error);
+}
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if(mach && mach.motors) {
                 mach.motors.splice(idx, 1);
@@ -1176,7 +1239,16 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         function updateMotor(idx, field, val) {
             if (currentRole !== 'admin') return;
-            let db = getDatabase();
+            // Como es asíncrono, la función donde lo uses debe ser async
+const { data: maquinaActual, error } = await dbSupabase
+    .from('maquinas')
+    .select('*')
+    .eq('id', currentMachineId)
+    .single();
+
+if (error) {
+    console.error("Error al cargar la máquina:", error);
+}
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if(mach && mach.motors && mach.motors[idx]) {
                 mach.motors[idx][field] = val;
@@ -1203,7 +1275,16 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         function addKardexRow() {
             if (currentRole !== 'admin') return;
-            let db = getDatabase();
+            // Como es asíncrono, la función donde lo uses debe ser async
+const { data: maquinaActual, error } = await dbSupabase
+    .from('maquinas')
+    .select('*')
+    .eq('id', currentMachineId)
+    .single();
+
+if (error) {
+    console.error("Error al cargar la máquina:", error);
+}
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if(mach) {
                 if(!mach.kardex) mach.kardex = [];
@@ -1215,7 +1296,16 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         function removeKardexRow(idx) {
             if (currentRole !== 'admin') return;
-            let db = getDatabase();
+            // Como es asíncrono, la función donde lo uses debe ser async
+const { data: maquinaActual, error } = await dbSupabase
+    .from('maquinas')
+    .select('*')
+    .eq('id', currentMachineId)
+    .single();
+
+if (error) {
+    console.error("Error al cargar la máquina:", error);
+}
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if(mach && mach.kardex) {
                 mach.kardex.splice(idx, 1);
@@ -1226,7 +1316,7 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         function updateKardex(idx, field, val) {
             if (currentRole !== 'admin') return;
-            let db = getDatabase();
+            const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if(mach && mach.kardex && mach.kardex[idx]) {
                 mach.kardex[idx][field] = val;
@@ -1235,7 +1325,7 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         }
 
         function loadInstructionsData() {
-            let db = getDatabase();
+            const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (!mach) return;
 
@@ -1269,7 +1359,7 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             let files = event.target.files;
             if (!files.length) return;
             
-            let db = getDatabase();
+            const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (!mach) return;
 
@@ -1292,7 +1382,7 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         function removeInstructionImage(idx) {
             if (currentRole !== 'admin') return;
-            let db = getDatabase();
+            const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (mach && mach.instructionImages) {
                 mach.instructionImages.splice(idx, 1);
@@ -1302,7 +1392,7 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         }
 
         function loadManualsData() {
-            let db = getDatabase();
+            const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (!mach) return;
 
@@ -1341,7 +1431,7 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             let files = event.target.files;
             if (!files.length) return;
 
-            let db = getDatabase();
+            const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (!mach) return;
 
@@ -1364,7 +1454,7 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         function removeManualPdf(idx) {
             if (currentRole !== 'admin') return;
-            let db = getDatabase();
+            const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (mach && mach.manualsPdf) {
                 mach.manualsPdf.splice(idx, 1);
@@ -1572,7 +1662,7 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             lista.innerHTML = "";
             let indexPieza = 1;
 
-            let db = getDatabase();
+            const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             let reportes = mach && mach.reportesPiezas ? mach.reportesPiezas : {};
 
@@ -1663,7 +1753,7 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         }
 
         function actualizarOpacidadYColoresEnEscena(piezaDestacadaNombre) {
-            let db = getDatabase();
+            const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             let reportes = mach && mach.reportesPiezas ? mach.reportesPiezas : {};
 
@@ -1702,7 +1792,7 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
                 enfocarPieza(piezaEncontrada);
                 actualizarOpacidadYColoresEnEscena(nombrePieza);
 
-                let db = getDatabase();
+                const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
                 let mach = db[currentLine].find(m => m.id === currentMachineId);
                 let reportes = mach && mach.reportesPiezas ? mach.reportesPiezas : {};
                 let repInfo = reportes[nombrePieza];
@@ -1778,7 +1868,7 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             let ahora = new Date();
             let fechaHoraStr = ahora.toLocaleDateString() + ' ' + ahora.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-            let db = getDatabase();
+            const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (mach) {
                 if (!mach.reportesPiezas) mach.reportesPiezas = {};
@@ -1798,7 +1888,7 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         }
 
         function marcarPiezaOperativa(nombrePieza) {
-            let db = getDatabase();
+            const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (mach && mach.reportesPiezas) {
                 delete mach.reportesPiezas[nombrePieza];
@@ -1812,7 +1902,7 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         }
 
         function abrirModalVerReportes() {
-            let db = getDatabase();
+            const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             let reportes = mach && mach.reportesPiezas ? mach.reportesPiezas : {};
 
