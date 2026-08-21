@@ -898,31 +898,21 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         }
 
 async function renderMachines() {
-    // 1. Consultamos la máquina específica en Supabase
-    const { data: maquina, error } = await dbSupabase
+    // 1. Traemos TODAS las máquinas de la tabla en lugar de buscar por .eq('id', ...)
+    const { data: maquinas, error } = await dbSupabase
         .from('maquinas')
-        .select('*')
-        .eq('id', currentMachineId)
-        .single();
+        .select('*');
 
     if (error) {
-        console.error("Error al cargar la máquina:", error);
-        return; // Salimos si hay error
+        console.error("Error al cargar las máquinas:", error);
+        return;
     }
 
-    // 2. Obtenemos el contenedor
     let container = document.getElementById('machines-grid-container');
     container.innerHTML = "";
 
-    // 3. Usamos la variable 'maquina' (que viene de Supabase) 
-    // en lugar de 'db.currentLine'
-    
-    // Si tu estructura antigua dependía de una lista (array), 
-    // asegúrate de que 'maquina' sea tratada correctamente.
-    // Como parece que aquí esperas un array para el forEach:
-    const listaDeMaquinas = [maquina]; // Ajusta esto según si esperas una o varias
-
-    listaDeMaquinas.forEach(maq => { 
+    // 2. Recorremos el arreglo de máquinas que nos devolvió Supabase
+    maquinas.forEach(maq => { 
         let card = document.createElement('div');
         card.className = 'card-item';
 
