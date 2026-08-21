@@ -693,9 +693,7 @@
                                 <label for="input-archivo" class="w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-md text-white font-bold text-xs shadow transition flex items-center justify-center cursor-pointer">
                                     📂 Importar Ensamblaje (.glb)
                                 </label>
-                                
                                 <input type="file" id="input-archivo" accept=".glb,.gltf" class="hidden">
-                                
                             </div>
 
                             <div id="contenedor-admin-reportes-btn" class="mb-2" style="display: none;">
@@ -826,9 +824,12 @@
     </div>
 
     <script>
-      const SUPABASE_URL = 'https://glgkfuiqwconjjffxgln.supabase.co';
-      const SUPABASE_ANON_KEY = 'sb_publishable_YxHDEuQiZ06ywaT5Yha68w_DX35lUVO';
-      const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      // Reemplaza con tus credenciales reales de tu proyecto de Supabase
+const SUPABASE_URL = 'https://glgkfuiqwconjjffxgln.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_YxHDEuQiZ06ywaT5Yha68w_DX35lUVO';
+
+const { createClient } = supabase;
+const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         const DB_KEY = "data_control_activos_db_v3";
         let currentRole = 'visitante';
         let currentLine = '';
@@ -874,19 +875,6 @@
                 }
             ]
         };
-
-        function getDatabase() {
-            let data = localStorage.getItem(DB_KEY);
-            if (!data) {
-                saveDatabase(defaultDatabase);
-                return defaultDatabase;
-            }
-            return JSON.parse(data);
-        }
-
-        function saveDatabase(db) {
-            localStorage.setItem(DB_KEY, JSON.stringify(db));
-        }
 
         function selectRole(role) {
             currentRole = role;
@@ -1571,31 +1559,6 @@
                 btnExplo.disabled = false;
                 btnExplo.classList.remove("opacity-50", "cursor-not-allowed");
             });
-            // Asegúrate de tener un input de tipo file en tu HTML original
-// <input type="file" id="btn-file-input">
-
-document.getElementById('tu-boton-subir-en-interfaz').addEventListener('click', async () => {
-    const input = document.getElementById('btn-file-input');
-    const archivo = input.files[0];
-
-    if (!archivo) return alert('Selecciona un archivo');
-
-    // Mismo proceso que ya funciona:
-    const { data: storageData, error: storageError } = await _supabase.storage
-        .from('modelos-glb')
-        .upload(`modelo_${Date.now()}_${archivo.name}`, archivo);
-
-    if (storageError) return alert('Error: ' + storageError.message);
-
-    const { data: { publicUrl } } = _supabase.storage
-        .from('modelos-glb')
-        .getPublicUrl(`modelo_${Date.now()}_${archivo.name}`);
-
-    // Insertar en tabla 'modelos'
-    await _supabase.from('modelos').insert([{ nombre: archivo.name, url: publicUrl }]);
-    
-    alert('¡Subido y guardado!');
-});
         }
 
         function procesarModeloCargado(gltf, nombreEquipo) {
@@ -1956,15 +1919,61 @@ document.getElementById('tu-boton-subir-en-interfaz').addEventListener('click', 
                 onUpdate: () => { controls.update(); }
             });
         }
-        async function cargarModelosDeSupabase() {
-    const { data: modelos, error } = await _supabase.from('modelos').select('*');
+        async function cargarMaquinas() {
+    const { data, error } = await dbSupabase
+        .from('maquinas')
+        .select('*');
     
-    if (modelos) {
-        modelos.forEach(modelo => {
-            console.log("Cargando modelo:", modelo.url);
-            // AQUÍ LLAMAS A TU FUNCIÓN QUE CARGA EL MODELO EN TU VISOR 3D
-            // Ejemplo: visor3d.load(modelo.url);
-        });
+    if (error) {
+        console.error('Error al cargar máquinas:', error);
+        return;
+    }
+    
+    // Aquí actualizas tu interfaz (por ejemplo, renderizar los botones de las máquinas)
+    console.log('Máquinas desde Supabase:', data);
+}
+async function actualizarNombreMaquina(idMaquina, nuevoNombre) {
+    const { data, error } = await dbSupabase
+        .from('maquinas')
+        .update({ nombre: nuevoNombre })
+        .eq('id', idMaquina);
+
+    if (error) {
+        console.error('Error al actualizar nombre:', error);
+    } else {
+        console.log('Nombre actualizado correctamente en la nube');
+    }
+}
+async function subirArchivoMaquina(idMaquina, archivo, tipoColumna) {
+    const nombreRuta = `maquina_${idMaquina}/${archivo.name}`;
+    
+    // 1. Subir archivo al Storage (ejemplo usando el bucket 'modelos-3d')
+    const { data: storageData, error: storageError } = await dbSupabase.storage
+        .from('modelos-3d')
+        .upload(nombreRuta, archivo, { upsert: true });
+
+    if (storageError) {
+        console.error('Error al subir archivo:', storageError);
+        return;
+    }
+
+    // 2. Obtener la URL pública del archivo
+    const { data: publicUrlData } = dbSupabase.storage
+        .from('modelos-3d')
+        .getPublicUrl(nombreRuta);
+
+    const urlPublica = publicUrlData.publicUrl;
+
+    // 3. Actualizar la tabla 'maquinas' con la nueva URL (modelo_url o manual_url)
+    const { error: dbError } = await dbSupabase
+        .from('maquinas')
+        .update({ [tipoColumna]: urlPublica })
+        .eq('id', idMaquina);
+
+    if (dbError) {
+        console.error('Error al guardar la URL en la base de datos:', dbError);
+    } else {
+        alert('¡Archivo subido y sincronizado en la nube con éxito!');
     }
 }
     </script>
