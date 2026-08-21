@@ -842,18 +842,18 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             'admin': 'admin123'
         };
 
-        function solicitarPassword(rol) {
+        async function solicitarPassword(rol) {
             rolPendiente = rol;
             document.getElementById('modal-password-title').innerText = `Contraseña para ${rol.toUpperCase()}`;
             document.getElementById('input-password-val').value = '';
             document.getElementById('modal-password').style.display = 'flex';
         }
 
-        function cerrarModalPassword() {
+        async function cerrarModalPassword() {
             document.getElementById('modal-password').style.display = 'none';
         }
 
-        function verificarPassword() {
+        async function verificarPassword() {
             let passInput = document.getElementById('input-password-val').value;
             if (passInput === PASSWORDS[rolPendiente]) {
                 cerrarModalPassword();
@@ -876,13 +876,13 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             ]
         };
 
-        function selectRole(role) {
+        async function selectRole(role) {
             currentRole = role;
             document.getElementById('main-menu').classList.remove('active-view');
             document.getElementById('view-lines').classList.add('active-view');
         }
 
-        function openLine(lineName, icon) {
+        async function openLine(lineName, icon) {
             currentLine = lineName;
             document.getElementById('lines-header-title').innerText = `${icon} ${lineName}`;
             document.getElementById('view-lines').classList.remove('active-view');
@@ -897,7 +897,7 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
             renderMachines();
         }
 
-        function renderMachines() {
+        async function renderMachines() {
             // Como es asíncrono, la función donde lo uses debe ser async
 const { data: maquinaActual, error } = await dbSupabase
     .from('maquinas')
@@ -934,14 +934,14 @@ if (error) {
             });
         }
 
-        function openMachineDetail(id, name) {
+        async function openMachineDetail(id, name) {
             currentMachineId = id;
             document.getElementById('selected-machine-title').innerText = name;
             document.getElementById('view-machines').classList.remove('active-view');
             document.getElementById('view-machine-detail').classList.add('active-view');
         }
 
-        function openOption(opt) {
+        async function openOption(opt) {
             document.getElementById('view-machine-detail').classList.remove('active-view');
             
             if (opt === 'Kardex') {
@@ -984,22 +984,22 @@ if (error) {
             }
         }
 
-        function salirKardex() {
+        async function salirKardex() {
             document.getElementById('view-kardex').classList.remove('fullscreen-mode');
             goBack('detail');
         }
 
-        function salirInstrucciones() {
+        async function salirInstrucciones() {
             document.getElementById('view-instructions').classList.remove('fullscreen-mode');
             goBack('detail');
         }
 
-        function salirManuales() {
+        async function salirManuales() {
             document.getElementById('view-manuals').classList.remove('fullscreen-mode');
             goBack('detail');
         }
 
-        function salirVisual3D() {
+        async function salirVisual3D() {
             const vista3D = document.getElementById('view-visual3d');
             vista3D.classList.remove('fullscreen-mode');
             
@@ -1009,7 +1009,7 @@ if (error) {
             goBack('detail');
         }
 
-        function redimensionarCanvas3D() {
+        async function redimensionarCanvas3D() {
             const container = document.getElementById('canvas-3d');
             if (container && renderer && camera) {
                 const w = container.clientWidth;
@@ -1020,7 +1020,7 @@ if (error) {
             }
         }
 
-        function goBack(target) {
+        async function goBack(target) {
             document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
             if (target === 'main') {
                 document.getElementById('main-menu').classList.add('active-view');
@@ -1033,7 +1033,7 @@ if (error) {
             }
         }
 
-        function toggleEditMode() {
+        async function toggleEditMode() {
             // Como es asíncrono, la función donde lo uses debe ser async
 const { data: maquinaActual, error } = await dbSupabase
     .from('maquinas')
@@ -1071,7 +1071,7 @@ if (error) {
             renderMachines();
         }
 
-        function addNewMachine() {
+        async function addNewMachine() {
             // Como es asíncrono, la función donde lo uses debe ser async
 const { data: maquinaActual, error } = await dbSupabase
     .from('maquinas')
@@ -1097,7 +1097,7 @@ if (error) {
             renderMachines();
         }
 
-        function loadKardexData() {
+        async function loadKardexData() {
             // Como es asíncrono, la función donde lo uses debe ser async
 const { data: maquinaActual, error } = await dbSupabase
     .from('maquinas')
@@ -1152,7 +1152,7 @@ if (error) {
             renderKardexRows(mach.kardex || [], isAdmin);
         }
 
-        function updateMeta(field, val) {
+        async function updateMeta(field, val) {
             if (currentRole !== 'admin') return;
             // Como es asíncrono, la función donde lo uses debe ser async
 const { data: maquinaActual, error } = await dbSupabase
@@ -1172,7 +1172,7 @@ if (error) {
             }
         }
 
-        function renderMotors(motors, isAdmin) {
+        async function renderMotors(motors, isAdmin) {
             let container = document.getElementById('motors-container');
             container.innerHTML = '';
             motors.forEach((m, idx) => {
@@ -1196,7 +1196,7 @@ if (error) {
             });
         }
 
-        function addMotorBlock() {
+        async function addMotorBlock() {
             if (currentRole !== 'admin') return;
             // Como es asíncrono, la función donde lo uses debe ser async
 const { data: maquinaActual, error } = await dbSupabase
@@ -1217,7 +1217,7 @@ if (error) {
             }
         }
 
-        function removeMotorBlock(idx) {
+        async function removeMotorBlock(idx) {
             if (currentRole !== 'admin') return;
             // Como es asíncrono, la función donde lo uses debe ser async
 const { data: maquinaActual, error } = await dbSupabase
@@ -1237,7 +1237,7 @@ if (error) {
             }
         }
 
-        function updateMotor(idx, field, val) {
+        async function updateMotor(idx, field, val) {
             if (currentRole !== 'admin') return;
             // Como es asíncrono, la función donde lo uses debe ser async
 const { data: maquinaActual, error } = await dbSupabase
@@ -1256,7 +1256,7 @@ if (error) {
             }
         }
 
-        function renderKardexRows(kardex, isAdmin) {
+        async function renderKardexRows(kardex, isAdmin) {
             let tbody = document.getElementById('kardex-tbody');
             tbody.innerHTML = '';
             kardex.forEach((row, idx) => {
@@ -1273,7 +1273,7 @@ if (error) {
             });
         }
 
-        function addKardexRow() {
+        async function addKardexRow() {
             if (currentRole !== 'admin') return;
             // Como es asíncrono, la función donde lo uses debe ser async
 const { data: maquinaActual, error } = await dbSupabase
@@ -1294,7 +1294,7 @@ if (error) {
             }
         }
 
-        function removeKardexRow(idx) {
+        async function removeKardexRow(idx) {
             if (currentRole !== 'admin') return;
             // Como es asíncrono, la función donde lo uses debe ser async
 const { data: maquinaActual, error } = await dbSupabase
@@ -1314,7 +1314,7 @@ if (error) {
             }
         }
 
-        function updateKardex(idx, field, val) {
+        async function updateKardex(idx, field, val) {
             if (currentRole !== 'admin') return;
             const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
             let mach = db[currentLine].find(m => m.id === currentMachineId);
@@ -1324,7 +1324,7 @@ if (error) {
             }
         }
 
-        function loadInstructionsData() {
+        async function loadInstructionsData() {
             const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (!mach) return;
@@ -1354,7 +1354,7 @@ if (error) {
             });
         }
 
-        function uploadInstructionImages(event) {
+        async function uploadInstructionImages(event) {
             if (currentRole !== 'admin') return;
             let files = event.target.files;
             if (!files.length) return;
@@ -1366,7 +1366,7 @@ if (error) {
             let processed = 0;
             Array.from(files).forEach(file => {
                 let reader = new FileReader();
-                reader.onload = function(e) {
+                reader.onload = async function(e) {
                     if (!mach.instructionImages) mach.instructionImages = [];
                     mach.instructionImages.push(e.target.result);
                     processed++;
@@ -1380,7 +1380,7 @@ if (error) {
             });
         }
 
-        function removeInstructionImage(idx) {
+        async function removeInstructionImage(idx) {
             if (currentRole !== 'admin') return;
             const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
             let mach = db[currentLine].find(m => m.id === currentMachineId);
@@ -1391,7 +1391,7 @@ if (error) {
             }
         }
 
-        function loadManualsData() {
+        async function loadManualsData() {
             const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (!mach) return;
@@ -1426,7 +1426,7 @@ if (error) {
             });
         }
 
-        function uploadManualsPdf(event) {
+        async function uploadManualsPdf(event) {
             if (currentRole !== 'admin') return;
             let files = event.target.files;
             if (!files.length) return;
@@ -1438,7 +1438,7 @@ if (error) {
             let processed = 0;
             Array.from(files).forEach(file => {
                 let reader = new FileReader();
-                reader.onload = function(e) {
+                reader.onload = async function(e) {
                     if (!mach.manualsPdf) mach.manualsPdf = [];
                     mach.manualsPdf.push({ name: file.name, data: e.target.result });
                     processed++;
@@ -1452,7 +1452,7 @@ if (error) {
             });
         }
 
-        function removeManualPdf(idx) {
+        async function removeManualPdf(idx) {
             if (currentRole !== 'admin') return;
             const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
             let mach = db[currentLine].find(m => m.id === currentMachineId);
@@ -1463,12 +1463,12 @@ if (error) {
             }
         }
 
-        function openImageModal(src) {
+        async function openImageModal(src) {
             document.getElementById('modal-img-tag').src = src;
             document.getElementById('img-modal').style.display = 'flex';
         }
 
-        function closeImageModal() {
+        async function closeImageModal() {
             document.getElementById('img-modal').style.display = 'none';
         }
 
@@ -1486,7 +1486,7 @@ if (error) {
 
         const defaultGLBUrl = "modelos/EXTRACTORA_POLICYTRUS.glb";
 
-        function init3D() {
+        async function init3D() {
             const container = document.getElementById('canvas-3d');
             const initW = container.clientWidth > 0 ? container.clientWidth : 300;
             const initH = container.clientHeight > 0 ? container.clientHeight : 480;
@@ -1526,7 +1526,7 @@ if (error) {
 
             const inputArchivo = document.getElementById('input-archivo');
             if (inputArchivo) {
-                inputArchivo.addEventListener('change', async function(e) {
+                inputArchivo.addEventListener('change', async async function(e) {
                     if (currentRole !== 'admin') return;
                     const archivo = e.target.files[0];
                     if (!archivo) return;
@@ -1562,7 +1562,7 @@ if (error) {
                 }
             });
 
-            function animate() {
+            async function animate() {
                 requestAnimationFrame(animate);
                 controls.update();
                 
@@ -1591,7 +1591,7 @@ if (error) {
                     : "w-full mb-2 py-2 bg-purple-600 hover:bg-purple-500 rounded-md text-white font-bold text-xs shadow transition";
             });
 
-            document.getElementById('buscador-piezas').addEventListener('input', function(e) {
+            document.getElementById('buscador-piezas').addEventListener('input', async function(e) {
                 const termino = e.target.value.toLowerCase();
                 const items = document.querySelectorAll('.item-partes'); 
                 items.forEach(item => {
@@ -1605,7 +1605,7 @@ if (error) {
             });
         }
 
-        async function cargarModeloMaquinaActual() {
+        async async function cargarModeloMaquinaActual() {
             const btnExplo = document.getElementById('btn-explo');
             const lista = document.getElementById('lista-partes');
             const indicador = document.getElementById('indicador-equipo');
@@ -1639,7 +1639,7 @@ if (error) {
             }
         }
 
-        function cargarModeloPorDefecto() {
+        async function cargarModeloPorDefecto() {
             gltfLoader.load(defaultGLBUrl, (gltf) => {
                 procesarModeloCargado(gltf, "EXTRACTORA POLICYTRUS");
             }, undefined, (err) => {
@@ -1651,7 +1651,7 @@ if (error) {
             });
         }
 
-        function procesarModeloCargado(gltf, nombreEquipo) {
+        async function procesarModeloCargado(gltf, nombreEquipo) {
             const modelo = gltf.scene;
             const boxCentro = new THREE.Box3().setFromObject(modelo);
             const center = boxCentro.getCenter(new THREE.Vector3());
@@ -1725,7 +1725,7 @@ if (error) {
             centrarVistaGeneral();
         }
 
-        function fijarCamara(vista) {
+        async function fijarCamara(vista) {
             const posiciones = {
                 frontal:  { x: 0, y: 0, z: 8 },
                 superior: { x: 0, y: 8, z: 0 },
@@ -1738,7 +1738,7 @@ if (error) {
             controls.update();
         }
 
-        function centrarVistaGeneral() {
+        async function centrarVistaGeneral() {
             if (piezaSeleccionadaActual) {
                 actualizarOpacidadYColoresEnEscena(null);
                 document.getElementById('panel-info').classList.add('hidden');
@@ -1752,7 +1752,7 @@ if (error) {
             });
         }
 
-        function actualizarOpacidadYColoresEnEscena(piezaDestacadaNombre) {
+        async function actualizarOpacidadYColoresEnEscena(piezaDestacadaNombre) {
             const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             let reportes = mach && mach.reportesPiezas ? mach.reportesPiezas : {};
@@ -1774,7 +1774,7 @@ if (error) {
             });
         }
 
-        function seleccionarComponente(nombrePieza) {
+        async function seleccionarComponente(nombrePieza) {
             const panel = document.getElementById('panel-info');
             const piezaEncontrada = piezasDetectadas.find(p => p.name === nombrePieza);
 
@@ -1848,17 +1848,17 @@ if (error) {
             }
         }
 
-        function abrirModalMotivoReporte(nombrePieza) {
+        async function abrirModalMotivoReporte(nombrePieza) {
             document.getElementById('lbl-pieza-a-reportar').innerText = `Pieza: ${nombrePieza}`;
             document.getElementById('txt-motivo-input').value = '';
             document.getElementById('modal-motivo-reporte').style.display = 'flex';
         }
 
-        function cerrarModalMotivo() {
+        async function cerrarModalMotivo() {
             document.getElementById('modal-motivo-reporte').style.display = 'none';
         }
 
-        function guardarReporteMantenimiento() {
+        async function guardarReporteMantenimiento() {
             let motivo = document.getElementById('txt-motivo-input').value.trim();
             if (!motivo) {
                 alert("Por favor ingresa el motivo del reporte.");
@@ -1887,7 +1887,7 @@ if (error) {
             }, 100);
         }
 
-        function marcarPiezaOperativa(nombrePieza) {
+        async function marcarPiezaOperativa(nombrePieza) {
             const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             if (mach && mach.reportesPiezas) {
@@ -1901,7 +1901,7 @@ if (error) {
             }, 100);
         }
 
-        function abrirModalVerReportes() {
+        async function abrirModalVerReportes() {
             const { data: maquinaActual, error } = await dbSupabase     .from('maquinas')     .select('*')     .eq('id', currentMachineId)     .single();  if (error) {     console.error("Error al cargar la máquina:", error); }
             let mach = db[currentLine].find(m => m.id === currentMachineId);
             let reportes = mach && mach.reportesPiezas ? mach.reportesPiezas : {};
@@ -1947,11 +1947,11 @@ if (error) {
             document.getElementById('modal-ver-reportes').style.display = 'flex';
         }
 
-        function cerrarModalVerReportes() {
+        async function cerrarModalVerReportes() {
             document.getElementById('modal-ver-reportes').style.display = 'none';
         }
 
-        function exportarReportesExcel() {
+        async function exportarReportesExcel() {
             const tabla = document.getElementById('tabla-reportes-excel');
             const tbody = document.getElementById('tbody-reportes-excel');
 
@@ -1969,7 +1969,7 @@ if (error) {
             }
         }
 
-        function detectarToque(x, y) {
+        async function detectarToque(x, y) {
             try {
                 const rect = renderer.domElement.getBoundingClientRect();
                 mouse.x = ((x - rect.left) / rect.width) * 2 - 1;
@@ -1988,7 +1988,7 @@ if (error) {
             }
         }
 
-        function enfocarPieza(objeto) {
+        async function enfocarPieza(objeto) {
             const box = new THREE.Box3().setFromObject(objeto);
             const size = new THREE.Vector3();
             box.getSize(size);
@@ -2009,7 +2009,7 @@ if (error) {
                 onUpdate: () => { controls.update(); }
             });
         }
-        async function cargarMaquinas() {
+        async async function cargarMaquinas() {
     const { data, error } = await dbSupabase
         .from('maquinas')
         .select('*');
@@ -2022,7 +2022,7 @@ if (error) {
     // Aquí actualizas tu interfaz (por ejemplo, renderizar los botones de las máquinas)
     console.log('Máquinas desde Supabase:', data);
 }
-async function actualizarNombreMaquina(idMaquina, nuevoNombre) {
+async async function actualizarNombreMaquina(idMaquina, nuevoNombre) {
     const { data, error } = await dbSupabase
         .from('maquinas')
         .update({ nombre: nuevoNombre })
@@ -2034,7 +2034,7 @@ async function actualizarNombreMaquina(idMaquina, nuevoNombre) {
         console.log('Nombre actualizado correctamente en la nube');
     }
 }
-async function subirArchivoMaquina(idMaquina, archivo, tipoColumna) {
+async async function subirArchivoMaquina(idMaquina, archivo, tipoColumna) {
     const nombreRuta = `maquina_${idMaquina}/${archivo.name}`;
     
     // 1. Subir archivo al Storage (ejemplo usando el bucket 'modelos-3d')
