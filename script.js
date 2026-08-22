@@ -304,15 +304,11 @@ async function toggleEditMode() {
 // CARGA Y EDICIÓN DEL KÁRDEX
 // ==========================================
 async function loadKardexData() {
-    // Usamos currentMachineId que es la variable global de tu app
     const targetId = typeof currentMachineId !== 'undefined' ? currentMachineId : null;
-    
-    if (!targetId) {
-        console.warn("No hay una máquina seleccionada actualmente.");
-        return;
-    }
+    if (!targetId) return;
 
-    const { data, error } = await supabaseClient
+    // Usamos 'dbSupabase' que es el nombre correcto en tu código
+    const { data, error } = await dbSupabase
         .from('machines')
         .select('*')
         .eq('id', targetId)
@@ -320,11 +316,9 @@ async function loadKardexData() {
 
     if (error || !data) return;
 
-    // Actualizar subtítulo de forma segura
     const sub = document.getElementById('kardex-subtitle');
     if (sub) sub.innerText = `Activo: ${data.nombre}`;
 
-    // Cargar la tabla de Excel guardada
     await cargarKardexMaquina(targetId);
 }
 // Guardar Metadatos del Kárdex en Supabase
@@ -1972,40 +1966,30 @@ function guardarKardexEnNube() {
         });
 }
 // Función para procesar el texto plano tabulado de Excel y renderizar la tabla
-function procesarTextoExcel() {
+async function procesarTextoExcel() {
     const rawData = document.getElementById('paste-excel-input').value;
     if (!rawData.trim()) {
         alert("Por favor pega primero las celdas copiadas de Excel.");
         return;
     }
 
-    const rows = rawData.trim().split('\n');
-    let htmlTable = '<table class="repuestos-table" style="width:100%; border-collapse: collapse; font-size: 11px; text-align: left;"><tbody>';
-
-    rows.forEach((row, rowIndex) => {
-        const cells = row.split('\t');
-        htmlTable += '<tr>';
-        cells.forEach(cell => {
-            // Si es la primera fila la tratamos como encabezado visual
-            if (rowIndex === 0) {
-                htmlTable += `<th style="border: 1px solid #ddd; padding: 6px; background-color: #2b2d42; color: #fff; font-weight: bold;">${cell.trim()}</th>`;
-            } else {
-                htmlTable += `<td style="border: 1px solid #ddd; padding: 6px;">${cell.trim()}</td>`;
-            }
-        });
-        htmlTable += '</tr>';
-    });
-
-    htmlTable += '</tbody></table>';
-
-    // Renderizar en pantalla
-    document.getElementById('kardex-excel-table-container').innerHTML = htmlTable;
+    renderizarTablaKardex(rawData);
     document.getElementById('paste-excel-input').value = '';
 
-    // Guardar automáticamente en Supabase para la máquina actual
-    guardarKardexEnSupabase(rawData);
-}
+    if (currentMachineId) {
+        const { error } = await dbSupabase
+            .from('machines')
+            .update({ kardex_raw: rawData })
+            .eq('id', currentMachineId);
 
+        if (error) {
+            console.error("Error al guardar el Kárdex:", error);
+            alert("Hubo un error al guardar en la nube.");
+        } else {
+            alert("¡Tabla de Kárdex guardada correctamente!");
+        }
+    }
+}
 // Guardar los datos de la tabla pegada vinculados al ID de la máquina
 async function guardarKardexEnSupabase(rawTextData) {
     if (!currentMachineId) return;
@@ -2120,16 +2104,14 @@ function renderizarTablaKardex(rawTextData) {
     htmlTable += '</tbody></table>';
     container.innerHTML = htmlTable;
 }
-
 // 3. Cargar Kárdex al abrir la sección
 async function cargarKardexMaquina(machineId) {
-    // Mostrar/ocultar zona de pegado según el rol
     const pasteZone = document.getElementById('admin-kardex-paste-zone');
     if (pasteZone) {
         pasteZone.style.display = (currentRole === 'admin') ? 'block' : 'none';
     }
 
-    const { data, error } = await supabaseClient
+    const { data, error } = await dbSupabase
         .from('machines')
         .select('kardex_raw')
         .eq('id', machineId)
