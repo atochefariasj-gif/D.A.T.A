@@ -177,10 +177,37 @@
                     
                     <div class="w-2/5 h-full bg-gray-800 p-3 flex flex-col justify-between border-r border-gray-700 z-10 text-gray-100">
                         <div class="flex flex-col flex-shrink-0">
-                         <button id="btn-explo" onclick="toggleVistaExplosionada()" class="w-full mb-2 py-2 bg-purple-600 hover:bg-purple-500 rounded-md text-white font-bold text-xs shadow transition cursor-pointer">
-    💥 Activar Vista Explosionada
-</button>
-
+                        
+<div class="flex gap-2 my-2">
+    <button onclick="toggleVistaExplosionada()" id="btn-explo" class="px-2 py-1 bg-blue-600 rounded text-white text-xs">💥 Activar Vista Explosionada</button>
+<button id="btn-iniciar-desensamblaje" onclick="iniciarDesensamblaje()" class="px-2 py-1 bg-purple-600 rounded text-white text-xs">🧭 Guía Paso a Paso</button>
+    <button onclick="toggleModoMedicion()" id="btn-medir" class="px-2 py-1 bg-amber-600 rounded text-white text-xs">📏 Medir Distancia</button>
+</div>
+<div id="panel-medicion" class="hidden bg-gray-900 border border-amber-500 p-2 rounded my-2 text-xs text-white">
+    <div class="font-bold text-amber-400">📏 Herramienta de Medición</div>
+    <div id="resultado-medicion" class="mt-1">Haz clic en dos puntos del modelo.</div>
+    <button onclick="limpiarMedicion()" class="mt-2 w-full py-1 bg-gray-700 hover:bg-gray-600 rounded text-[10px]">Limpiar Medición</button>
+</div>
+<!-- Controles de navegación del paso a paso (inicialmente ocultos) -->
+<div id="panel-paso-a-paso" class="hidden bg-gray-900 border border-purple-500 p-2 rounded my-2 text-xs text-white">
+    <div id="texto-paso-actual" class="font-bold mb-2 text-purple-300">Paso 0: Preparación</div>
+    <div class="flex gap-2">
+        <button onclick="pasoAnterior()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-1 rounded">⬅️ Anterior</button>
+        <button onclick="pasoSiguiente()" class="flex-1 bg-purple-700 hover:bg-purple-600 py-1 rounded">Siguiente ➡️</button>
+        <button onclick="cerrarDesensamblaje()" class="bg-red-700 px-2 py-1 rounded">❌ Salir</button>
+    </div>
+</div>
+<!-- Controles para el Administrador (Guardar Secuencia) -->
+<div id="panel-admin-secuencia" class="hidden bg-gray-900 border border-yellow-500 p-2 rounded my-2 text-xs text-white">
+    <div class="font-bold text-yellow-400 mb-1">🛠️ Configurar Secuencia de Desmontaje (Admin)</div>
+    <div class="text-[10px] text-gray-300 mb-2">Haz clic en las piezas en el orden en que deben retirarse (Paso 1, Paso 2...).</div>
+    <div class="flex gap-2">
+        <button onclick="guardarSecuenciaPersonalizada()" class="bg-yellow-600 hover:bg-yellow-500 px-2 py-1 rounded text-black font-bold">💾 Guardar Secuencia en la Nube</button>
+        <button onclick="limpiarSecuenciaActual()" class="bg-gray-700 px-2 py-1 rounded">🔄 Reiniciar Selección</button>
+        <button onclick="borrarSecuenciaGuardada()" class="bg-red-700 hover:bg-red-600 text-white px-3 py-1 rounded text-xs">🗑️ Borrar Secuencia Anterior</button>
+    </div>
+    <div id="lista-secuencia-admin" class="mt-2 max-h-24 overflow-y-auto text-[10px] text-gray-400"></div>
+</div>
                             <div id="contenedor-importar-3d" class="mb-3">
                                 <label for="input-archivo" class="w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-md text-white font-bold text-xs shadow transition flex items-center justify-center cursor-pointer">
                                     📂 Importar Ensamblaje (.glb)
