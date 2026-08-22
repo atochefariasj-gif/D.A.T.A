@@ -310,32 +310,14 @@ async function loadKardexData() {
         .eq('id', currentMachineId)
         .single();
 
-    if (error || !maq) return;
+if (error || !maq) return;
 
-    document.getElementById('kardex-subtitle').innerText = `Activo: ${maq.nombre}`;
-    document.getElementById('k-maquina-lbl').innerText = maq.nombre;
-    
-    let isAdmin = (currentRole === 'admin');
+    // Actualizar subtítulo de forma segura
+    const sub = document.getElementById('kardex-subtitle');
+    if (sub) sub.innerText = `Activo: ${maq.nombre}`;
 
-    let fields = ['k-area', 'k-codigo', 'k-femision', 'k-eq-marca', 'k-eq-capacidad', 'k-eq-material', 'k-eq-serie', 'k-eq-modelo'];
-    let meta = maq.meta || {};
-
-    fields.forEach(f => {
-        let inputEl = document.getElementById(f);
-        if (inputEl) {
-            inputEl.readOnly = !isAdmin;
-            let propName = f.replace('k-', '').replace('eq_', '');
-            if(f.startsWith('k-eq-')) propName = 'eq_' + propName;
-            
-            inputEl.value = meta[propName] || '';
-
-            if (isAdmin) {
-                inputEl.onchange = async () => {
-                    await guardarCambiosKardexMeta();
-                };
-            }
-        }
-    });
+    // Cargar la tabla de Excel guardada para esta máquina
+    await cargarKardexMaquina(machineId);
 
     const addRowBtn = document.getElementById('add-row-btn');
     const addMotorBtn = document.getElementById('add-motor-btn');
@@ -1968,47 +1950,7 @@ function manejarIncompatibilidadAR() {
         renderer.xr.enabled = false;
     }
 }
-// Habilitar la función de pegar desde Excel en la tabla de repuestos del Kárdex
-document.getElementById('kardex-tbody').addEventListener('paste', function (e) {
-    // Evitar el comportamiento por defecto de pegado
-    e.preventDefault();
 
-    // Obtener el texto del portapapeles
-    const clipboardData = e.clipboardData || window.clipboardData;
-    const pastedData = clipboardData.getData('Text');
-
-    // Separar las filas y columnas del texto copiado (formato tabulado de Excel)
-    const rows = pastedData.split('\r\n').filter(row => row.trim() !== '');
-    
-    if (rows.length === 0) return;
-
-    // Obtener todas las filas actuales de la tabla de repuestos
-    const trElements = this.querySelectorAll('tr');
-    
-    rows.forEach((rowText, rowIndex) => {
-        const cellsData = rowText.split('\t'); // Las celdas en Excel se separan por tabuladores
-
-        // Si la fila ya existe en nuestra tabla HTML, la rellenamos
-        if (rowIndex < trElements.length) {
-            const inputs = trElements[rowIndex].querySelectorAll('input');
-            
-            // Suponiendo que las columnas de inputs son: [Categoria, Descripcion, UM, Cantidad]
-            // cellsData[0] suele ser el ITEM, así que podemos empezar a mapear desde el índice 1 o ajustar según tus columnas
-            let cellIndexOffset = cellsData.length > 4 ? 1 : 0; // Ajuste si Excel trae la columna de "Item"
-
-            inputs.forEach((input, inputIndex) => {
-                const dataIndex = inputIndex + cellIndexOffset;
-                if (cellsData[dataIndex] !== undefined) {
-                    input.value = cellsData[dataIndex].trim();
-                    // Disparar evento input para que se guarde automáticamente en los datos locales/Supabase
-                    input.dispatchEvent(new Event('input'));
-                }
-            });
-        } else {
-            // Opcional: Si el portapapeles tiene más filas de las que existen, puedes llamar a addKardexRow() y rellenarlas
-        }
-    });
-});
 function guardarKardexEnNube() {
     // Recolectar datos del kárdex (metadatos, motores, repuestos)
     const kardexData = {
