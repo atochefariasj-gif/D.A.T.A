@@ -98,57 +98,28 @@
             <button class="back-btn" onclick="goBack('machines')">⬅ Volver a Máquinas</button>
         </div>
 
-        <div id="view-kardex" class="view-section">
-            <h2 style="color: #2b2d42; margin-top: 0; font-size: 14px; margin-bottom: 5px;">📋 Kárdex de Mantenimiento</h2>
-            <p id="kardex-subtitle" style="font-size: 11px; color: #666; margin-bottom: 8px;"></p>
+   <div id="view-kardex" class="view-section">
+    <h2 style="color: #2b2d42; margin-top: 0; font-size: 16px; margin-bottom: 5px;">📋 Kárdex de Mantenimiento</h2>
+    <p id="kardex-subtitle" style="font-size: 11px; color: #666; margin-bottom: 12px;"></p>
 
-            <div class="kardex-sheet-wrapper">
-                <div class="agrimar-header">
-                    <div style="font-weight: bold; color: #2c9a29; font-size: 11px; text-align: left;">agromar<br><span style="font-size: 7px; color:#555;">industrial</span></div>
-                    <div class="agrimar-title-box">
-                        <input type="text" id="k-area" placeholder="AREA..." oninput="updateMeta('area', this.value)">
-                    </div>
-                    <div style="font-size: 8px; text-align: right; line-height: 1.2;">
-                        <b>CODIGO:</b> <input type="text" id="k-codigo" style="width: 55px; border-bottom: 1px solid #999; font-size:8px;" oninput="updateMeta('codigo', this.value)"><br>
-                        <b>F.EMISIÓN:</b> <input type="date" id="k-femision" style="width: 75px; font-size:8px;" oninput="updateMeta('femision', this.value)">
-                    </div>
-                </div>
+    <!-- Zona para pegar desde Excel (solo visible para Administrador) -->
+    <div id="admin-kardex-paste-zone" style="display: none; margin-bottom: 15px; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 2px dashed #00b4d8; text-align: center;">
+        <label style="font-size: 11px; font-weight: bold; color: #023e8a; display: block; margin-bottom: 5px;">
+            📋 Haz clic abajo y presiona CTRL + V para pegar la tabla desde Excel:
+        </label>
+        <textarea id="paste-excel-input" placeholder="Pega aquí las celdas copiadas de Excel..." style="width: 100%; height: 60px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px; padding: 6px; resize: none;"></textarea>
+        <button onclick="procesarTextoExcel()" class="btn btn-admin" style="margin-top: 6px; padding: 6px 12px; font-size: 11px;">📥 Cargar Datos Copiados</button>
+    </div>
 
-                <div style="border-bottom: 2px solid #000; padding: 4px; display: flex; align-items: center; background: #fff;">
-                    <span style="font-size: 9px; font-weight: bold; width: 35%;">NOMBRE DE MAQUINA :</span>
-                    <span id="k-maquina-lbl" style="font-weight: bold; font-size: 11px; color: #000;">-</span>
-                </div>
-
-                <div class="agrimar-section-title">DESCRIPCION DE EQUIPO</div>
-                <div class="form-grid-2"><div class="field-box"><label>MARCA:</label></div><div class="field-box"><input type="text" id="k-eq-marca" placeholder="Marca..." oninput="updateMeta('eq_marca', this.value)"></div></div>
-                <div class="form-grid-2"><div class="field-box"><label>CAPACIDAD:</label></div><div class="field-box"><input type="text" id="k-eq-capacidad" placeholder="Ej. 12 TN/H" oninput="updateMeta('eq_capacidad', this.value)"></div></div>
-                <div class="form-grid-2"><div class="field-box"><label>MATERIAL:</label></div><div class="field-box"><input type="text" id="k-eq-material" placeholder="Ej. ACERO" oninput="updateMeta('eq_material', this.value)"></div></div>
-                <div class="form-grid-2"><div class="field-box"><label>Nº SERIE:</label></div><div class="field-box"><input type="text" id="k-eq-serie" placeholder="Nº Serie..." oninput="updateMeta('eq_serie', this.value)"></div></div>
-                <div class="form-grid-2" style="border-bottom: 2px solid #000;"><div class="field-box"><label>MODELO:</label></div><div class="field-box"><input type="text" id="k-eq-modelo" placeholder="Modelo..." oninput="updateMeta('eq_modelo', this.value)"></div></div>
-
-                <div class="agrimar-section-title">DATOS DEL MOTOR</div>
-                <div id="motors-container"></div>
-                <button id="add-motor-btn" class="btn btn-admin" style="display: none; margin: 6px auto; padding: 6px; font-size: 11px; width: 95%;" onclick="addMotorBlock()">➕ Agregar otro Bloque de Motor</button>
-
-                <div class="agrimar-section-title">DESCRIPCION DE LOS REPUESTOS</div>
-                <table class="repuestos-table">
-                    <thead>
-                        <tr>
-                            <th style="width: 8%;">ITEM</th>
-                            <th style="width: 27%;">CATEGORIA</th>
-                            <th style="width: 38%;">DESCRIPCION</th>
-                            <th style="width: 12%;">UM</th>
-                            <th style="width: 10%;">Cantidad</th>
-                            <th id="th-action" style="width: 5%; display:none;">X</th>
-                        </tr>
-                    </thead>
-                    <tbody id="kardex-tbody"></tbody>
-                </table>
-            </div>
-
-            <button id="add-row-btn" class="btn btn-admin" style="display: none; margin-bottom: 6px; padding: 10px;" onclick="addKardexRow()">➕ Agregar Fila de Repuesto</button>
-            <button class="back-btn" onclick="salirKardex()">⬅ Volver a Opciones</button>
+    <!-- Contenedor donde se dibuja la tabla del Kárdex -->
+    <div class="kardex-sheet-wrapper" style="overflow-x: auto; background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <div id="kardex-excel-table-container">
+            <p style="font-size: 12px; color: #888; text-align: center; margin: 20px 0;">No hay información cargada en el Kárdex para esta máquina.</p>
         </div>
+    </div>
+
+    <button class="back-btn" style="margin-top: 15px;" onclick="salirKardex()">⬅ Volver a Opciones</button>
+</div>
 
         <div id="view-instructions" class="view-section">
             <h2 style="color: #2b2d42; margin-top: 0; font-size: 16px; margin-bottom: 5px;">📖 Instrucciones de Uso</h2>
