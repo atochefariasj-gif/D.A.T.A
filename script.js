@@ -1504,14 +1504,6 @@ function calcularSnappingInteligente(puntoGlobal, mesh, tolerancia) {
     return { punto: puntoGlobal, esCercanoACilindro: true };
 }
 
-    if (minDist <= tolerancia) {
-        let mejorPuntoGlobal = mejorPuntoLocal.clone();
-        mesh.localToWorld(mejorPuntoGlobal);
-        return { punto: mejorPuntoGlobal, esCercanoACilindro: false };
-    }
-
-    return { punto: puntoGlobal, esCercanoACilindro: true };
-}
 
 function distanciaPuntoSegmento(p, a, b, target) {
     const ab = new THREE.Vector3().subVectors(b, a);
