@@ -146,7 +146,10 @@ async function openOption(opt) {
         vista3D.classList.add('active-view', 'fullscreen-mode');
         
         const innerBox = document.getElementById('visual3d-wrapper-box');
-        if(innerBox) innerBox.style.height = 'calc(100vh - 65px)';
+        if(innerBox) {
+            // Ajuste responsivo para celulares y escritorio
+            innerBox.style.height = window.innerWidth < 768 ? '50vh' : 'calc(100vh - 65px)';
+        }
 
         const contenedorImportar = document.getElementById('contenedor-importar-3d');
         const contenedorAdminBtn = document.getElementById('contenedor-admin-reportes-btn');
