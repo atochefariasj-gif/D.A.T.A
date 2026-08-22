@@ -12,6 +12,7 @@ let isEditMode = false;
 let rolPendiente = '';
 let mapaNombres = {}; // Aquí se guardarán los nombres del JSON[cite: 1]
 let reportesCargados = {}; // Variable para guardar el estado de las piezas[cite: 1]
+let documentacionPiezasCargada = {}; // Variable para guardar los links/planos de las piezas
 
 let centroModeloGlobal = new THREE.Vector3(); // Centro global para las vistas rápidas y centrado
 
@@ -147,14 +148,12 @@ async function openOption(opt) {
         
         const innerBox = document.getElementById('visual3d-wrapper-box');
         if(innerBox) {
-            // Ajuste responsivo automático: 70vh para celulares y calc(100vh - 65px) para tablets/PC
             innerBox.style.height = window.innerWidth < 768 ? '70vh' : 'calc(100vh - 65px)';
         }
 
         const contenedorImportar = document.getElementById('contenedor-importar-3d');
         const contenedorAdminBtn = document.getElementById('contenedor-admin-reportes-btn');
         
-        // Botones específicos de herramientas avanzadas
         const btnDesensamblaje = document.getElementById('btn-iniciar-desensamblaje'); 
         const btnMedicion = document.getElementById('btn-medir');
 
@@ -169,7 +168,6 @@ async function openOption(opt) {
             if (btnDesensamblaje) btnDesensamblaje.style.display = 'inline-block';
             if (btnMedicion) btnMedicion.style.display = 'inline-block';
         } else {
-            // Rol VISITANTE: Ocultar importación, reportes admin, paso a paso y medición
             if (contenedorImportar) contenedorImportar.style.display = 'none';
             if (contenedorAdminBtn) contenedorAdminBtn.style.display = 'none';
             if (btnDesensamblaje) btnDesensamblaje.style.display = 'none';
@@ -297,42 +295,22 @@ async function loadKardexData() {
     document.getElementById('k-eq-serie').value = meta.eq_serie || '';
     document.getElementById('k-eq-modelo').value = meta.eq_modelo || '';
 
-    document.getElementById('add-row-btn').style.display = isAdmin ? 'block' : 'none';
-    document.getElementById('add-motor-btn').style.display = isAdmin ? 'block' : 'none';
-    document.getElementById('th-action').style.display = isAdmin ? 'table-cell' : 'none';
+    const addRowBtn = document.getElementById('add-row-btn');
+    const addMotorBtn = document.getElementById('add-motor-btn');
+    const thAction = document.getElementById('th-action');
+    if (addRowBtn) addRowBtn.style.display = isAdmin ? 'block' : 'none';
+    if (addMotorBtn) addMotorBtn.style.display = isAdmin ? 'block' : 'none';
+    if (thAction) thAction.style.display = isAdmin ? 'table-cell' : 'none';
 
-    renderMotors(maq.motors || [], isAdmin);
-    renderKardexRows(maq.kardex || [], isAdmin);
-}
-
-async function renderMotors(motors, isAdmin) {
-    let container = document.getElementById('motors-container');
-    container.innerHTML = '';
-    motors.forEach((m, idx) => {
-        let div = document.createElement('div');
-        div.className = 'motor-block-container';
-        div.innerHTML = `
-            <div class="motor-block-header">
-                <span>MOTOR Nº ${idx + 1}</span>
-                ${isAdmin && motors.length > 1 ? `<button class="btn-row-del" onclick="removeMotorBlock(${idx})">Eliminar Motor</button>` : ''}
-            </div>
-            <div class="form-grid-motor-1" style="display:grid; grid-template-columns: repeat(3, 1fr);">
-                <div class="field-box"><label>MARCA</label><input type="text" ${!isAdmin?'readonly':''} value="${m.marca||''}" oninput="updateMotor(${idx},'marca',this.value)"></div>
-                <div class="field-box"><label>HP</label><input type="text" ${!isAdmin?'readonly':''} value="${m.hp||''}" oninput="updateMotor(${idx},'hp',this.value)"></div>
-                <div class="field-box"><label>KW</label><input type="text" ${!isAdmin?'readonly':''} value="${m.kw||''}" oninput="updateMotor(${idx},'kw',this.value)"></div>
-                <div class="field-box"><label>RPM</label><input type="text" ${!isAdmin?'readonly':''} value="${m.rpm||''}" oninput="updateMotor(${idx},'rpm',this.value)"></div>
-                <div class="field-box"><label>VOLTIOS</label><input type="text" ${!isAdmin?'readonly':''} value="${m.voltios||''}" oninput="updateMotor(${idx},'voltios',this.value)"></div>
-                <div class="field-box"><label>AMP</label><input type="text" ${!isAdmin?'readonly':''} value="${m.amperios||''}" oninput="updateMotor(${idx},'amperios',this.value)"></div>
-            </div>
-        `;
-        container.appendChild(div);
-    });
+    if (typeof renderMotors === 'function') renderMotors(maq.motors || [], isAdmin);
+    if (typeof renderKardexRows === 'function') renderKardexRows(maq.kardex || [], isAdmin);
 }
 
 async function loadInstructionsData() {
     const { data: maq } = await dbSupabase.from('maquinas').select('instruction_images').eq('id', currentMachineId).single();
     let isAdmin = (currentRole === 'admin');
-    document.getElementById('admin-img-upload').style.display = isAdmin ? 'block' : 'none';
+    const adminImgUpload = document.getElementById('admin-img-upload');
+    if (adminImgUpload) adminImgUpload.style.display = isAdmin ? 'block' : 'none';
 
     let wrapper = document.getElementById('instructions-gallery-wrapper');
     wrapper.innerHTML = '';
@@ -358,7 +336,8 @@ async function loadInstructionsData() {
 async function loadManualsData() {
     const { data: maq } = await dbSupabase.from('maquinas').select('manuals_pdf').eq('id', currentMachineId).single();
     let isAdmin = (currentRole === 'admin');
-    document.getElementById('admin-pdf-upload').style.display = isAdmin ? 'block' : 'none';
+    const adminPdfUpload = document.getElementById('admin-pdf-upload');
+    if (adminPdfUpload) adminPdfUpload.style.display = isAdmin ? 'block' : 'none';
 
     let wrapper = document.getElementById('manuals-list-wrapper');
     wrapper.innerHTML = '';
@@ -396,9 +375,11 @@ async function closeImageModal() {
 }
 
 // ==========================================
-// LÓGICA 3D, VISTA EXPLOSIONADA Y ANIMACIÓN FLUIDA[cite: 1]
+// LÓGICA 3D, VISTA EXPLOSIONADA, GIZMO Y ANIMACIÓN FLUIDA
 // ==========================================
 let scene, camera, renderer, grupoMaquina, controls, raycaster, mouse, gltfLoader;
+let viewHelper = null; 
+let viewHelperContainer = null;
 let piezaSeleccionadaActual = "";
 let vistaExplosionada = false;
 let piezasDetectadas = [];
@@ -422,20 +403,45 @@ async function init3D() {
     camera = new THREE.PerspectiveCamera(50, initW / initH, 0.1, 100);
     camera.position.set(5, 5, 8);
 
-    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
     renderer.setSize(initW, initH);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.autoClear = false; 
     container.appendChild(renderer.domElement);
 
     controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    if (typeof THREE.ViewHelper !== 'undefined') {
+        viewHelper = new THREE.ViewHelper(camera, renderer);
+        
+        viewHelperContainer = document.createElement('div');
+        viewHelperContainer.style.position = 'absolute';
+        viewHelperContainer.style.top = '10px';
+        viewHelperContainer.style.right = '10px';
+        viewHelperContainer.style.width = '128px';
+        viewHelperContainer.style.height = '128px';
+        viewHelperContainer.style.zIndex = '10';
+        container.style.position = 'relative';
+        container.appendChild(viewHelperContainer);
+
+        viewHelperContainer.addEventListener('pointerdown', (e) => {
+            const rect = viewHelperContainer.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            if (viewHelper.handleClick({ clientX: x, clientY: y, target: viewHelperContainer })) {
+                e.stopPropagation();
+            }
+        });
+    }
 
     raycaster = new THREE.Raycaster();
     mouse = new THREE.Vector2();
     gltfLoader = new THREE.GLTFLoader();
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
     dirLight.position.set(10, 20, 10);
     scene.add(dirLight);
 
@@ -443,8 +449,8 @@ async function init3D() {
     scene.add(grupoMaquina);
 
     cargarModeloMaquinaActual();
+    cargarNotas3DEnModelo();
 
-    // Configuración del Buscador de Piezas en tiempo real[cite: 1]
     const inputBuscador = document.querySelector('input[placeholder*="Buscar"]');
     if (inputBuscador) {
         inputBuscador.addEventListener('input', (e) => {
@@ -497,7 +503,7 @@ async function init3D() {
     });
 
     renderer.domElement.addEventListener('pointermove', (e) => {
-        if (Math.abs(e.clientX - pointerDownX) > 5 || Math.abs(e.clientY - pointerDownY) > 5) {
+        if (Math.abs(e.clientX - pointerDownX) > 4 || Math.abs(e.clientY - pointerDownY) > 4) {
             hasMoved = true;
         }
     });
@@ -510,10 +516,12 @@ async function init3D() {
         requestAnimationFrame(animate);
         
         if (targetCameraPos && targetControlsTarget) {
-            camera.position.lerp(targetCameraPos, 0.08);
-            controls.target.lerp(targetControlsTarget, 0.08);
+            camera.position.lerp(targetCameraPos, 0.1);
+            controls.target.lerp(targetControlsTarget, 0.1);
 
-            if (camera.position.distanceTo(targetCameraPos) < 0.05) {
+            if (camera.position.distanceTo(targetCameraPos) < 0.01 && controls.target.distanceTo(targetControlsTarget) < 0.01) {
+                camera.position.copy(targetCameraPos);
+                controls.target.copy(targetControlsTarget);
                 targetCameraPos = null;
                 targetControlsTarget = null;
             }
@@ -525,19 +533,19 @@ async function init3D() {
             piezasDetectadas.forEach(pieza => {
                 if (pieza.userData && pieza.userData.posOrig && pieza.userData.posExp) {
                     const target = vistaExplosionada ? pieza.userData.posExp : pieza.userData.posOrig;
-                    pieza.position.lerp(target, 0.08); 
+                    pieza.position.lerp(target, 0.1); 
                 }
             });
         } else {
             listaPiezasOrdenadas.forEach((pieza, index) => {
                 if (pieza.userData && pieza.userData.posOrig && pieza.userData.posExp) {
                     let targetPos = index < pasoActualIndice ? pieza.userData.posExp : pieza.userData.posOrig;
-                    pieza.position.lerp(targetPos, 0.1);
+                    pieza.position.lerp(targetPos, 0.12);
 
                     if (pieza.material) {
                         pieza.material.transparent = true;
-                        let targetOpacity = index < pasoActualIndice ? 0.0 : 1.0;
-                        pieza.material.opacity += (targetOpacity - pieza.material.opacity) * 0.1;
+                        let targetOpacity = index < pasoActualIndice ? 0.05 : 1.0;
+                        pieza.material.opacity += (targetOpacity - pieza.material.opacity) * 0.12;
                     }
                 }
             });
@@ -545,17 +553,22 @@ async function init3D() {
             piezasDetectadas.forEach(pieza => {
                 if (!listaPiezasOrdenadas.includes(pieza)) {
                     if (pieza.userData && pieza.userData.posOrig) {
-                        pieza.position.lerp(pieza.userData.posOrig, 0.1);
+                        pieza.position.lerp(pieza.userData.posOrig, 0.12);
                         if (pieza.material) {
                             pieza.material.transparent = true;
-                            pieza.material.opacity += (1.0 - pieza.material.opacity) * 0.1;
+                            pieza.material.opacity += (1.0 - pieza.material.opacity) * 0.12;
                         }
                     }
                 }
             });
         }
         
+        renderer.clear();
         renderer.render(scene, camera);
+        
+        if (viewHelper) {
+            viewHelper.render(renderer);
+        }
     }
     animate();
 }
@@ -571,9 +584,6 @@ function toggleVistaExplosionada() {
     }
 }
 
-// ==========================================
-// FUNCIONES DE VISTAS RÁPIDAS Y CENTRADO[cite: 1]
-// ==========================================
 function centrarVistaGeneral() {
     if (!controls || !camera) return;
     targetControlsTarget = centroModeloGlobal.clone();
@@ -599,7 +609,7 @@ function cambiarVistaRapida(tipo) {
 async function cargarModeloMaquinaActual() {
     const btnExplo = document.getElementById('btn-explo');
     if(btnExplo) {
-        btnExplo.innerText = "⏳ Cargando modelo...";
+        btnExplo.innerText = "⏳ Cargando modelo... 0%";
         btnExplo.disabled = true;
     }
 
@@ -610,10 +620,18 @@ async function cargarModeloMaquinaActual() {
     const { data: maq } = await dbSupabase.from('maquinas').select('modelo_url').eq('id', currentMachineId).single();
 
     if (maq && maq.modelo_url && maq.modelo_url.trim() !== "" && maq.modelo_url !== "EMPTY") {
-        gltfLoader.load(maq.modelo_url, (gltf) => {
-            procesarModeloCargado(gltf, "Modelo Cloud");
+        const manager = new THREE.LoadingManager();
+        
+        manager.onProgress = (url, itemsLoaded, itemsTotal) => {
+            const percentComplete = Math.round((itemsLoaded / itemsTotal) * 100);
+            if(btnExplo) btnExplo.innerText = `Cargando: ${percentComplete}%`;
+        };
+
+        const loader = new THREE.GLTFLoader(manager);
+        loader.load(maq.modelo_url, (gltf) => {
+            procesarModeloCargado(gltf, "Modelo Cloud (Optimizado)");
         }, undefined, (err) => {
-            console.error("Error cargando modelo desde Supabase:", err);
+            console.error("Error al cargar modelo 3D:", err);
             cargarModeloPorDefecto();
         });
     } else {
@@ -633,19 +651,32 @@ async function cargarModeloPorDefecto() {
 
 async function procesarModeloCargado(gltf, nombreEquipo) {
     const modelo = gltf.scene;
+    
+    modelo.traverse((child) => {
+        if (child.isMesh) {
+            child.castShadow = false;
+            child.receiveShadow = false;
+            if (child.material) {
+                child.material.precision = 'mediump';
+                if (child.material.map) child.material.map.generateMipmaps = true;
+            }
+        }
+    });
+
     const boxCentro = new THREE.Box3().setFromObject(modelo);
     const center = boxCentro.getCenter(new THREE.Vector3());
     modelo.position.sub(center); 
 
-    centroModeloGlobal = center.clone(); // Guardamos el centro global para los botones de vista[cite: 1]
+    centroModeloGlobal = center.clone();
 
     piezasDetectadas = [];
     const lista = document.getElementById('lista-partes');
     if(lista) lista.innerHTML = "";
     let indexPieza = 1;
 
-    const { data: maq } = await dbSupabase.from('maquinas').select('reportes_piezas').eq('id', currentMachineId).single();
+    const { data: maq } = await dbSupabase.from('maquinas').select('reportes_piezas, documentacion_piezas').eq('id', currentMachineId).single();
     reportesCargados = maq?.reportes_piezas || {}; 
+    documentacionPiezasCargada = maq?.documentacion_piezas || {};
 
     modelo.traverse((child) => {
         if (child.isMesh) {
@@ -668,13 +699,18 @@ async function procesarModeloCargado(gltf, nombreEquipo) {
                 else if (Array.isArray(child.material) && child.material[0]?.color) colorOriginal = child.material[0].color.getHex();
             }
 
-            let tieneReporte = reportesCargados[child.name] && reportesCargados[child.name].estado === 'mantenimiento';
+            let repInfo = reportesCargados[child.name];
+            let colorHex = colorOriginal;
+            if (repInfo) {
+                if (repInfo.estado === 'mantenimiento') colorHex = 0xef4444; 
+                else if (repInfo.estado === 'preventivo') colorHex = 0xf59e0b; 
+            }
 
             child.userData = { posOrig, posExp, colorBase: colorOriginal };
 
             child.material = new THREE.MeshStandardMaterial({ 
-                color: tieneReporte ? 0xef4444 : colorOriginal,
-                roughness: 0.5, metalness: 0.1, transparent: true, opacity: 1.0
+                color: colorHex,
+                roughness: 0.4, metalness: 0.2, transparent: true, opacity: 1.0
             });
 
             if(lista) {
@@ -712,8 +748,13 @@ async function seleccionarComponente(nombrePieza) {
                 p.material.transparent = true;
                 p.material.opacity = 1.0;
                 
-                const tieneReporte = reportesCargados[p.name] && reportesCargados[p.name].estado === 'mantenimiento';
-                p.material.color.setHex(tieneReporte ? 0xef4444 : p.userData.colorBase);
+                let repInfo = reportesCargados[p.name];
+                let colorHex = p.userData.colorBase;
+                if (repInfo) {
+                    if (repInfo.estado === 'mantenimiento') colorHex = 0xef4444;
+                    else if (repInfo.estado === 'preventivo') colorHex = 0xf59e0b;
+                }
+                p.material.color.setHex(colorHex);
             }
         });
         return;
@@ -732,8 +773,13 @@ async function seleccionarComponente(nombrePieza) {
                     p.material.opacity = 1.0;
                 } else {
                     p.material.opacity = 0.15;
-                    const tieneReporte = reportesCargados[p.name] && reportesCargados[p.name].estado === 'mantenimiento';
-                    p.material.color.setHex(tieneReporte ? 0xef4444 : p.userData.colorBase);
+                    let repInfo = reportesCargados[p.name];
+                    let colorHex = p.userData.colorBase;
+                    if (repInfo) {
+                        if (repInfo.estado === 'mantenimiento') colorHex = 0xef4444;
+                        else if (repInfo.estado === 'preventivo') colorHex = 0xf59e0b;
+                    }
+                    p.material.color.setHex(colorHex);
                 }
             }
         });
@@ -741,10 +787,11 @@ async function seleccionarComponente(nombrePieza) {
         const boxPieza = new THREE.Box3().setFromObject(piezaEncontrada);
         const centroPieza = boxPieza.getCenter(new THREE.Vector3());
         targetControlsTarget = centroPieza.clone();
-        const offset = camera.position.clone().sub(controls.target).normalize().multiplyScalar(2.2); // Zoom cercano[cite: 1]
+        const offset = camera.position.clone().sub(controls.target).normalize().multiplyScalar(2.2); 
         targetCameraPos = centroPieza.clone().add(offset);
 
         let repInfo = reportesCargados[nombrePieza];
+        let docInfo = documentacionPiezasCargada[nombrePieza];
 
         const lblEstado = document.getElementById('info-estado');
         const boxMotivo = document.getElementById('info-motivo-box');
@@ -752,29 +799,59 @@ async function seleccionarComponente(nombrePieza) {
         const contenedorAcciones = document.getElementById('panel-acciones-pieza');
         contenedorAcciones.innerHTML = '';
 
-        if (repInfo && repInfo.estado === 'mantenimiento') {
-            lblEstado.innerText = "Requiere Mantenimiento";
-            lblEstado.className = "text-red-400 font-bold";
+        if (repInfo) {
+            if (repInfo.estado === 'mantenimiento') {
+                lblEstado.innerText = "🚨 Requiere Mantenimiento Crítico";
+                lblEstado.className = "text-red-400 font-bold";
+            } else if (repInfo.estado === 'preventivo') {
+                lblEstado.innerText = "⚠️ Alerta Preventiva / Desgaste";
+                lblEstado.className = "text-yellow-400 font-bold";
+            } else {
+                lblEstado.innerText = "✅ Operativo";
+                lblEstado.className = "text-green-400 font-bold";
+            }
             boxMotivo.classList.remove('hidden');
-            txtMotivo.innerText = `${repInfo.motivo} (${repInfo.fecha})`;
+            txtMotivo.innerHTML = `<b>${repInfo.motivo}</b><br><span class="text-[10px] text-gray-400">${repInfo.fecha}</span>`;
         } else {
-            lblEstado.innerText = "Operativo";
+            lblEstado.innerText = "✅ Operativo";
             lblEstado.className = "text-green-400 font-bold";
             boxMotivo.classList.add('hidden');
         }
 
+        if (docInfo && docInfo.url) {
+            contenedorAcciones.innerHTML += `
+                <a href="${docInfo.url}" target="_blank" class="w-full py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-white font-bold text-[11px] text-center block mb-1">
+                    📄 Ver Plano / Manual de Pieza
+                </a>`;
+        } else if (currentRole === 'admin') {
+            contenedorAcciones.innerHTML += `
+                <button onclick="abrirModalAsociarDocumento('${nombrePieza}')" class="w-full py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-white text-[11px] mb-1">
+                    ➕ Adjuntar Manual a Pieza
+                </button>`;
+        }
+
         if (currentRole === 'mantenimiento' || currentRole === 'admin') {
-            if (!repInfo || repInfo.estado !== 'mantenimiento') {
-                contenedorAcciones.innerHTML = `<button onclick="abrirModalMotivoReporte('${nombrePieza}')" class="w-full py-1.5 bg-red-600 hover:bg-red-500 rounded text-white font-bold text-[11px]">⚠️ Requiere Mantenimiento</button>`;
-            } else if (currentRole === 'admin') {
-                contenedorAcciones.innerHTML = `<button onclick="marcarPiezaOperativa('${nombrePieza}')" class="w-full py-1.5 bg-green-600 hover:bg-green-500 rounded text-white font-bold text-[11px]">✅ Marcar como Operativa</button>`;
+            contenedorAcciones.innerHTML += `
+                <button onclick="abrirModalMotivoReporte('${nombrePieza}', 'preventivo')" class="w-full py-1.5 bg-yellow-600 hover:bg-yellow-500 rounded text-white font-bold text-[11px] mb-1">⚠️ Marcar Alerta Preventiva</button>
+                <button onclick="abrirModalMotivoReporte('${nombrePieza}', 'mantenimiento')" class="w-full py-1.5 bg-red-600 hover:bg-red-500 rounded text-white font-bold text-[11px] mb-1">🔴 Reportar Mantenimiento</button>
+                <button onclick="activarModoCrearNota('${nombrePieza}')" class="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded text-white font-bold text-[11px] mb-1">📌 Dejar Nota 3D</button>
+            `;
+            if (repInfo) {
+                contenedorAcciones.innerHTML += `
+                    <button onclick="marcarPiezaOperativa('${nombrePieza}')" class="w-full py-1.5 bg-green-600 hover:bg-green-500 rounded text-white font-bold text-[11px]">✅ Marcar como Operativa</button>
+                `;
             }
         }
+        
+        cargarDatosInventarioPieza(nombrePieza);
     }
 }
 
-async function abrirModalMotivoReporte(nombrePieza) {
-    document.getElementById('lbl-pieza-a-reportar').innerText = `Pieza: ${nombrePieza}`;
+let estadoReporteSeleccionado = 'mantenimiento';
+
+async function abrirModalMotivoReporte(nombrePieza, estado = 'mantenimiento') {
+    estadoReporteSeleccionado = estado;
+    document.getElementById('lbl-pieza-a-reportar').innerText = `Pieza: ${nombrePieza} (${estado.toUpperCase()})`;
     document.getElementById('txt-motivo-input').value = '';
     document.getElementById('modal-motivo-reporte').style.display = 'flex';
 }
@@ -791,7 +868,7 @@ async function guardarReporteMantenimiento() {
     const { data: maq } = await dbSupabase.from('maquinas').select('reportes_piezas').eq('id', currentMachineId).single();
     let reportes = maq?.reportes_piezas || {};
 
-    reportes[piezaSeleccionadaActual] = { estado: 'mantenimiento', motivo, fecha: fechaHoraStr };
+    reportes[piezaSeleccionadaActual] = { estado: estadoReporteSeleccionado, motivo, fecha: fechaHoraStr };
     await dbSupabase.from('maquinas').update({ reportes_piezas: reportes }).eq('id', currentMachineId);
 
     cerrarModalMotivo();
@@ -799,7 +876,7 @@ async function guardarReporteMantenimiento() {
 }
 
 async function marcarPiezaOperativa(nombrePieza) {
-    if (currentRole !== 'admin') return;
+    if (currentRole !== 'admin' && currentRole !== 'mantenimiento') return;
 
     const { data: maq } = await dbSupabase.from('maquinas').select('reportes_piezas').eq('id', currentMachineId).single();
     let reportes = maq?.reportes_piezas || {};
@@ -812,6 +889,20 @@ async function marcarPiezaOperativa(nombrePieza) {
     }
 
     cargarModeloMaquinaActual();
+}
+
+async function abrirModalAsociarDocumento(nombrePieza) {
+    let urlDoc = prompt(`Ingrese la URL del plano o manual PDF para la pieza "${nombrePieza}":`);
+    if (!urlDoc) return;
+
+    const { data: maq } = await dbSupabase.from('maquinas').select('documentacion_piezas').eq('id', currentMachineId).single();
+    let docs = maq?.documentacion_piezas || {};
+    docs[nombrePieza] = { url: urlDoc };
+
+    await dbSupabase.from('maquinas').update({ documentacion_piezas: docs }).eq('id', currentMachineId);
+    alert("¡Documentación asociada correctamente!");
+    cargarModeloMaquinaActual();
+    seleccionarComponente(nombrePieza);
 }
 
 async function abrirModalVerReportes() {
@@ -829,12 +920,21 @@ async function abrirModalVerReportes() {
         contenedor.innerHTML += `
             <div class="bg-gray-900 border border-gray-700 p-2 rounded mb-2 cursor-pointer hover:border-blue-500 transition-colors" onclick="enfocarPiezaDesdeReporte('${piezaName}')">
                 <span class="text-blue-400 font-bold">⚙️ ${piezaName}</span>
-                <p class="text-xs text-gray-300 mt-1"><b>Motivo:</b> ${rep.motivo}</p>
+                <p class="text-xs text-gray-300 mt-1"><b>Estado:</b> ${rep.estado} | <b>Motivo:</b> ${rep.motivo}</p>
                 <p class="text-[10px] text-gray-400 mt-0.5"><b>Fecha:</b> ${rep.fecha}</p>
             </div>`;
             
-        tbodyExcel.innerHTML += `<tr><td>${piezaName}</td><td>Mantenimiento</td><td>${rep.motivo}</td><td>${rep.fecha}</td></tr>`;
+        tbodyExcel.innerHTML += `<tr><td>${piezaName}</td><td>${rep.estado}</td><td>${rep.motivo}</td><td>${rep.fecha}</td></tr>`;
     });
+
+    const btnExportarExcel = document.getElementById('btn-exportar-excel');
+    if (btnExportarExcel) {
+        if (currentRole === 'admin') {
+            btnExportarExcel.style.display = 'flex';
+        } else {
+            btnExportarExcel.style.display = 'none';
+        }
+    }
 
     document.getElementById('modal-ver-reportes').style.display = 'flex';
 }
@@ -880,13 +980,22 @@ async function detectarToque(x, y) {
     mouse.y = -((y - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
 
-    // Si ya aislamos una pieza, filtramos estrictamente por ella para máxima precisión
     let listaAExplorar = (modoMedicionActivo && piezaEnMedicion) ? [piezaEnMedicion] : piezasDetectadas;
     const intersects = raycaster.intersectObjects(listaAExplorar, true);
     
     if (intersects.length > 0) {
         let interseccion = intersects[0];
         let puntoInterseccion = interseccion.point; 
+
+        if (window.modoNotaActivo) {
+            window.modoNotaActivo = false;
+            let mensajeNota = prompt("Escribe tu nota para el siguiente turno:");
+            if (mensajeNota) {
+                let autorNota = prompt("Tu nombre o turno:") || "Anónimo";
+                await guardarNota3D(interseccion.object.name, puntoInterseccion, mensajeNota, autorNota);
+            }
+            return;
+        }
 
         if (modoMedicionActivo) {
             if (!piezaEnMedicion) {
@@ -1020,8 +1129,13 @@ function limpiarSecuenciaActual() {
     
     piezasDetectadas.forEach(p => {
         if (p.material && p.userData) {
-            const tieneReporte = reportesCargados[p.name] && reportesCargados[p.name].estado === 'mantenimiento';
-            p.material.color.setHex(tieneReporte ? 0xef4444 : p.userData.colorBase);
+            let repInfo = reportesCargados[p.name];
+            let colorHex = p.userData.colorBase;
+            if (repInfo) {
+                if (repInfo.estado === 'mantenimiento') colorHex = 0xef4444;
+                else if (repInfo.estado === 'preventivo') colorHex = 0xf59e0b;
+            }
+            p.material.color.setHex(colorHex);
         }
     });
 }
@@ -1079,8 +1193,13 @@ async function guardarSecuenciaPersonalizada() {
         
         piezasDetectadas.forEach(p => {
             if (p.material && p.userData) {
-                const tieneReporte = reportesCargados[p.name] && reportesCargados[p.name].estado === 'mantenimiento';
-                p.material.color.setHex(tieneReporte ? 0xef4444 : p.userData.colorBase);
+                let repInfo = reportesCargados[p.name];
+                let colorHex = p.userData.colorBase;
+                if (repInfo) {
+                    if (repInfo.estado === 'mantenimiento') colorHex = 0xef4444;
+                    else if (repInfo.estado === 'preventivo') colorHex = 0xf59e0b;
+                }
+                p.material.color.setHex(colorHex);
             }
         });
 
@@ -1117,7 +1236,7 @@ function cerrarDesensamblaje() {
 }
 
 // ==========================================
-// HERRAMIENTA DE MEDICIÓN PRECISA CON AISLAMIENTO Y SNAP (VÉRTICES/ARISTAS)
+// HERRAMIENTA DE MEDICIÓN MEJORADA
 // ==========================================
 let modoMedicionActivo = false;
 let piezaEnMedicion = null;
@@ -1135,7 +1254,7 @@ function toggleModoMedicion() {
     if (modoMedicionActivo) {
         panel.classList.remove('hidden');
         btn.classList.add('bg-amber-700');
-        document.getElementById('resultado-medicion').innerText = "Seleccione la pieza a medir.";
+        document.getElementById('resultado-medicion').innerText = "Haga clic en una pieza para aislarla y medir con precisión.";
         document.getElementById('panel-info').classList.add('hidden');
         limpiarMedicionManteniendoModo();
     } else {
@@ -1164,7 +1283,7 @@ function aislarPiezaParaMedir(piezaSeleccionada) {
     const box = new THREE.Box3().setFromObject(piezaSeleccionada);
     const centro = box.getCenter(new THREE.Vector3());
     targetControlsTarget = centro.clone();
-    const offset = camera.position.clone().sub(controls.target).normalize().multiplyScalar(1.5); 
+    const offset = camera.position.clone().sub(controls.target).normalize().multiplyScalar(2.0); 
     targetCameraPos = centro.clone().add(offset);
 
     document.getElementById('resultado-medicion').innerText = "Pieza aislada. Haga clic en el primer punto.";
@@ -1177,39 +1296,36 @@ function restaurarVisibilidadPiezas() {
         if (p.material) {
             p.material.transparent = true;
             p.material.opacity = 1.0;
-            const tieneReporte = reportesCargados[p.name] && reportesCargados[p.name].estado === 'mantenimiento';
-            p.material.color.setHex(tieneReporte ? 0xef4444 : p.userData.colorBase);
+            let repInfo = reportesCargados[p.name];
+            let colorHex = p.userData.colorBase;
+            if (repInfo) {
+                if (repInfo.estado === 'mantenimiento') colorHex = 0xef4444;
+                else if (repInfo.estado === 'preventivo') colorHex = 0xf59e0b;
+            }
+            p.material.color.setHex(colorHex);
         }
     });
 }
 
-// ==========================================
-// HERRAMIENTA DE MEDICIÓN CON RESTRICCIÓN ESTRICTA (VÉRTICES Y ARISTAS)
-// ==========================================
-
-// Tolerancia máxima en metros para considerar que el usuario hizo clic sobre una arista o vértice (ej. 1.5 cm = 0.015 metros)
-const TOLERANCIA_SNAP = 0.015; 
+const TOLERANCIA_SNAP_AMPLIADA = 0.08; 
 
 function manejarPuntoMedicionPreciso(puntoInterseccionGlobal, meshObjetivo) {
     const res = document.getElementById('resultado-medicion');
 
-    // Intentamos obtener el punto exacto de la arista o vértice más cercano
-    const resultadoSnap = calcularSnappingVerticesYAristasEstricto(puntoInterseccionGlobal, meshObjetivo, TOLERANCIA_SNAP);
+    const resultadoSnap = calcularSnappingInteligente(puntoInterseccionGlobal, meshObjetivo, TOLERANCIA_SNAP_AMPLIADA);
 
-    // Si el resultado es falso, significa que el usuario hizo clic en medio de una cara plana y no cerca de un vértice/arista
     if (!resultadoSnap) {
-        res.innerText = "⚠️ Debe hacer clic estrictamente sobre una arista o vértice.";
-        return; // No hace nada y evita colocar puntos
+        res.innerText = "⚠️ Acerque un poco más el cursor al vértice o arista de la pieza.";
+        return; 
     }
 
-    const puntoAjustado = resultadoSnap.clone();
+    const puntoAjustado = resultadoSnap.punto.clone();
 
     if (!puntoMedicion1) {
         puntoMedicion1 = puntoAjustado.clone();
-        res.innerText = "Vértice/Arista 1 fijado. Seleccione el segundo punto.";
+        res.innerText = "Punto 1 fijado correctamente. Seleccione el segundo punto.";
         
-        // Esfera ultra pequeña (0.002)
-        const geometry = new THREE.SphereGeometry(0.002, 16, 16);
+        const geometry = new THREE.SphereGeometry(0.003, 16, 16);
         const material = new THREE.MeshBasicMaterial({ color: 0xef4444 });
         esferaPunto1 = new THREE.Mesh(geometry, material);
         esferaPunto1.position.copy(puntoMedicion1);
@@ -1218,7 +1334,7 @@ function manejarPuntoMedicionPreciso(puntoInterseccionGlobal, meshObjetivo) {
     } else if (!puntoMedicion2) {
         puntoMedicion2 = puntoAjustado.clone();
         
-        const geometry = new THREE.SphereGeometry(0.002, 16, 16);
+        const geometry = new THREE.SphereGeometry(0.003, 16, 16);
         const material = new THREE.MeshBasicMaterial({ color: 0xef4444 });
         esferaPunto2 = new THREE.Mesh(geometry, material);
         esferaPunto2.position.copy(puntoMedicion2);
@@ -1227,9 +1343,16 @@ function manejarPuntoMedicionPreciso(puntoInterseccionGlobal, meshObjetivo) {
         let distancia = puntoMedicion1.distanceTo(puntoMedicion2);
         let distanciaMm = distancia * 1000; 
         
-        res.innerHTML = `<b>Distancia:</b> ${distancia.toFixed(4)} m (${distanciaMm.toFixed(2)} mm)`;
+        let textoMedida = `<b>Distancia:</b> ${distancia.toFixed(4)} m (${distanciaMm.toFixed(2)} mm)`;
+        if (resultadoSnap.esCercanoACilindro || distanciaMm > 1) {
+            let diametroEstimadoMm = distanciaMm; 
+            let radioEstimadoMm = diametroEstimadoMm / 2;
+            textoMedida += `<br><b>Ø Diámetro Est.:</b> ${diametroEstimadoMm.toFixed(2)} mm | <b>Radio:</b> ${radioEstimadoMm.toFixed(2)} mm`;
+        }
 
-        const materialLinea = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 2 });
+        res.innerHTML = textoMedida;
+
+        const materialLinea = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 3 });
         const puntosLinea = [puntoMedicion1, puntoMedicion2];
         const geometriaLinea = new THREE.BufferGeometry().setFromPoints(puntosLinea);
         lineaMedicionMesh = new THREE.Line(geometriaLinea, materialLinea);
@@ -1245,8 +1368,8 @@ function manejarPuntoMedicionPreciso(puntoInterseccionGlobal, meshObjetivo) {
         esferaPunto2 = null;
         lineaMedicionMesh = null;
 
-        res.innerText = "Vértice/Arista 1 fijado. Seleccione el segundo punto.";
-        const geometry = new THREE.SphereGeometry(0.002, 16, 16);
+        res.innerText = "Punto 1 fijado. Seleccione el segundo punto.";
+        const geometry = new THREE.SphereGeometry(0.003, 16, 16);
         const material = new THREE.MeshBasicMaterial({ color: 0xef4444 });
         esferaPunto1 = new THREE.Mesh(geometry, material);
         esferaPunto1.position.copy(puntoMedicion1);
@@ -1254,8 +1377,7 @@ function manejarPuntoMedicionPreciso(puntoInterseccionGlobal, meshObjetivo) {
     }
 }
 
-// Función estricta que retorna null si el clic fue en una cara plana
-function calcularSnappingVerticesYAristasEstricto(puntoGlobal, mesh, tolerancia) {
+function calcularSnappingInteligente(puntoGlobal, mesh, tolerancia) {
     const geometry = mesh.geometry;
     const positionAttribute = geometry.attributes.position;
     
@@ -1280,7 +1402,6 @@ function calcularSnappingVerticesYAristasEstricto(puntoGlobal, mesh, tolerancia)
             vA.fromBufferAttribute(positionAttribute, a);
             vB.fromBufferAttribute(positionAttribute, b);
 
-            // 1. Evaluar Vértices
             [vA, vB].forEach(v => {
                 let dist = localPoint.distanceTo(v);
                 if (dist < minDist) {
@@ -1289,24 +1410,21 @@ function calcularSnappingVerticesYAristasEstricto(puntoGlobal, mesh, tolerancia)
                 }
             });
 
-            // 2. Evaluar Aristas
             let distArista = distanciaPuntoSegmento(localPoint, vA, vB, tempPuntoArista);
             if (distArista < minDist) {
                 minDist = distArista;
-                mejorPuntoLocal.copy(tempPuntoArista);
+                mejorPontoLocal.copy(tempPuntoArista);
             }
         }
     }
 
-    // Si la distancia mínima al vértice o arista supera la tolerancia permitida, 
-    // asumimos que hizo clic en una cara plana y rechazamos el punto.
-    if (minDist > tolerancia) {
-        return null;
+    if (minDist <= tolerancia) {
+        let mejorPuntoGlobal = mejorPuntoLocal.clone();
+        mesh.localToWorld(mejorPuntoGlobal);
+        return { punto: mejorPuntoGlobal, esCercanoACilindro: false };
     }
 
-    let mejorPuntoGlobal = mejorPuntoLocal.clone();
-    mesh.localToWorld(mejorPuntoGlobal);
-    return mejorPuntoGlobal;
+    return { punto: puntoGlobal, esCercanoACilindro: true };
 }
 
 function distanciaPuntoSegmento(p, a, b, target) {
@@ -1332,5 +1450,126 @@ function limpiarMedicionManteniendoModo() {
 function limpiarMedicion() {
     limpiarMedicionManteniendoModo();
     const res = document.getElementById('resultado-medicion');
-    if (res && modoMedicionActivo) res.innerText = "Seleccione la pieza a medir.";
+    if (res && modoMedicionActivo) res.innerText = "Haga clic en una pieza para aislarla y medir con precisión.";
+}
+
+// ==========================================
+// 1. REALIDAD AUMENTADA (AR / WebXR) - CORREGIDO
+// ==========================================
+function iniciarRealidadAumentada() {
+    if ('xr' in navigator) {
+        navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+            if (supported) {
+                alert("Iniciando modo AR. Apunte la cámara hacia una superficie plana en planta.");
+            } else {
+                fallbackAR_Movil();
+            }
+        }).catch(() => {
+            fallbackAR_Movil();
+        });
+    } else {
+        fallbackAR_Movil();
+    }
+}
+
+async function fallbackAR_Movil() {
+    const { data: maq } = await dbSupabase.from('maquinas').select('modelo_url').eq('id', currentMachineId).single();
+    if (maq && maq.modelo_url) {
+        window.open(maq.modelo_url, '_blank');
+    } else {
+        alert("Este dispositivo o modelo no soporta AR directo en este momento.");
+    }
+}
+
+// ==========================================
+// 2. BIBLIOTECA DE REPUESTOS Y STOCK (SKU)
+// ==========================================
+async function cargarDatosInventarioPieza(nombrePieza) {
+    const { data: rep } = await dbSupabase
+        .from('repuestos_inventario')
+        .select('*')
+        .eq('maquina_id', currentMachineId)
+        .eq('nombre_pieza', nombrePieza)
+        .single();
+
+    const contenedorInventario = document.getElementById('panel-inventario-pieza');
+    if (!contenedorInventario) return;
+
+    if (rep) {
+        contenedorInventario.innerHTML = `
+            <div class="bg-gray-800 p-2 rounded mt-2 border border-gray-700 text-xs">
+                <p><b>SKU:</b> ${rep.sku}</p>
+                <p><b>Stock Almacén:</b> <span class="${rep.stock_actual > 0 ? 'text-green-400' : 'text-red-400 font-bold'}">${rep.stock_actual} unidades</span></p>
+                <p><b>Ubicación:</b> ${rep.ubicacion_almacen || 'No especificada'}</p>
+                <button onclick="solicitarRepuestoAlPanol('${nombrePieza}', '${rep.sku}')" class="mt-2 w-full py-1 bg-indigo-600 hover:bg-indigo-500 rounded text-white font-bold">
+                    🛒 Solicitar al Pañol
+                </button>
+            </div>
+        `;
+    } else {
+        contenedorInventario.innerHTML = `
+            <div class="bg-gray-800 p-2 rounded mt-2 text-xs text-gray-400">
+                <p>No hay SKU vinculado a esta pieza.</p>
+                ${currentRole === 'admin' ? `<button onclick="vincularSkuPrompt('${nombrePieza}')" class="mt-1 text-blue-400 underline">Vincular SKU ahora</button>` : ''}
+            </div>
+        `;
+    }
+}
+
+async function solicitarRepuestoAlPanol(nombrePieza, sku) {
+    let solicitantName = prompt("Ingrese su nombre y turno para la solicitud:");
+    if (!solicitantName) return;
+
+    const { error } = await dbSupabase.from('solicitudes_repuestos').insert([
+        { maquina_id: currentMachineId, nombre_pieza: nombrePieza, sku: sku, solicitante: solicitantName, estado: 'pendiente' }
+    ]);
+
+    if (error) alert("Error al solicitar: " + error.message);
+    else alert("¡Solicitud enviada al pañol con éxito!");
+}
+
+// ==========================================
+// 3. ANOTACIONES COLABORATIVAS 3D
+// ==========================================
+let puntoClicadoParaNota = null;
+
+function activarModoCrearNota(nombrePieza) {
+    alert("Haz clic en el punto exacto de la pieza donde deseas dejar la nota colaborativa.");
+    window.modoNotaActivo = true;
+}
+
+async function guardarNota3D(nombrePieza, puntoCoord, mensaje, autor) {
+    const { error } = await dbSupabase.from('anotaciones_3d').insert([{
+        maquina_id: currentMachineId,
+        nombre_pieza: nombrePieza,
+        pos_x: puntoCoord.x,
+        pos_y: puntoCoord.y,
+        pos_z: puntoCoord.z,
+        autor: autor,
+        mensaje: mensaje
+    }]);
+
+    if (!error) {
+        alert("Nota 3D guardada para el siguiente turno.");
+        cargarNotas3DEnModelo();
+    }
+}
+
+async function cargarNotas3DEnModelo() {
+    const { data: notas } = await dbSupabase
+        .from('anotaciones_3d')
+        .select('*')
+        .eq('maquina_id', currentMachineId);
+
+    if (!notas) return;
+
+    notas.forEach(nota => {
+        const geometry = new THREE.ConeGeometry(0.02, 0.05, 8);
+        const material = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+        const pin = new THREE.Mesh(geometry, material);
+        
+        pin.position.set(nota.pos_x, nota.pos_y, nota.pos_z);
+        pin.userData = { esNota: true, mensaje: nota.mensaje, autor: nota.autor, fecha: nota.fecha };
+        grupoMaquina.add(pin);
+    });
 }
