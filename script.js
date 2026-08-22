@@ -1485,12 +1485,17 @@ async function fallbackAR_Movil() {
 // 2. BIBLIOTECA DE REPUESTOS Y STOCK (SKU)
 // ==========================================
 async function cargarDatosInventarioPieza(nombrePieza) {
-    const { data: rep } = await dbSupabase
+    // Usamos .maybeSingle() en lugar de .single() para que devuelva null si no existe en lugar de un error 406
+    const { data: rep, error } = await dbSupabase
         .from('repuestos_inventario')
         .select('*')
         .eq('maquina_id', currentMachineId)
         .eq('nombre_pieza', nombrePieza)
-        .single();
+        .maybeSingle();
+
+    if (error) {
+        console.warn("Aviso al cargar inventario de pieza:", error.message);
+    }
 
     const contenedorInventario = document.getElementById('panel-inventario-pieza');
     if (!contenedorInventario) return;
@@ -1510,7 +1515,7 @@ async function cargarDatosInventarioPieza(nombrePieza) {
         contenedorInventario.innerHTML = `
             <div class="bg-gray-800 p-2 rounded mt-2 text-xs text-gray-400">
                 <p>No hay SKU vinculado a esta pieza.</p>
-                ${currentRole === 'admin' ? `<button onclick="vincularSkuPrompt('${nombrePieza}')" class="mt-1 text-blue-400 underline">Vincular SKU ahora</button>` : ''}
+                ${currentRole === 'admin' ? `<button onclick="vincularSkuAhora('${nombrePieza}')" class="mt-1 text-blue-400 underline">Vincular SKU ahora</button>` : ''}
             </div>
         `;
     }
@@ -1573,3 +1578,32 @@ async function cargarNotas3DEnModelo() {
         grupoMaquina.add(pin);
     });
 }
+// Exponer funciones clave al objeto global para evitar ReferenceError en los onclick del HTML
+window.mejorPuntoLocal = mejorPuntoLocal;
+window.vincularSkuAhora = typeof vincularSkuAhora !== 'undefined' ? vincularSkuAhora : function(nombrePieza) {
+    let sku = prompt(`Ingrese el SKU para la pieza "${nombrePieza}":`);
+    if (!sku) return;
+    dbSupabase.from('repuestos_inventario').insert([
+        { maquina_id: currentMachineId, nombre_pieza: nombrePieza, sku: sku, stock_actual: 0 }
+    ]).then(({ error }) => {
+        if (error) alert("Error al vincular SKU: " + error.message);
+        else {
+            alert("¡SKU vinculado con éxito!");
+            cargarDatosInventarioPieza(nombrePieza);
+        }
+    });
+};
+window.removeInstructionImage = typeof removeInstructionImage !== 'undefined' ? removeInstructionImage : async function(idx) {
+    const { data: maq } = await dbSupabase.from('maquinas').select('instruction_images').eq('id', currentMachineId).single();
+    let images = maq?.instruction_images || [];
+    images.splice(idx, 1);
+    await dbSupabase.from('maquinas').update({ instruction_images: images }).eq('id', currentMachineId);
+    loadInstructionsData();
+};
+window.removeManualPdf = typeof removeManualPdf !== 'undefined' ? removeManualPdf : async function(idx) {
+    const { data: maq } = await dbSupabase.from('maquinas').select('manuals_pdf').eq('id', currentMachineId).single();
+    let manuals = maq?.manuals_pdf || [];
+    manuals.splice(idx, 1);
+    await dbSupabase.from('maquinas').update({ manuals_pdf: manuals }).eq('id', currentMachineId);
+    loadManualsData();
+};
