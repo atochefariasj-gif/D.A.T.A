@@ -150,13 +150,27 @@ async function openOption(opt) {
 
         const contenedorImportar = document.getElementById('contenedor-importar-3d');
         const contenedorAdminBtn = document.getElementById('contenedor-admin-reportes-btn');
+        
+        // Botones específicos de herramientas avanzadas
+        const btnDesensamblaje = document.getElementById('btn-iniciar-desensamblaje'); 
+        const btnMedicion = document.getElementById('btn-medir');
 
         if (currentRole === 'admin') {
-            contenedorImportar.style.display = 'block';
-            contenedorAdminBtn.style.display = 'block';
+            if (contenedorImportar) contenedorImportar.style.display = 'block';
+            if (contenedorAdminBtn) contenedorAdminBtn.style.display = 'block';
+            if (btnDesensamblaje) btnDesensamblaje.style.display = 'inline-block';
+            if (btnMedicion) btnMedicion.style.display = 'inline-block';
+        } else if (currentRole === 'mantenimiento') {
+            if (contenedorImportar) contenedorImportar.style.display = 'none';
+            if (contenedorAdminBtn) contenedorAdminBtn.style.display = 'block';
+            if (btnDesensamblaje) btnDesensamblaje.style.display = 'inline-block';
+            if (btnMedicion) btnMedicion.style.display = 'inline-block';
         } else {
-            contenedorImportar.style.display = 'none';
-            contenedorAdminBtn.style.display = 'none';
+            // Rol VISITANTE: Ocultar importación, reportes admin, paso a paso y medición
+            if (contenedorImportar) contenedorImportar.style.display = 'none';
+            if (contenedorAdminBtn) contenedorAdminBtn.style.display = 'none';
+            if (btnDesensamblaje) btnDesensamblaje.style.display = 'none'; // <- Oculta la guía paso a paso
+            if (btnMedicion) btnMedicion.style.display = 'none';
         }
 
         if (!window.is3DInitialized) {
@@ -504,12 +518,39 @@ async function init3D() {
 
         controls.update();
         
-        piezasDetectadas.forEach(pieza => {
-            if (pieza.userData && pieza.userData.posOrig && pieza.userData.posExp) {
-                const target = vistaExplosionada ? pieza.userData.posExp : pieza.userData.posOrig;
-                pieza.position.lerp(target, 0.08); 
-            }
-        });
+        if (!modoDesensamblajeActivo) {
+            piezasDetectadas.forEach(pieza => {
+                if (pieza.userData && pieza.userData.posOrig && pieza.userData.posExp) {
+                    const target = vistaExplosionada ? pieza.userData.posExp : pieza.userData.posOrig;
+                    pieza.position.lerp(target, 0.08); 
+                }
+            });
+        } else {
+            listaPiezasOrdenadas.forEach((pieza, index) => {
+                if (pieza.userData && pieza.userData.posOrig && pieza.userData.posExp) {
+                    let targetPos = index < pasoActualIndice ? pieza.userData.posExp : pieza.userData.posOrig;
+                    pieza.position.lerp(targetPos, 0.1);
+
+                    if (pieza.material) {
+                        pieza.material.transparent = true;
+                        let targetOpacity = index < pasoActualIndice ? 0.0 : 1.0;
+                        pieza.material.opacity += (targetOpacity - pieza.material.opacity) * 0.1;
+                    }
+                }
+            });
+
+            piezasDetectadas.forEach(pieza => {
+                if (!listaPiezasOrdenadas.includes(pieza)) {
+                    if (pieza.userData && pieza.userData.posOrig) {
+                        pieza.position.lerp(pieza.userData.posOrig, 0.1);
+                        if (pieza.material) {
+                            pieza.material.transparent = true;
+                            pieza.material.opacity += (1.0 - pieza.material.opacity) * 0.1;
+                        }
+                    }
+                }
+            });
+        }
         
         renderer.render(scene, camera);
     }
@@ -781,7 +822,14 @@ async function abrirModalVerReportes() {
 
     Object.keys(reportes).forEach(piezaName => {
         let rep = reportes[piezaName];
-        contenedor.innerHTML += `<div class="bg-gray-900 border border-gray-700 p-2 rounded mb-2"><span class="text-blue-400 font-bold">${piezaName}</span> - ${rep.motivo}</div>`;
+        
+        contenedor.innerHTML += `
+            <div class="bg-gray-900 border border-gray-700 p-2 rounded mb-2 cursor-pointer hover:border-blue-500 transition-colors" onclick="enfocarPiezaDesdeReporte('${piezaName}')">
+                <span class="text-blue-400 font-bold">⚙️ ${piezaName}</span>
+                <p class="text-xs text-gray-300 mt-1"><b>Motivo:</b> ${rep.motivo}</p>
+                <p class="text-[10px] text-gray-400 mt-0.5"><b>Fecha:</b> ${rep.fecha}</p>
+            </div>`;
+            
         tbodyExcel.innerHTML += `<tr><td>${piezaName}</td><td>Mantenimiento</td><td>${rep.motivo}</td><td>${rep.fecha}</td></tr>`;
     });
 
@@ -792,22 +840,494 @@ async function cerrarModalVerReportes() {
     document.getElementById('modal-ver-reportes').style.display = 'none';
 }
 
+function enfocarPiezaDesdeReporte(nombrePieza) {
+    cerrarModalVerReportes();
+    seleccionarComponente(nombrePieza);
+}
+
+function exportarReportesExcel() {
+    let tbodyExcel = document.getElementById('tbody-reportes-excel');
+    if (!tbodyExcel || tbodyExcel.rows.length === 0) {
+        alert("No hay reportes para exportar.");
+        return;
+    }
+
+    let csv = [];
+    csv.push(["Pieza", "Estado", "Motivo", "Fecha y Hora"].join(","));
+
+    for (let i = 0; i < tbodyExcel.rows.length; i++) {
+        let row = tbodyExcel.rows[i];
+        let cols = Array.from(row.cells).map(td => `"${td.innerText.replace(/"/g, '""')}"`);
+        csv.push(cols.join(","));
+    }
+
+    let csvFile = new Blob([csv.join("\n")], { type: "text/csv;charset=utf-8;" });
+    let downloadLink = document.createElement("a");
+    downloadLink.download = `Reportes_Mantenimiento_${currentMachineId}_${Date.now()}.csv`;
+    downloadLink.href = window.URL.createObjectURL(csvFile);
+    downloadLink.style.display = "none";
+    document.body.appendChild(downloadLink);
+    downloadLink.click();
+    document.body.removeChild(downloadLink);
+}
+
 async function detectarToque(x, y) {
     const rect = renderer.domElement.getBoundingClientRect();
     mouse.x = ((x - rect.left) / rect.width) * 2 - 1;
     mouse.y = -((y - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
 
-    const intersects = raycaster.intersectObjects(piezasDetectadas, true);
-    if (intersects.length > 0 && intersects[0].object.name) {
-        seleccionarComponente(intersects[0].object.name);
+    // Si ya aislamos una pieza, filtramos estrictamente por ella para máxima precisión
+    let listaAExplorar = (modoMedicionActivo && piezaEnMedicion) ? [piezaEnMedicion] : piezasDetectadas;
+    const intersects = raycaster.intersectObjects(listaAExplorar, true);
+    
+    if (intersects.length > 0) {
+        let interseccion = intersects[0];
+        let puntoInterseccion = interseccion.point; 
+
+        if (modoMedicionActivo) {
+            if (!piezaEnMedicion) {
+                aislarPiezaParaMedir(interseccion.object);
+            } else {
+                manejarPuntoMedicionPreciso(puntoInterseccion, interseccion.object);
+            }
+            return;
+        }
+
+        let objetoSeleccionado = interseccion.object;
+        let nombrePieza = objetoSeleccionado.name;
+        
+        if (modoConfiguracionAdmin) {
+            if (!secuenciaPersonalizada.includes(nombrePieza)) {
+                secuenciaPersonalizada.push(nombrePieza);
+                actualizarUIAdminSecuencia();
+                if (objetoSeleccionado.material) {
+                    objetoSeleccionado.material.color.setHex(0x3b82f6);
+                }
+            }
+            return;
+        }
+
+        seleccionarComponente(nombrePieza);
     }
 }
-// Función puente para que funcionen los botones del HTML actual
+
 function fijarCamara(tipo) {
     if (tipo === 'iso') {
         cambiarVistaRapida('isometrica');
     } else {
         cambiarVistaRapida(tipo);
     }
+}
+
+let secuenciaPersonalizada = []; 
+let modoConfiguracionAdmin = false;
+let listaPiezasOrdenadas = [];
+let pasoActualIndice = 0;
+let modoDesensamblajeActivo = false;
+
+async function iniciarDesensamblaje() {
+    if (piezasDetectadas.length === 0) {
+        alert("No hay piezas detectadas en el modelo 3D.");
+        return;
+    }
+
+    if (vistaExplosionada) toggleVistaExplosionada();
+    modoDesensamblajeActivo = true;
+    pasoActualIndice = 0;
+
+    const { data: maq } = await dbSupabase.from('maquinas').select('secuencia_desmontaje').eq('id', currentMachineId).single();
+    
+    listaPiezasOrdenadas = [];
+    if (maq && maq.secuencia_desmontaje && maq.secuencia_desmontaje.length > 0) {
+        maq.secuencia_desmontaje.forEach(nombrePieza => {
+            let encontrada = piezasDetectadas.find(p => p.name === nombrePieza);
+            if (encontrada) listaPiezasOrdenadas.push(encontrada);
+        });
+    } else {
+        listaPiezasOrdenadas = [...piezasDetectadas];
+    }
+    
+    piezasDetectadas.forEach(pieza => {
+        if (pieza.userData && pieza.userData.posOrig) {
+            pieza.position.copy(pieza.userData.posOrig);
+            if (pieza.material) {
+                pieza.material.transparent = true;
+                pieza.material.opacity = 1.0;
+            }
+        }
+    });
+
+    document.getElementById('panel-paso-a-paso').classList.remove('hidden');
+
+    if (currentRole === 'admin') {
+        modoConfiguracionAdmin = true;
+        secuenciaPersonalizada = []; 
+        document.getElementById('panel-admin-secuencia').classList.remove('hidden');
+        actualizarUIAdminSecuencia();
+    } else {
+        modoConfiguracionAdmin = false;
+        document.getElementById('panel-admin-secuencia').classList.add('hidden');
+    }
+
+    actualizarEstadoDesensamblaje();
+}
+
+function pasoSiguiente() {
+    if (!listaPiezasOrdenadas || listaPiezasOrdenadas.length === 0) {
+        listaPiezasOrdenadas = [...piezasDetectadas];
+    }
+    
+    let maxPasos = listaPiezasOrdenadas.length > 0 ? listaPiezasOrdenadas.length : piezasDetectadas.length;
+    if (pasoActualIndice < maxPasos) {
+        pasoActualIndice++;
+        actualizarEstadoDesensamblaje();
+    }
+}
+
+function pasoAnterior() {
+    if (pasoActualIndice > 0) {
+        pasoActualIndice--;
+        actualizarEstadoDesensamblaje();
+    }
+}
+
+function actualizarEstadoDesensamblaje() {
+    const lblPaso = document.getElementById('texto-paso-actual');
+    if (lblPaso) {
+        let totalPasos = listaPiezasOrdenadas.length > 0 ? listaPiezasOrdenadas.length : piezasDetectadas.length;
+        if (pasoActualIndice === 0) {
+            lblPaso.innerText = `Paso 0: Preparación`;
+        } else {
+            lblPaso.innerText = `Paso ${pasoActualIndice} de ${totalPasos}`;
+        }
+    }
+}
+
+function actualizarUIAdminSecuencia() {
+    let contenedor = document.getElementById('lista-secuencia-admin');
+    if(contenedor) {
+        contenedor.innerHTML = "<b>Orden actual:</b> " + (secuenciaPersonalizada.length > 0 ? secuenciaPersonalizada.join(" ➡️ ") : "Ninguna pieza seleccionada aún.");
+    }
+}
+
+function limpiarSecuenciaActual() {
+    secuenciaPersonalizada = [];
+    actualizarUIAdminSecuencia();
+    
+    piezasDetectadas.forEach(p => {
+        if (p.material && p.userData) {
+            const tieneReporte = reportesCargados[p.name] && reportesCargados[p.name].estado === 'mantenimiento';
+            p.material.color.setHex(tieneReporte ? 0xef4444 : p.userData.colorBase);
+        }
+    });
+}
+
+async function borrarSecuenciaGuardada() {
+    if (currentRole !== 'admin') {
+        alert("Acceso denegado.");
+        return;
+    }
+
+    if (!confirm("¿Estás seguro de borrar la secuencia guardada de esta máquina?")) return;
+
+    const { error } = await dbSupabase
+        .from('maquinas')
+        .update({ secuencia_desmontaje: [] })
+        .eq('id', currentMachineId);
+
+    if (error) {
+        alert("Error al borrar la secuencia: " + error.message);
+    } else {
+        alert("Secuencia borrada correctamente. Ahora puedes crear una nueva.");
+        secuenciaPersonalizada = [];
+        listaPiezasOrdenadas = [...piezasDetectadas];
+        pasoActualIndice = 0;
+        actualizarUIAdminSecuencia();
+        actualizarEstadoDesensamblaje();
+    }
+}
+
+async function guardarSecuenciaPersonalizada() {
+    if (secuenciaPersonalizada.length === 0) {
+        alert("Primero haz clic en las piezas en orden para definir la secuencia.");
+        return;
+    }
+
+    const { error } = await dbSupabase
+        .from('maquinas')
+        .update({ secuencia_desmontaje: secuenciaPersonalizada })
+        .eq('id', currentMachineId);
+
+    if (error) {
+        alert("Error al guardar la secuencia: " + error.message);
+    } else {
+        alert("¡Secuencia de desmontaje guardada con éxito!");
+        modoConfiguracionAdmin = false;
+        document.getElementById('panel-admin-secuencia').classList.add('hidden');
+        
+        listaPiezasOrdenadas = [];
+        secuenciaPersonalizada.forEach(nombre => {
+            let p = piezasDetectadas.find(x => x.name === nombre);
+            if (p) listaPiezasOrdenadas.push(p);
+        });
+
+        pasoActualIndice = 0;
+        
+        piezasDetectadas.forEach(p => {
+            if (p.material && p.userData) {
+                const tieneReporte = reportesCargados[p.name] && reportesCargados[p.name].estado === 'mantenimiento';
+                p.material.color.setHex(tieneReporte ? 0xef4444 : p.userData.colorBase);
+            }
+        });
+
+        piezasDetectadas.forEach(pieza => {
+            if (pieza.userData && pieza.userData.posOrig) {
+                pieza.position.copy(pieza.userData.posOrig);
+                if (pieza.material) {
+                    pieza.material.transparent = true;
+                    pieza.material.opacity = 1.0;
+                }
+            }
+        });
+
+        actualizarEstadoDesensamblaje();
+    }
+}
+
+function cerrarDesensamblaje() {
+    modoDesensamblajeActivo = false;
+    modoConfiguracionAdmin = false;
+    pasoActualIndice = 0;
+    document.getElementById('panel-paso-a-paso').classList.add('hidden');
+    document.getElementById('panel-admin-secuencia').classList.add('hidden');
+    
+    piezasDetectadas.forEach(p => {
+        if (p.userData && p.userData.posOrig) {
+            p.position.copy(p.userData.posOrig);
+            if(p.material) {
+                p.material.transparent = true;
+                p.material.opacity = 1.0;
+            }
+        }
+    });
+}
+
+// ==========================================
+// HERRAMIENTA DE MEDICIÓN PRECISA CON AISLAMIENTO Y SNAP (VÉRTICES/ARISTAS)
+// ==========================================
+let modoMedicionActivo = false;
+let piezaEnMedicion = null;
+let puntoMedicion1 = null;
+let puntoMedicion2 = null;
+let lineaMedicionMesh = null;
+let esferaPunto1 = null;
+let esferaPunto2 = null;
+
+function toggleModoMedicion() {
+    modoMedicionActivo = !modoMedicionActivo;
+    const panel = document.getElementById('panel-medicion');
+    const btn = document.getElementById('btn-medir');
+
+    if (modoMedicionActivo) {
+        panel.classList.remove('hidden');
+        btn.classList.add('bg-amber-700');
+        document.getElementById('resultado-medicion').innerText = "Seleccione la pieza a medir.";
+        document.getElementById('panel-info').classList.add('hidden');
+        limpiarMedicionManteniendoModo();
+    } else {
+        panel.classList.add('hidden');
+        btn.classList.remove('bg-amber-700');
+        limpiarMedicion();
+    }
+}
+
+function aislarPiezaParaMedir(piezaSeleccionada) {
+    piezaEnMedicion = piezaSeleccionada;
+    
+    piezasDetectadas.forEach(p => {
+        if (p.name === piezaSeleccionada.name) {
+            p.visible = true;
+            if (p.material) {
+                p.material.transparent = false;
+                p.material.opacity = 1.0;
+                p.material.color.setHex(p.userData.colorBase);
+            }
+        } else {
+            p.visible = false; 
+        }
+    });
+
+    const box = new THREE.Box3().setFromObject(piezaSeleccionada);
+    const centro = box.getCenter(new THREE.Vector3());
+    targetControlsTarget = centro.clone();
+    const offset = camera.position.clone().sub(controls.target).normalize().multiplyScalar(1.5); 
+    targetCameraPos = centro.clone().add(offset);
+
+    document.getElementById('resultado-medicion').innerText = "Pieza aislada. Haga clic en el primer punto.";
+}
+
+function restaurarVisibilidadPiezas() {
+    piezaEnMedicion = null;
+    piezasDetectadas.forEach(p => {
+        p.visible = true;
+        if (p.material) {
+            p.material.transparent = true;
+            p.material.opacity = 1.0;
+            const tieneReporte = reportesCargados[p.name] && reportesCargados[p.name].estado === 'mantenimiento';
+            p.material.color.setHex(tieneReporte ? 0xef4444 : p.userData.colorBase);
+        }
+    });
+}
+
+// ==========================================
+// HERRAMIENTA DE MEDICIÓN CON RESTRICCIÓN ESTRICTA (VÉRTICES Y ARISTAS)
+// ==========================================
+
+// Tolerancia máxima en metros para considerar que el usuario hizo clic sobre una arista o vértice (ej. 1.5 cm = 0.015 metros)
+const TOLERANCIA_SNAP = 0.015; 
+
+function manejarPuntoMedicionPreciso(puntoInterseccionGlobal, meshObjetivo) {
+    const res = document.getElementById('resultado-medicion');
+
+    // Intentamos obtener el punto exacto de la arista o vértice más cercano
+    const resultadoSnap = calcularSnappingVerticesYAristasEstricto(puntoInterseccionGlobal, meshObjetivo, TOLERANCIA_SNAP);
+
+    // Si el resultado es falso, significa que el usuario hizo clic en medio de una cara plana y no cerca de un vértice/arista
+    if (!resultadoSnap) {
+        res.innerText = "⚠️ Debe hacer clic estrictamente sobre una arista o vértice.";
+        return; // No hace nada y evita colocar puntos
+    }
+
+    const puntoAjustado = resultadoSnap.clone();
+
+    if (!puntoMedicion1) {
+        puntoMedicion1 = puntoAjustado.clone();
+        res.innerText = "Vértice/Arista 1 fijado. Seleccione el segundo punto.";
+        
+        // Esfera ultra pequeña (0.002)
+        const geometry = new THREE.SphereGeometry(0.002, 16, 16);
+        const material = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+        esferaPunto1 = new THREE.Mesh(geometry, material);
+        esferaPunto1.position.copy(puntoMedicion1);
+        scene.add(esferaPunto1);
+
+    } else if (!puntoMedicion2) {
+        puntoMedicion2 = puntoAjustado.clone();
+        
+        const geometry = new THREE.SphereGeometry(0.002, 16, 16);
+        const material = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+        esferaPunto2 = new THREE.Mesh(geometry, material);
+        esferaPunto2.position.copy(puntoMedicion2);
+        scene.add(esferaPunto2);
+
+        let distancia = puntoMedicion1.distanceTo(puntoMedicion2);
+        let distanciaMm = distancia * 1000; 
+        
+        res.innerHTML = `<b>Distancia:</b> ${distancia.toFixed(4)} m (${distanciaMm.toFixed(2)} mm)`;
+
+        const materialLinea = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 2 });
+        const puntosLinea = [puntoMedicion1, puntoMedicion2];
+        const geometriaLinea = new THREE.BufferGeometry().setFromPoints(puntosLinea);
+        lineaMedicionMesh = new THREE.Line(geometriaLinea, materialLinea);
+        scene.add(lineaMedicionMesh);
+
+    } else {
+        if (esferaPunto1) scene.remove(esferaPunto1);
+        if (esferaPunto2) scene.remove(esferaPunto2);
+        if (lineaMedicionMesh) scene.remove(lineaMedicionMesh);
+
+        puntoMedicion1 = puntoAjustado.clone();
+        puntoMedicion2 = null;
+        esferaPunto2 = null;
+        lineaMedicionMesh = null;
+
+        res.innerText = "Vértice/Arista 1 fijado. Seleccione el segundo punto.";
+        const geometry = new THREE.SphereGeometry(0.002, 16, 16);
+        const material = new THREE.MeshBasicMaterial({ color: 0xef4444 });
+        esferaPunto1 = new THREE.Mesh(geometry, material);
+        esferaPunto1.position.copy(puntoMedicion1);
+        scene.add(esferaPunto1);
+    }
+}
+
+// Función estricta que retorna null si el clic fue en una cara plana
+function calcularSnappingVerticesYAristasEstricto(puntoGlobal, mesh, tolerancia) {
+    const geometry = mesh.geometry;
+    const positionAttribute = geometry.attributes.position;
+    
+    let localPoint = puntoGlobal.clone();
+    mesh.worldToLocal(localPoint);
+
+    let minDist = Infinity;
+    let mejorPuntoLocal = localPoint.clone();
+
+    const vA = new THREE.Vector3();
+    const vB = new THREE.Vector3();
+    const tempPuntoArista = new THREE.Vector3();
+
+    const index = geometry.index;
+    
+    if (index) {
+        for (let i = 0; i < index.count; i += 3) {
+            const a = index.getX(i);
+            const b = index.getX(i + 1);
+            const c = index.getX(i + 2);
+
+            vA.fromBufferAttribute(positionAttribute, a);
+            vB.fromBufferAttribute(positionAttribute, b);
+
+            // 1. Evaluar Vértices
+            [vA, vB].forEach(v => {
+                let dist = localPoint.distanceTo(v);
+                if (dist < minDist) {
+                    minDist = dist;
+                    mejorPuntoLocal.copy(v);
+                }
+            });
+
+            // 2. Evaluar Aristas
+            let distArista = distanciaPuntoSegmento(localPoint, vA, vB, tempPuntoArista);
+            if (distArista < minDist) {
+                minDist = distArista;
+                mejorPuntoLocal.copy(tempPuntoArista);
+            }
+        }
+    }
+
+    // Si la distancia mínima al vértice o arista supera la tolerancia permitida, 
+    // asumimos que hizo clic en una cara plana y rechazamos el punto.
+    if (minDist > tolerancia) {
+        return null;
+    }
+
+    let mejorPuntoGlobal = mejorPuntoLocal.clone();
+    mesh.localToWorld(mejorPuntoGlobal);
+    return mejorPuntoGlobal;
+}
+
+function distanciaPuntoSegmento(p, a, b, target) {
+    const ab = new THREE.Vector3().subVectors(b, a);
+    const ap = new THREE.Vector3().subVectors(p, a);
+    let t = ap.dot(ab) / ab.dot(ab);
+    t = Math.max(0, Math.min(1, t));
+    target.copy(a).addScaledVector(ab, t);
+    return p.distanceTo(target);
+}
+
+function limpiarMedicionManteniendoModo() {
+    puntoMedicion1 = null;
+    puntoMedicion2 = null;
+    
+    if (lineaMedicionMesh) { scene.remove(lineaMedicionMesh); lineaMedicionMesh = null; }
+    if (esferaPunto1) { scene.remove(esferaPunto1); esferaPunto1 = null; }
+    if (esferaPunto2) { scene.remove(esferaPunto2); esferaPunto2 = null; }
+    
+    restaurarVisibilidadPiezas();
+}
+
+function limpiarMedicion() {
+    limpiarMedicionManteniendoModo();
+    const res = document.getElementById('resultado-medicion');
+    if (res && modoMedicionActivo) res.innerText = "Seleccione la pieza a medir.";
 }
