@@ -10,12 +10,26 @@ let currentLine = '';
 let currentMachineId = null;
 let isEditMode = false;
 let rolPendiente = '';
+let mapaNombres = {}; // Aquí se guardarán los nombres del JSON
+let reportesCargados = {}; // Variable para guardar el estado de las piezas
 
 const PASSWORDS = {
     'mantenimiento': '123',
     'admin': 'admin123'
 };
 
+// Función para cargar los nombres desde el archivo JSON
+async function cargarTraducciones() {
+    try {
+        const response = await fetch('nombres.json');
+        if (!response.ok) throw new Error("No se pudo cargar el archivo nombres.json");
+        mapaNombres = await response.json();
+        console.log("Traducciones cargadas correctamente.");
+    } catch (error) {
+        console.warn("No se pudo cargar nombres.json, usando nombres originales.", error);
+        mapaNombres = {}; // Si falla, queda vacío y no se rompe nada
+    }
+}
 async function solicitarPassword(rol) {
     rolPendiente = rol;
     document.getElementById('modal-password-title').innerText = `Contraseña para ${rol.toUpperCase()}`;
@@ -377,6 +391,8 @@ let pointerDownY = 0;
 let hasMoved = false;
 
 async function init3D() {
+  await cargarTraducciones(); // Espera a que cargue el JSON antes de seguir
+    // ... tu lógica para cargar la máquina, etc.
     const container = document.getElementById('canvas-3d');
     const initW = container.clientWidth > 0 ? container.clientWidth : 300;
     const initH = container.clientHeight > 0 ? container.clientHeight : 480;
@@ -535,15 +551,22 @@ async function procesarModeloCargado(gltf, nombreEquipo) {
     if(lista) lista.innerHTML = "";
     let indexPieza = 1;
 
-    const { data: maq } = await dbSupabase.from('maquinas').select('reportes_piezas').eq('id', currentMachineId).single();
-    let reportes = maq?.reportes_piezas || {};
+    // ... dentro de procesarModeloCargado ...
+const { data: maq } = await dbSupabase.from('maquinas').select('reportes_piezas').eq('id', currentMachineId).single();
+reportesCargados = maq?.reportes_piezas || {}; // <--- Guardamos aquí los reportes
+// ... el resto de tu código ...
 
     modelo.traverse((child) => {
         if (child.isMesh) {
-            // Guardamos el nombre visual del padre (que ya vimos que trae los nombres de Inventor)
-            let nombreVisual = child.parent && child.parent.name && child.parent.name !== "Scene" ? child.parent.name : (child.name || `Pieza_${indexPieza}`);
-            
-            child.name = nombreVisual; // Asignamos el nombre limpio directamente al mesh
+// ... dentro del modelo.traverse ...
+
+let nombreBruto = child.parent && child.parent.name && child.parent.name !== "Scene" ? child.parent.name : (child.name || `Pieza_${indexPieza}`);
+
+// Si existe en el JSON, lo traduce, si no, usa el original
+let nombreVisual = mapaNombres[nombreBruto] || nombreBruto;
+
+child.name = nombreVisual;
+// ... resto de tu lógica ...
             piezasDetectadas.push(child);
 
             const posOrig = child.position.clone();
@@ -595,52 +618,51 @@ async function seleccionarComponente(nombrePieza) {
     const panel = document.getElementById('panel-info');
     const piezaEncontrada = piezasDetectadas.find(p => p.name === nombrePieza);
 
+    // Lógica de deselección
     if (piezaSeleccionadaActual === nombrePieza) {
         panel.classList.add('hidden');
         piezaSeleccionadaActual = null;
-        targetCameraPos = null;
-        targetControlsTarget = null;
 
         piezasDetectadas.forEach(p => {
             if (p.material) {
                 p.material.transparent = true;
                 p.material.opacity = 1.0;
-                let colorBase = p.userData.colorBase || 0x888888;
-                p.material.color.setHex(colorBase);
+                
+                // Usamos reportesCargados (la variable global) en lugar de consultar a Supabase
+                const tieneReporte = reportesCargados[p.name] && reportesCargados[p.name].estado === 'mantenimiento';
+                p.material.color.setHex(tieneReporte ? 0xef4444 : p.userData.colorBase);
             }
         });
         return;
     }
 
+    // Lógica de selección
     if (piezaEncontrada) {
         piezaSeleccionadaActual = nombrePieza;
         panel.classList.remove('hidden');
         document.getElementById('info-titulo').innerText = nombrePieza;
 
-        // Transparencia a los demás y amarillo a la seleccionada
         piezasDetectadas.forEach(p => {
             if (p.material) {
                 p.material.transparent = true;
                 if (p.name === nombrePieza) {
-                    p.material.color.setHex(0xfacc15); // Amarillo
+                    p.material.color.setHex(0xfacc15);
                     p.material.opacity = 1.0;
                 } else {
-                    p.material.opacity = 0.15; // Translúcidas
+                    p.material.opacity = 0.15;
                 }
             }
         });
 
-        // Acercamiento fluido de la cámara
+        // Zoom y carga de info (esta parte sí puede ser asíncrona porque es info del reporte)
         const boxPieza = new THREE.Box3().setFromObject(piezaEncontrada);
         const centroPieza = boxPieza.getCenter(new THREE.Vector3());
-
         targetControlsTarget = centroPieza.clone();
         const offset = camera.position.clone().sub(controls.target).normalize().multiplyScalar(3.5);
         targetCameraPos = centroPieza.clone().add(offset);
 
-        const { data: maq } = await dbSupabase.from('maquinas').select('reportes_piezas').eq('id', currentMachineId).single();
-        let reportes = maq?.reportes_piezas || {};
-        let repInfo = reportes[nombrePieza];
+        // Usamos la variable global
+        let repInfo = reportesCargados[nombrePieza];
 
         const lblEstado = document.getElementById('info-estado');
         const boxMotivo = document.getElementById('info-motivo-box');
@@ -658,7 +680,8 @@ async function seleccionarComponente(nombrePieza) {
             lblEstado.className = "text-green-400 font-bold";
             boxMotivo.classList.add('hidden');
         }
-
+        
+        // Botones de acción (Admin/Mant)
         if (currentRole === 'mantenimiento' || currentRole === 'admin') {
             if (!repInfo || repInfo.estado !== 'mantenimiento') {
                 contenedorAcciones.innerHTML = `<button onclick="abrirModalMotivoReporte('${nombrePieza}')" class="w-full py-1.5 bg-red-600 hover:bg-red-500 rounded text-white font-bold text-[11px]">⚠️ Requiere Mantenimiento</button>`;
@@ -696,11 +719,20 @@ async function guardarReporteMantenimiento() {
 
 async function marcarPiezaOperativa(nombrePieza) {
     if (currentRole !== 'admin') return;
+
+    // 1. Actualizamos Supabase (borramos el reporte)
     const { data: maq } = await dbSupabase.from('maquinas').select('reportes_piezas').eq('id', currentMachineId).single();
     let reportes = maq?.reportes_piezas || {};
     delete reportes[nombrePieza];
-    
+
     await dbSupabase.from('maquinas').update({ reportes_piezas: reportes }).eq('id', currentMachineId);
+
+    // 2. Actualizamos nuestra variable global para que refleje el cambio al instante
+    if (reportesCargados[nombrePieza]) {
+        delete reportesCargados[nombrePieza];
+    }
+
+    // 3. Recargamos el modelo para que la pieza recupere su color original de inmediato
     cargarModeloMaquinaActual();
 }
 
