@@ -77,9 +77,11 @@ async function openLine(lineName, icon) {
 }
 
 async function renderMachines() {
+    // 🔍 Filtramos las máquinas de Supabase según la línea actual
     const { data: maquinas, error } = await dbSupabase
         .from('maquinas')
-        .select('*');
+        .select('*')
+        .eq('linea', currentLine); // <--- FILTRO INDIVIDUAL POR LÍNEA
 
     if (error) {
         console.error("Error al cargar las máquinas:", error);
@@ -108,6 +110,35 @@ async function renderMachines() {
         }
         container.appendChild(card);
     });
+}
+
+// ==========================================
+// FUNCIÓN DE AGREGAR MÁQUINA INDIVIDUAL
+// ==========================================
+async function addNewMachine() {
+    if (currentRole !== 'admin') {
+        alert("No tienes permisos para realizar esta acción.");
+        return;
+    }
+
+    // ➕ Insertamos la máquina vinculada estrictamente a la línea actual
+    const { data, error } = await dbSupabase
+        .from('maquinas')
+        .insert([
+            { 
+                nombre: "Nueva Máquina",
+                modelo_url: "EMPTY",
+                manual_url: "EMPTY",
+                linea: currentLine // <--- GUARDAMOS LA LÍNEA ACTUAL
+            }
+        ]);
+
+    if (error) {
+        console.error("Error al agregar máquina:", error.message);
+        alert("No se pudo agregar la máquina: " + error.message);
+    } else {
+        renderMachines();
+    }
 }
 
 async function updateMachineNameInline(id, nuevoNombre) {
@@ -206,6 +237,7 @@ async function salirVisual3D() {
     const innerBox = document.getElementById('visual3d-wrapper-box');
     if(innerBox) innerBox.style.height = '480px';
 
+    ocultarBannerEnCreacion();
     goBack('detail');
 }
 
@@ -374,9 +406,42 @@ async function closeImageModal() {
     document.getElementById('img-modal').style.display = 'none';
 }
 
-// ==========================================
-// LÓGICA 3D, VISTA EXPLOSIONADA, GIZMO Y ANIMACIÓN FLUIDA
-// ==========================================
+function mostrarBannerEnCreacion(texto) {
+    let container = document.getElementById('view-visual3d');
+    if (!container) return;
+    
+    let banner = document.getElementById('banner-modelo-creacion');
+    if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'banner-modelo-creacion';
+        banner.style.position = 'absolute';
+        banner.style.top = '70px';
+        banner.style.left = '50%';
+        banner.style.transform = 'translateX(-50%)';
+        banner.style.backgroundColor = 'rgba(239, 68, 68, 0.95)';
+        banner.style.color = '#ffffff';
+        banner.style.padding = '12px 24px';
+        banner.style.borderRadius = '8px';
+        banner.style.fontWeight = 'bold';
+        banner.style.fontSize = '15px';
+        banner.style.zIndex = '1000';
+        banner.style.boxShadow = '0 6px 15px rgba(0,0,0,0.5)';
+        banner.style.textAlign = 'center';
+        banner.style.border = '2px solid #f87171';
+        container.style.position = 'relative';
+        container.appendChild(banner);
+    }
+    banner.innerHTML = `⚠️ ${texto}`;
+    banner.style.display = 'block';
+}
+
+function ocultarBannerEnCreacion() {
+    let banner = document.getElementById('banner-modelo-creacion');
+    if (banner) {
+        banner.style.display = 'none';
+    }
+}
+
 let scene, camera, renderer, grupoMaquina, controls, raycaster, mouse, gltfLoader;
 let viewHelper = null; 
 let viewHelperContainer = null;
@@ -453,7 +518,7 @@ async function init3D() {
 
     const inputBuscador = document.querySelector('input[placeholder*="Buscar"]');
     if (inputBuscador) {
-      inputBuscador.value = "";
+        inputBuscador.value = "";
         inputBuscador.addEventListener('input', (e) => {
             const textoFiltro = e.target.value.toLowerCase();
             const lista = document.getElementById('lista-partes');
@@ -609,35 +674,50 @@ function cambiarVistaRapida(tipo) {
 
 async function cargarModeloMaquinaActual() {
     const btnExplo = document.getElementById('btn-explo');
-    if(btnExplo) {
-        btnExplo.innerText = "⏳ Cargando modelo... 0%";
-        btnExplo.disabled = true;
-    }
-
+    
     while(grupoMaquina.children.length > 0) {
         grupoMaquina.remove(grupoMaquina.children[0]);
     }
 
     const { data: maq } = await dbSupabase.from('maquinas').select('modelo_url').eq('id', currentMachineId).single();
 
-    if (maq && maq.modelo_url && maq.modelo_url.trim() !== "" && maq.modelo_url !== "EMPTY") {
-        const manager = new THREE.LoadingManager();
+    if (!maq || !maq.modelo_url || maq.modelo_url.trim() === "" || maq.modelo_url === "EMPTY") {
+        let indicador = document.getElementById('indicador-equipo');
+        if(indicador) indicador.innerText = `⚠️ Modelo aún en creación`;
         
-        manager.onProgress = (url, itemsLoaded, itemsTotal) => {
-            const percentComplete = Math.round((itemsLoaded / itemsTotal) * 100);
-            if(btnExplo) btnExplo.innerText = `Cargando: ${percentComplete}%`;
-        };
-
-        const loader = new THREE.GLTFLoader(manager);
-        loader.load(maq.modelo_url, (gltf) => {
-            procesarModeloCargado(gltf, "Modelo Cloud (Optimizado)");
-        }, undefined, (err) => {
-            console.error("Error al cargar modelo 3D:", err);
-            cargarModeloPorDefecto();
-        });
-    } else {
-        cargarModeloPorDefecto();
+        mostrarBannerEnCreacion("Modelo 3D aún en creación / desarrollo");
+        
+        if(btnExplo) {
+            btnExplo.innerText = "💥 Activar Vista Explosionada";
+            btnExplo.disabled = true;
+        }
+        
+        const lista = document.getElementById('lista-partes');
+        if(lista) lista.innerHTML = `<span style="color: #888; font-size: 11px; padding: 10px; display: block;">No hay piezas disponibles.</span>`;
+        return; 
     }
+
+    ocultarBannerEnCreacion();
+
+    if(btnExplo) {
+        btnExplo.innerText = "⏳ Cargando modelo... 0%";
+        btnExplo.disabled = true;
+    }
+
+    const manager = new THREE.LoadingManager();
+    
+    manager.onProgress = (url, itemsLoaded, itemsTotal) => {
+        const percentComplete = Math.round((itemsLoaded / itemsTotal) * 100);
+        if(btnExplo) btnExplo.innerText = `Cargando: ${percentComplete}%`;
+    };
+
+    const loader = new THREE.GLTFLoader(manager);
+    loader.load(maq.modelo_url, (gltf) => {
+        procesarModeloCargado(gltf, "Modelo Cloud (Optimizado)");
+    }, undefined, (err) => {
+        console.error("Error al cargar modelo 3D:", err);
+        cargarModeloPorDefecto();
+    });
 }
 
 async function cargarModeloPorDefecto() {
@@ -647,10 +727,12 @@ async function cargarModeloPorDefecto() {
         btnExplo.disabled = false;
     }
     let indicador = document.getElementById('indicador-equipo');
-    if(indicador) indicador.innerText = `📍 Vista: Sin modelo 3D`;
+    if(indicador) indicador.innerText = `⚠️ Modelo aún en creación`;
+    mostrarBannerEnCreacion("Modelo 3D aún en creación / desarrollo");
 }
 
 async function procesarModeloCargado(gltf, nombreEquipo) {
+    ocultarBannerEnCreacion();
     const modelo = gltf.scene;
     
     modelo.traverse((child) => {
@@ -899,7 +981,6 @@ async function marcarPiezaOperativa(nombrePieza) {
     cargarModeloMaquinaActual();
 }
 
-// Subir PDF de una pieza específica en la interfaz 3D
 async function subirManualPieza3D(nombrePieza) {
     const fileInput = document.getElementById('input-pdf-pieza');
     if (!fileInput || !fileInput.files[0]) {
@@ -1044,7 +1125,6 @@ async function detectarToque(x, y) {
     mouse.y = -((y - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
 
-    // Incluimos todos los objetos del grupo máquina (piezas y pines de notas)
     let todosLosObjetos = [];
     grupoMaquina.traverse(child => {
         if (child.isMesh) todosLosObjetos.push(child);
@@ -1057,11 +1137,10 @@ async function detectarToque(x, y) {
         let interseccion = intersects[0];
         let objetoSeleccionado = interseccion.object;
 
-        // NUEVO: Si lo que tocamos es una Nota 3D, mostramos su contenido en una alerta
         if (objetoSeleccionado.userData && objetoSeleccionado.userData.esNota) {
             let datos = objetoSeleccionado.userData;
             alert(`📌 Nota 3D para el turno:\n\n"${datos.mensaje}"\n\n✍️ Escrito por: ${datos.autor}`);
-            return; // Detenemos para que no abra el panel de la pieza
+            return; 
         }
 
         let puntoInterseccion = interseccion.point; 
@@ -1313,9 +1392,6 @@ function cerrarDesensamblaje() {
     });
 }
 
-// ==========================================
-// HERRAMIENTA DE MEDICIÓN MEJORADA
-// ==========================================
 let modoMedicionActivo = false;
 let piezaEnMedicion = null;
 let puntoMedicion1 = null;
@@ -1505,7 +1581,6 @@ function calcularSnappingInteligente(puntoGlobal, mesh, tolerancia) {
     return { punto: puntoGlobal, esCercanoACilindro: true };
 }
 
-
 function distanciaPuntoSegmento(p, a, b, target) {
     const ab = new THREE.Vector3().subVectors(b, a);
     const ap = new THREE.Vector3().subVectors(p, a);
@@ -1532,15 +1607,11 @@ function limpiarMedicion() {
     if (res && modoMedicionActivo) res.innerText = "Haga clic en una pieza para aislarla y medir con precisión.";
 }
 
-// ==========================================
-// 1. REALIDAD AUMENTADA (AR / WebXR)
-// ==========================================
 async function iniciarRealidadAumentada() {
     if ('xr' in navigator) {
         try {
             const supported = await navigator.xr.isSessionSupported('immersive-ar');
             if (supported) {
-                // Iniciamos la sesión de Realidad Aumentada directamente
                 const session = await navigator.xr.requestSession('immersive-ar', {
                     requiredFeatures: ['hit-test', 'local-floor']
                 });
@@ -1552,7 +1623,6 @@ async function iniciarRealidadAumentada() {
                     renderer.xr.enabled = false;
                 });
             } else {
-                // Si no soporta XR inmersivo, usamos el fallback
                 fallbackAR_Movil();
             }
         } catch (error) {
@@ -1576,10 +1646,8 @@ async function fallbackAR_Movil() {
         let esAndroid = /android/i.test(navigator.userAgent);
         
         if (esAndroid) {
-            // Usamos 'ar_preferred' para garantizar que aparezca el botón de alternar a RA
             let intentUrl = `intent://arvr.google.com/scene-viewer/1.0?file=${encodeURIComponent(urlModelo)}&mode=ar_preferred#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;end;`;
             
-            // Creamos un elemento <a> invisible para simular el toque del usuario de forma nativa
             let enlace = document.createElement('a');
             enlace.href = intentUrl;
             document.body.appendChild(enlace);
@@ -1593,9 +1661,6 @@ async function fallbackAR_Movil() {
     }
 }
 
-// ==========================================
-// 2. BIBLIOTECA DE REPUESTOS Y STOCK (SKU)
-// ==========================================
 async function cargarDatosInventarioPieza(nombrePieza) {
     const { data: rep, error } = await dbSupabase
         .from('repuestos_inventario')
@@ -1644,11 +1709,6 @@ async function solicitarRepuestoAlPanol(nombrePieza, sku) {
     else alert("¡Solicitud enviada al pañol con éxito!");
 }
 
-// ==========================================
-// 3. ANOTACIONES COLABORATIVAS 3D
-// ==========================================
-let puntoClicadoParaNota = null;
-
 function activarModoCrearNota(nombrePieza) {
     alert("Haz clic en el punto exacto de la pieza donde deseas dejar la nota colaborativa.");
     window.modoNotaActivo = true;
@@ -1690,9 +1750,6 @@ async function cargarNotas3DEnModelo() {
     });
 }
 
-// ==========================================
-// FUNCIONES GLOBALES Y MANEJO DE MANUALES PDF DE MÁQUINA
-// ==========================================
 window.vincularSkuAhora = typeof vincularSkuAhora !== 'undefined' ? vincularSkuAhora : function(nombrePieza) {
     let sku = prompt(`Ingrese el SKU para la pieza "${nombrePieza}":`);
     if (!sku) return;
@@ -1763,15 +1820,16 @@ async function subirManualPdf() {
         if (typeof loadManualsData === 'function') loadManualsData();
     }
 }
+
 function manejarIncompatibilidadAR() {
-    // En lugar de alertar con un error, abrimos un panel de ayuda o la vista detallada
     let usarModeloWeb = confirm("Tu dispositivo no soporta Realidad Aumentada en vivo. ¿Deseas explorar la máquina en el visor 3D interactivo en pantalla?");
     if (usarModeloWeb) {
-        // Cierra cualquier intento de AR y regresa al canvas 3D normal
         renderer.xr.enabled = false;
     }
 }
-// Exponer funciones nuevas globalmente para los eventos en el DOM HTML
+
+// Exponer funciones globalmente
+window.addNewMachine = addNewMachine;
 window.subirManualPieza3D = subirManualPieza3D;
 window.eliminarManualPieza = eliminarManualPieza;
 window.subirManualPdf = subirManualPdf;
