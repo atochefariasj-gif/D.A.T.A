@@ -67,8 +67,9 @@
             <h2 id="line-title" style="color: #2b2d42; margin-top: 0; font-size: 16px;">Línea</h2>
             <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Lista de máquinas:</p>
             
-            <div id="admin-toolbar" class="admin-toolbar" style="display:none;">
-                <button class="btn-action" onclick="addNewMachine()">➕ Agregar</button>
+            <!-- 🛠️ Barra de herramientas actualizada para manejar la adición y edición en línea -->
+            <div id="admin-toolbar" class="admin-toolbar" style="display:none; gap: 8px; margin-bottom: 10px;">
+                <button class="btn-action" onclick="addNewMachine()">➕ Agregar Máquina</button>
                 <button id="toggle-edit-btn" class="btn-action" onclick="toggleEditMode()">✏️ Editar Nombres</button>
             </div>
             
@@ -178,6 +179,11 @@
         <div id="view-visual3d" class="view-section" style="width: 100%;">
             <div style="display: flex; flex-direction: column; height: 480px; width: 100%; background: #111827; border-radius: 12px; overflow: hidden; text-align: left; position: relative;" id="visual3d-wrapper-box">
                 
+              <!-- ⚠️ AVISO FLOTANTE DE MODELO EN CREACIÓN / DISPONIBLE -->
+              <div id="aviso-estado-modelo" style="display: none; position: absolute; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(31, 41, 55, 0.95); border: 2px solid #f77f00; color: #fff; padding: 10px 16px; border-radius: 8px; z-index: 50; font-size: 12px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); backdrop-filter: blur(4px);">
+                  <span id="texto-aviso-modelo" style="font-weight: bold;">⚠️ Este modelo 3D se encuentra actualmente en proceso de creación.</span>
+              </div>
+
               <!-- Contenedor principal adaptable: Columna en móvil, Fila en tablet/PC -->
               <div class="flex flex-col md:flex-row w-full h-full relative">
                     
@@ -283,6 +289,7 @@
             <button class="back-btn" style="margin-top: 10px;" onclick="salirVisual3D()">⬅ Volver a Opciones</button>
         </div>
     </div>
+    
 
     <!-- MODAL PARA CUESTIONARIO DE REPORTE DE MANTENIMIENTO -->
     <div class="image-modal" id="modal-motivo-reporte">
