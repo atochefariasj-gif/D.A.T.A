@@ -304,32 +304,29 @@ async function toggleEditMode() {
 // CARGA Y EDICIÓN DEL KÁRDEX
 // ==========================================
 async function loadKardexData() {
-    const { data: maq, error } = await dbSupabase
-        .from('maquinas')
+    // Usamos currentMachineId que es la variable global de tu app
+    const targetId = typeof currentMachineId !== 'undefined' ? currentMachineId : null;
+    
+    if (!targetId) {
+        console.warn("No hay una máquina seleccionada actualmente.");
+        return;
+    }
+
+    const { data, error } = await supabaseClient
+        .from('machines')
         .select('*')
-        .eq('id', currentMachineId)
+        .eq('id', targetId)
         .single();
 
-if (error || !maq) return;
+    if (error || !data) return;
 
     // Actualizar subtítulo de forma segura
     const sub = document.getElementById('kardex-subtitle');
-    if (sub) sub.innerText = `Activo: ${maq.nombre}`;
+    if (sub) sub.innerText = `Activo: ${data.nombre}`;
 
-    // Cargar la tabla de Excel guardada para esta máquina
-    await cargarKardexMaquina(machineId);
-
-    const addRowBtn = document.getElementById('add-row-btn');
-    const addMotorBtn = document.getElementById('add-motor-btn');
-    const thAction = document.getElementById('th-action');
-    if (addRowBtn) addRowBtn.style.display = isAdmin ? 'block' : 'none';
-    if (addMotorBtn) addMotorBtn.style.display = isAdmin ? 'block' : 'none';
-    if (thAction) thAction.style.display = isAdmin ? 'table-cell' : 'none';
-
-    renderMotors(maq.motors || [], isAdmin);
-    renderKardexRows(maq.kardex || [], isAdmin);
+    // Cargar la tabla de Excel guardada
+    await cargarKardexMaquina(targetId);
 }
-
 // Guardar Metadatos del Kárdex en Supabase
 async function guardarCambiosKardexMeta() {
     if (currentRole !== 'admin') return;
