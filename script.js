@@ -12,7 +12,7 @@ let isEditMode = false;
 let rolPendiente = '';
 
 const PASSWORDS = {
-    'mantenimiento': 'mantenimiento123',
+    'mantenimiento': '123',
     'admin': 'admin123'
 };
 
@@ -514,6 +514,16 @@ async function cargarModeloMaquinaActual() {
     }
 }
 
+async function cargarModeloPorDefecto() {
+    const btnExplo = document.getElementById('btn-explo');
+    if(btnExplo) {
+        btnExplo.innerText = "💥 Activar Vista Explosionada";
+        btnExplo.disabled = false;
+    }
+    let indicador = document.getElementById('indicador-equipo');
+    if(indicador) indicador.innerText = `📍 Vista: Sin modelo 3D`;
+}
+
 async function procesarModeloCargado(gltf, nombreEquipo) {
     const modelo = gltf.scene;
     const boxCentro = new THREE.Box3().setFromObject(modelo);
@@ -528,22 +538,12 @@ async function procesarModeloCargado(gltf, nombreEquipo) {
     const { data: maq } = await dbSupabase.from('maquinas').select('reportes_piezas').eq('id', currentMachineId).single();
     let reportes = maq?.reportes_piezas || {};
 
-modelo.traverse((child) => {
+    modelo.traverse((child) => {
         if (child.isMesh) {
+            // Guardamos el nombre visual del padre (que ya vimos que trae los nombres de Inventor)
+            let nombreVisual = child.parent && child.parent.name && child.parent.name !== "Scene" ? child.parent.name : (child.name || `Pieza_${indexPieza}`);
             
-            // 1. OBTENER Y HEREDAR EL NOMBRE ORIGINAL CORRECTAMENTE
-            let nombreReal = child.name;
-            if (!nombreReal || nombreReal === "" || nombreReal.includes("Mesh") || nombreReal.includes("Object")) {
-                if (child.parent && child.parent.name && child.parent.name !== "Scene") {
-                    nombreReal = child.parent.name;
-                } else if (child.parent && child.parent.parent && child.parent.parent.name !== "Scene") {
-                    nombreReal = child.parent.parent.name;
-                }
-            }
-            
-            // Asignar el nombre limpio y definitivo al mesh
-            child.name = nombreReal && nombreReal !== "" ? nombreReal : `Pieza_${indexPieza}`;
-            
+            child.name = nombreVisual; // Asignamos el nombre limpio directamente al mesh
             piezasDetectadas.push(child);
 
             const posOrig = child.position.clone();
@@ -553,7 +553,13 @@ modelo.traverse((child) => {
             if(direccionExplosion.lengthSq() === 0) direccionExplosion.set(0, 1, 0);
             const posExp = posOrig.clone().add(direccionExplosion.multiplyScalar(2));
 
-            let colorOriginal = child.material.color ? child.material.color.getHex() : 0x888888;
+            // Respetamos el color original del material del GLB
+            let colorOriginal = 0x888888;
+            if (child.material) {
+                if (child.material.color) colorOriginal = child.material.color.getHex();
+                else if (Array.isArray(child.material) && child.material[0]?.color) colorOriginal = child.material[0].color.getHex();
+            }
+
             let tieneReporte = reportes[child.name] && reportes[child.name].estado === 'mantenimiento';
 
             child.userData = { posOrig, posExp, colorBase: colorOriginal };
@@ -563,16 +569,11 @@ modelo.traverse((child) => {
                 roughness: 0.5, metalness: 0.1, transparent: true, opacity: 1.0
             });
 
-            // 2. CREAR EL BOTÓN USANDO YA EL NOMBRE CORRECTO
             if(lista) {
                 const btn = document.createElement('button');
-                btn.className = "item-partes w-full text-left p-1.5 rounded hover:bg-gray-700 text-gray-300 text-xs flex justify-between items-center";
-                
-                // FORZAR EL NOMBRE DIRECTAMENTE DE LA CONSOLA
-                let nombreMostrado = child.name || (child.parent ? child.parent.name : `Pieza_${indexPieza}`);
-                
-                btn.innerHTML = `<span>⚙️ ${nombreMostrado}</span> ${tieneReporte ? '<span class="text-[9px] bg-red-600 text-white px-1 rounded">Mantenimiento</span>' : ''}`;
-                btn.onclick = () => seleccionarComponente(nombreMostrado);
+                btn.className = "w-full text-left p-1.5 rounded bg-gray-800 hover:bg-gray-700 text-white text-xs mb-1";
+                btn.innerHTML = `⚙️ ${child.name}`;
+                btn.onclick = () => seleccionarComponente(child.name);
                 lista.appendChild(btn);
             }
             indexPieza++;
@@ -616,20 +617,20 @@ async function seleccionarComponente(nombrePieza) {
         panel.classList.remove('hidden');
         document.getElementById('info-titulo').innerText = nombrePieza;
 
-        // Poner transparentes las demás piezas y resaltar en amarillo la seleccionada
+        // Transparencia a los demás y amarillo a la seleccionada
         piezasDetectadas.forEach(p => {
             if (p.material) {
                 p.material.transparent = true;
                 if (p.name === nombrePieza) {
-                    p.material.color.setHex(0xfacc15); // Amarillo exacto
+                    p.material.color.setHex(0xfacc15); // Amarillo
                     p.material.opacity = 1.0;
                 } else {
-                    p.material.opacity = 0.15; // Translúcidas las demás
+                    p.material.opacity = 0.15; // Translúcidas
                 }
             }
         });
 
-        // Configurar destino fluido de la cámara
+        // Acercamiento fluido de la cámara
         const boxPieza = new THREE.Box3().setFromObject(piezaEncontrada);
         const centroPieza = boxPieza.getCenter(new THREE.Vector3());
 
