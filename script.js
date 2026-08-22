@@ -10,15 +10,17 @@ let currentLine = '';
 let currentMachineId = null;
 let isEditMode = false;
 let rolPendiente = '';
-let mapaNombres = {}; // Aquí se guardarán los nombres del JSON
-let reportesCargados = {}; // Variable para guardar el estado de las piezas
+let mapaNombres = {}; // Aquí se guardarán los nombres del JSON[cite: 1]
+let reportesCargados = {}; // Variable para guardar el estado de las piezas[cite: 1]
+
+let centroModeloGlobal = new THREE.Vector3(); // Centro global para las vistas rápidas y centrado
 
 const PASSWORDS = {
     'mantenimiento': '123',
     'admin': 'admin123'
 };
 
-// Función para cargar los nombres desde el archivo JSON
+// Función para cargar los nombres desde el archivo JSON[cite: 1]
 async function cargarTraducciones() {
     try {
         const response = await fetch('nombres.json');
@@ -27,9 +29,10 @@ async function cargarTraducciones() {
         console.log("Traducciones cargadas correctamente.");
     } catch (error) {
         console.warn("No se pudo cargar nombres.json, usando nombres originales.", error);
-        mapaNombres = {}; // Si falla, queda vacío y no se rompe nada
+        mapaNombres = {}; // Si falla, queda vacío y no se rompe nada[cite: 1]
     }
 }
+
 async function solicitarPassword(rol) {
     rolPendiente = rol;
     document.getElementById('modal-password-title').innerText = `Contraseña para ${rol.toUpperCase()}`;
@@ -376,7 +379,7 @@ async function closeImageModal() {
 }
 
 // ==========================================
-// LÓGICA 3D, VISTA EXPLOSIONADA Y ANIMACIÓN FLUIDA
+// LÓGICA 3D, VISTA EXPLOSIONADA Y ANIMACIÓN FLUIDA[cite: 1]
 // ==========================================
 let scene, camera, renderer, grupoMaquina, controls, raycaster, mouse, gltfLoader;
 let piezaSeleccionadaActual = "";
@@ -391,8 +394,7 @@ let pointerDownY = 0;
 let hasMoved = false;
 
 async function init3D() {
-  await cargarTraducciones(); // Espera a que cargue el JSON antes de seguir
-    // ... tu lógica para cargar la máquina, etc.
+    await cargarTraducciones(); 
     const container = document.getElementById('canvas-3d');
     const initW = container.clientWidth > 0 ? container.clientWidth : 300;
     const initH = container.clientHeight > 0 ? container.clientHeight : 480;
@@ -424,6 +426,26 @@ async function init3D() {
     scene.add(grupoMaquina);
 
     cargarModeloMaquinaActual();
+
+    // Configuración del Buscador de Piezas en tiempo real[cite: 1]
+    const inputBuscador = document.querySelector('input[placeholder*="Buscar"]');
+    if (inputBuscador) {
+        inputBuscador.addEventListener('input', (e) => {
+            const textoFiltro = e.target.value.toLowerCase();
+            const lista = document.getElementById('lista-partes');
+            if (lista) {
+                const botones = lista.getElementsByTagName('button');
+                Array.from(botones).forEach(boton => {
+                    const nombrePieza = boton.innerText.toLowerCase();
+                    if (nombrePieza.includes(textoFiltro)) {
+                        boton.style.display = "block";
+                    } else {
+                        boton.style.display = "none";
+                    }
+                });
+            }
+        });
+    }
 
     const inputArchivo = document.getElementById('input-archivo');
     if (inputArchivo) {
@@ -505,6 +527,31 @@ function toggleVistaExplosionada() {
     }
 }
 
+// ==========================================
+// FUNCIONES DE VISTAS RÁPIDAS Y CENTRADO[cite: 1]
+// ==========================================
+function centrarVistaGeneral() {
+    if (!controls || !camera) return;
+    targetControlsTarget = centroModeloGlobal.clone();
+    targetCameraPos = centroModeloGlobal.clone().add(new THREE.Vector3(0, 3, 7));
+}
+
+function cambiarVistaRapida(tipo) {
+    if (!camera || !controls) return;
+    const distancia = 7;
+    targetControlsTarget = centroModeloGlobal.clone();
+
+    if (tipo === 'frontal') {
+        targetCameraPos = centroModeloGlobal.clone().add(new THREE.Vector3(0, 0, distancia));
+    } else if (tipo === 'superior') {
+        targetCameraPos = centroModeloGlobal.clone().add(new THREE.Vector3(0, distancia, 0.01));
+    } else if (tipo === 'lateral') {
+        targetCameraPos = centroModeloGlobal.clone().add(new THREE.Vector3(distancia, 0, 0));
+    } else if (tipo === 'isometrica') {
+        targetCameraPos = centroModeloGlobal.clone().add(new THREE.Vector3(distancia, distancia, distancia));
+    }
+}
+
 async function cargarModeloMaquinaActual() {
     const btnExplo = document.getElementById('btn-explo');
     if(btnExplo) {
@@ -546,27 +593,22 @@ async function procesarModeloCargado(gltf, nombreEquipo) {
     const center = boxCentro.getCenter(new THREE.Vector3());
     modelo.position.sub(center); 
 
+    centroModeloGlobal = center.clone(); // Guardamos el centro global para los botones de vista[cite: 1]
+
     piezasDetectadas = [];
     const lista = document.getElementById('lista-partes');
     if(lista) lista.innerHTML = "";
     let indexPieza = 1;
 
-    // ... dentro de procesarModeloCargado ...
-const { data: maq } = await dbSupabase.from('maquinas').select('reportes_piezas').eq('id', currentMachineId).single();
-reportesCargados = maq?.reportes_piezas || {}; // <--- Guardamos aquí los reportes
-// ... el resto de tu código ...
+    const { data: maq } = await dbSupabase.from('maquinas').select('reportes_piezas').eq('id', currentMachineId).single();
+    reportesCargados = maq?.reportes_piezas || {}; 
 
     modelo.traverse((child) => {
         if (child.isMesh) {
-// ... dentro del modelo.traverse ...
+            let nombreBruto = child.parent && child.parent.name && child.parent.name !== "Scene" ? child.parent.name : (child.name || `Pieza_${indexPieza}`);
+            let nombreVisual = mapaNombres[nombreBruto] || nombreBruto;
 
-let nombreBruto = child.parent && child.parent.name && child.parent.name !== "Scene" ? child.parent.name : (child.name || `Pieza_${indexPieza}`);
-
-// Si existe en el JSON, lo traduce, si no, usa el original
-let nombreVisual = mapaNombres[nombreBruto] || nombreBruto;
-
-child.name = nombreVisual;
-// ... resto de tu lógica ...
+            child.name = nombreVisual;
             piezasDetectadas.push(child);
 
             const posOrig = child.position.clone();
@@ -576,7 +618,6 @@ child.name = nombreVisual;
             if(direccionExplosion.lengthSq() === 0) direccionExplosion.set(0, 1, 0);
             const posExp = posOrig.clone().add(direccionExplosion.multiplyScalar(2));
 
-            // Respetamos el color original del material del GLB
             let colorOriginal = 0x888888;
             if (child.material) {
                 if (child.material.color) colorOriginal = child.material.color.getHex();
@@ -618,12 +659,10 @@ async function seleccionarComponente(nombrePieza) {
     const panel = document.getElementById('panel-info');
     const piezaEncontrada = piezasDetectadas.find(p => p.name === nombrePieza);
 
-    // Si clicamos la misma pieza que ya estaba seleccionada, la deseleccionamos
     if (piezaSeleccionadaActual === nombrePieza) {
         panel.classList.add('hidden');
         piezaSeleccionadaActual = null;
 
-        // Restauramos todas las piezas a su estado normal (rojo si tienen reporte, o su color base)
         piezasDetectadas.forEach(p => {
             if (p.material) {
                 p.material.transparent = true;
@@ -636,21 +675,18 @@ async function seleccionarComponente(nombrePieza) {
         return;
     }
 
-    // Si seleccionamos una pieza nueva
     if (piezaEncontrada) {
         piezaSeleccionadaActual = nombrePieza;
         panel.classList.remove('hidden');
         document.getElementById('info-titulo').innerText = nombrePieza;
 
-        // AQUÍ ESTÁ LA CLAVE: Recorremos todas las piezas
         piezasDetectadas.forEach(p => {
             if (p.material) {
                 p.material.transparent = true;
                 if (p.name === nombrePieza) {
-                    p.material.color.setHex(0xfacc15); // La seleccionada se pone AMARILLA
+                    p.material.color.setHex(0xfacc15); 
                     p.material.opacity = 1.0;
                 } else {
-                    // A las demás les bajamos la opacidad y les devolvemos SU color correcto (rojo o base)
                     p.material.opacity = 0.15;
                     const tieneReporte = reportesCargados[p.name] && reportesCargados[p.name].estado === 'mantenimiento';
                     p.material.color.setHex(tieneReporte ? 0xef4444 : p.userData.colorBase);
@@ -658,11 +694,10 @@ async function seleccionarComponente(nombrePieza) {
             }
         });
 
-        // Zoom y carga de información de la pieza seleccionada
         const boxPieza = new THREE.Box3().setFromObject(piezaEncontrada);
         const centroPieza = boxPieza.getCenter(new THREE.Vector3());
         targetControlsTarget = centroPieza.clone();
-        const offset = camera.position.clone().sub(controls.target).normalize().multiplyScalar(1);
+        const offset = camera.position.clone().sub(controls.target).normalize().multiplyScalar(2.2); // Zoom cercano[cite: 1]
         targetCameraPos = centroPieza.clone().add(offset);
 
         let repInfo = reportesCargados[nombrePieza];
@@ -722,19 +757,16 @@ async function guardarReporteMantenimiento() {
 async function marcarPiezaOperativa(nombrePieza) {
     if (currentRole !== 'admin') return;
 
-    // 1. Actualizamos Supabase (borramos el reporte)
     const { data: maq } = await dbSupabase.from('maquinas').select('reportes_piezas').eq('id', currentMachineId).single();
     let reportes = maq?.reportes_piezas || {};
     delete reportes[nombrePieza];
 
     await dbSupabase.from('maquinas').update({ reportes_piezas: reportes }).eq('id', currentMachineId);
 
-    // 2. Actualizamos nuestra variable global para que refleje el cambio al instante
     if (reportesCargados[nombrePieza]) {
         delete reportesCargados[nombrePieza];
     }
 
-    // 3. Recargamos el modelo para que la pieza recupere su color original de inmediato
     cargarModeloMaquinaActual();
 }
 
@@ -769,5 +801,13 @@ async function detectarToque(x, y) {
     const intersects = raycaster.intersectObjects(piezasDetectadas, true);
     if (intersects.length > 0 && intersects[0].object.name) {
         seleccionarComponente(intersects[0].object.name);
+    }
+}
+// Función puente para que funcionen los botones del HTML actual
+function fijarCamara(tipo) {
+    if (tipo === 'iso') {
+        cambiarVistaRapida('isometrica');
+    } else {
+        cambiarVistaRapida(tipo);
     }
 }
