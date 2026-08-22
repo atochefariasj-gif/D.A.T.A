@@ -354,7 +354,7 @@ async function loadManualsData() {
         row.innerHTML = `
             <div class="manual-info">
                 <span class="manual-icon">📄</span>
-                <span class="manual-name" title="${man.name}">${man.name}</span>
+                <span class="manual-name" title="${man.name || man.nombre}">${man.name || man.nombre}</span>
             </div>
             <div class="manual-actions">
                 <a href="${man.url}" target="_blank" class="btn-pdf-download">📥 Ver / Descargar</a>
@@ -820,14 +820,21 @@ async function seleccionarComponente(nombrePieza) {
 
         if (docInfo && docInfo.url) {
             contenedorAcciones.innerHTML += `
-                <a href="${docInfo.url}" target="_blank" class="w-full py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-white font-bold text-[11px] text-center block mb-1">
-                    📄 Ver Plano / Manual de Pieza
-                </a>`;
+                <div class="mb-2 p-1.5 bg-gray-800 rounded border border-gray-700">
+                    <a href="${docInfo.url}" target="_blank" class="w-full py-1.5 bg-blue-600 hover:bg-blue-500 rounded text-white font-bold text-[11px] text-center block mb-1">
+                        📄 Ver Plano / Manual de Pieza
+                    </a>
+                    ${currentRole === 'admin' ? `<button onclick="eliminarManualPieza('${nombrePieza}')" class="w-full py-1 bg-red-700 hover:bg-red-600 rounded text-white text-[10px]">🗑️ Eliminar Manual de Pieza</button>` : ''}
+                </div>`;
         } else if (currentRole === 'admin') {
             contenedorAcciones.innerHTML += `
-                <button onclick="abrirModalAsociarDocumento('${nombrePieza}')" class="w-full py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-white text-[11px] mb-1">
-                    ➕ Adjuntar Manual a Pieza
-                </button>`;
+                <div class="mb-2 p-2 bg-gray-800 rounded border border-gray-700">
+                    <label class="block text-[10px] font-bold text-amber-400 mb-1">📎 Adjuntar Manual PDF a esta pieza:</label>
+                    <input type="file" id="input-pdf-pieza" accept=".pdf" class="block w-full text-[10px] text-gray-300 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-amber-600 file:text-white hover:file:bg-amber-500 cursor-pointer mb-1"/>
+                    <button onclick="subirManualPieza3D('${nombrePieza}')" class="w-full py-1 bg-blue-600 hover:bg-blue-500 rounded text-white font-bold text-[10px]">
+                        💾 Subir y Guardar PDF
+                    </button>
+                </div>`;
         }
 
         if (currentRole === 'mantenimiento' || currentRole === 'admin') {
@@ -891,18 +898,74 @@ async function marcarPiezaOperativa(nombrePieza) {
     cargarModeloMaquinaActual();
 }
 
-async function abrirModalAsociarDocumento(nombrePieza) {
-    let urlDoc = prompt(`Ingrese la URL del plano o manual PDF para la pieza "${nombrePieza}":`);
-    if (!urlDoc) return;
+// Subir PDF de una pieza específica en la interfaz 3D
+async function subirManualPieza3D(nombrePieza) {
+    const fileInput = document.getElementById('input-pdf-pieza');
+    if (!fileInput || !fileInput.files[0]) {
+        alert("Por favor, selecciona un archivo PDF primero.");
+        return;
+    }
 
-    const { data: maq } = await dbSupabase.from('maquinas').select('documentacion_piezas').eq('id', currentMachineId).single();
-    let docs = maq?.documentacion_piezas || {};
-    docs[nombrePieza] = { url: urlDoc };
+    const archivo = fileInput.files[0];
+    const nombreLimpio = nombrePieza.replace(/[^a-zA-Z0-9]/g, "_");
+    const rutaArchivo = `piezas/${currentMachineId}_${nombreLimpio}_${Date.now()}.pdf`;
 
-    await dbSupabase.from('maquinas').update({ documentacion_piezas: docs }).eq('id', currentMachineId);
-    alert("¡Documentación asociada correctamente!");
-    cargarModeloMaquinaActual();
-    seleccionarComponente(nombrePieza);
+    try {
+        const { error: uploadError } = await dbSupabase.storage
+            .from('manuales')
+            .upload(rutaArchivo, archivo);
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicUrlData } = dbSupabase.storage
+            .from('manuales')
+            .getPublicUrl(rutaArchivo);
+
+        const urlPublica = publicUrlData.publicUrl;
+
+        const { data: maq } = await dbSupabase.from('maquinas').select('documentacion_piezas').eq('id', currentMachineId).maybeSingle();
+        let docs = maq?.documentacion_piezas || {};
+        docs[nombrePieza] = { url: urlPublica, name: archivo.name };
+
+        const { error: dbError } = await dbSupabase
+            .from('maquinas')
+            .update({ documentacion_piezas: docs })
+            .eq('id', currentMachineId);
+
+        if (dbError) throw dbError;
+
+        alert(`¡Manual PDF subido con éxito para la pieza "${nombrePieza}"!`);
+        documentacionPiezasCargada = docs;
+        seleccionarComponente(nombrePieza);
+
+    } catch (err) {
+        console.error("Error al adjuntar manual:", err);
+        alert("Ocurrió un error al subir el PDF: " + err.message);
+    }
+}
+
+async function eliminarManualPieza(nombrePieza) {
+    if (!confirm(`¿Deseas eliminar el manual asociado a la pieza "${nombrePieza}"?`)) return;
+
+    try {
+        const { data: maq } = await dbSupabase.from('maquinas').select('documentacion_piezas').eq('id', currentMachineId).maybeSingle();
+        let docs = maq?.documentacion_piezas || {};
+        delete docs[nombrePieza];
+
+        const { error } = await dbSupabase
+            .from('maquinas')
+            .update({ documentacion_piezas: docs })
+            .eq('id', currentMachineId);
+
+        if (error) throw error;
+
+        alert("Manual de pieza eliminado correctamente.");
+        documentacionPiezasCargada = docs;
+        seleccionarComponente(nombrePieza);
+    } catch (err) {
+        console.error("Error al eliminar manual de pieza:", err);
+        alert("No se pudo eliminar el manual: " + err.message);
+    }
 }
 
 async function abrirModalVerReportes() {
@@ -1454,7 +1517,7 @@ function limpiarMedicion() {
 }
 
 // ==========================================
-// 1. REALIDAD AUMENTADA (AR / WebXR) - CORREGIDO
+// 1. REALIDAD AUMENTADA (AR / WebXR)
 // ==========================================
 function iniciarRealidadAumentada() {
     if ('xr' in navigator) {
@@ -1485,7 +1548,6 @@ async function fallbackAR_Movil() {
 // 2. BIBLIOTECA DE REPUESTOS Y STOCK (SKU)
 // ==========================================
 async function cargarDatosInventarioPieza(nombrePieza) {
-    // Usamos .maybeSingle() en lugar de .single() para que devuelva null si no existe en lugar de un error 406
     const { data: rep, error } = await dbSupabase
         .from('repuestos_inventario')
         .select('*')
@@ -1578,8 +1640,10 @@ async function cargarNotas3DEnModelo() {
         grupoMaquina.add(pin);
     });
 }
-// Exponer funciones clave al objeto global para evitar ReferenceError en los onclick del HTML
-window.mejorPuntoLocal = mejorPuntoLocal;
+
+// ==========================================
+// FUNCIONES GLOBALES Y MANEJO DE MANUALES PDF DE MÁQUINA
+// ==========================================
 window.vincularSkuAhora = typeof vincularSkuAhora !== 'undefined' ? vincularSkuAhora : function(nombrePieza) {
     let sku = prompt(`Ingrese el SKU para la pieza "${nombrePieza}":`);
     if (!sku) return;
@@ -1593,6 +1657,7 @@ window.vincularSkuAhora = typeof vincularSkuAhora !== 'undefined' ? vincularSkuA
         }
     });
 };
+
 window.removeInstructionImage = typeof removeInstructionImage !== 'undefined' ? removeInstructionImage : async function(idx) {
     const { data: maq } = await dbSupabase.from('maquinas').select('instruction_images').eq('id', currentMachineId).single();
     let images = maq?.instruction_images || [];
@@ -1600,6 +1665,7 @@ window.removeInstructionImage = typeof removeInstructionImage !== 'undefined' ? 
     await dbSupabase.from('maquinas').update({ instruction_images: images }).eq('id', currentMachineId);
     loadInstructionsData();
 };
+
 window.removeManualPdf = typeof removeManualPdf !== 'undefined' ? removeManualPdf : async function(idx) {
     const { data: maq } = await dbSupabase.from('maquinas').select('manuals_pdf').eq('id', currentMachineId).single();
     let manuals = maq?.manuals_pdf || [];
@@ -1607,3 +1673,49 @@ window.removeManualPdf = typeof removeManualPdf !== 'undefined' ? removeManualPd
     await dbSupabase.from('maquinas').update({ manuals_pdf: manuals }).eq('id', currentMachineId);
     loadManualsData();
 };
+
+async function subirManualPdf() {
+    const fileInput = document.getElementById('pdf-file-input');
+    if (!fileInput || !fileInput.files[0]) {
+        alert("Por favor selecciona un archivo PDF primero.");
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const fileName = `manual_${currentMachineId}_${Date.now()}.pdf`;
+    
+    const { error } = await dbSupabase.storage
+        .from('manuales')
+        .upload(fileName, file);
+
+    if (error) {
+        alert("Error al subir el PDF: " + error.message);
+        return;
+    }
+
+    const { data: { publicUrl } } = dbSupabase.storage
+        .from('manuales')
+        .getPublicUrl(fileName);
+
+    const { data: maq } = await dbSupabase.from('maquinas').select('manuals_pdf').eq('id', currentMachineId).maybeSingle();
+    let manuals = maq?.manuals_pdf || [];
+    manuals.push({ name: file.name, url: publicUrl });
+
+    const { error: updateError } = await dbSupabase
+        .from('maquinas')
+        .update({ manuals_pdf: manuals })
+        .eq('id', currentMachineId);
+
+    if (updateError) {
+        alert("Error al guardar la referencia del manual: " + updateError.message);
+    } else {
+        alert("¡Manual PDF subido y guardado con éxito!");
+        fileInput.value = ""; 
+        if (typeof loadManualsData === 'function') loadManualsData();
+    }
+}
+
+// Exponer funciones nuevas globalmente para los eventos en el DOM HTML
+window.subirManualPieza3D = subirManualPieza3D;
+window.eliminarManualPieza = eliminarManualPieza;
+window.subirManualPdf = subirManualPdf;
