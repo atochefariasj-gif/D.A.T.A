@@ -1564,9 +1564,26 @@ async function iniciarRealidadAumentada() {
 }
 
 async function fallbackAR_Movil() {
-    const { data: maq } = await dbSupabase.from('maquinas').select('modelo_url').eq('id', currentMachineId).single();
-    if (maq && maq.modelo_url) {
-        window.open(maq.modelo_url, '_blank');
+    const { data, error } = await dbSupabase
+        .from('maquinas')
+        .select('modelo_url')
+        .eq('id', currentMachineId)
+        .single();
+
+    if (data && data.modelo_url) {
+        let urlModelo = data.modelo_url;
+        
+        // Detectar si es Android para abrir con Google Scene Viewer de forma nativa
+        let esAndroid = /android/i.test(navigator.userAgent);
+        
+        if (esAndroid) {
+            // Esto abre la cámara y proyecta el 3D en el piso de manera nativa en Android
+            let intentUrl = `intent://arvr.google.com/scene-viewer/1.0?file=${encodeURIComponent(urlModelo)}&mode=ar_only#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;end;`;
+            window.location.href = intentUrl;
+        } else {
+            // Para otros dispositivos o PC, abre la URL o descarga
+            window.open(urlModelo, '_blank');
+        }
     } else {
         alert("Este dispositivo o modelo no soporta AR directo en este momento.");
     }
