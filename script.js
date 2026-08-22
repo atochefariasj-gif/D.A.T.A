@@ -300,6 +300,9 @@ async function toggleEditMode() {
     renderMachines();
 }
 
+// ==========================================
+// CARGA Y EDICIÓN DEL KÁRDEX
+// ==========================================
 async function loadKardexData() {
     const { data: maq, error } = await dbSupabase
         .from('maquinas')
@@ -315,17 +318,24 @@ async function loadKardexData() {
     let isAdmin = (currentRole === 'admin');
 
     let fields = ['k-area', 'k-codigo', 'k-femision', 'k-eq-marca', 'k-eq-capacidad', 'k-eq-material', 'k-eq-serie', 'k-eq-modelo'];
-    fields.forEach(f => document.getElementById(f).readOnly = !isAdmin);
-
     let meta = maq.meta || {};
-    document.getElementById('k-area').value = meta.area || '';
-    document.getElementById('k-codigo').value = meta.codigo || '';
-    document.getElementById('k-femision').value = meta.femision || '';
-    document.getElementById('k-eq-marca').value = meta.eq_marca || '';
-    document.getElementById('k-eq-capacidad').value = meta.eq_capacidad || '';
-    document.getElementById('k-eq-material').value = meta.eq_material || '';
-    document.getElementById('k-eq-serie').value = meta.eq_serie || '';
-    document.getElementById('k-eq-modelo').value = meta.eq_modelo || '';
+
+    fields.forEach(f => {
+        let inputEl = document.getElementById(f);
+        if (inputEl) {
+            inputEl.readOnly = !isAdmin;
+            let propName = f.replace('k-', '').replace('eq_', '');
+            if(f.startsWith('k-eq-')) propName = 'eq_' + propName;
+            
+            inputEl.value = meta[propName] || '';
+
+            if (isAdmin) {
+                inputEl.onchange = async () => {
+                    await guardarCambiosKardexMeta();
+                };
+            }
+        }
+    });
 
     const addRowBtn = document.getElementById('add-row-btn');
     const addMotorBtn = document.getElementById('add-motor-btn');
@@ -334,8 +344,139 @@ async function loadKardexData() {
     if (addMotorBtn) addMotorBtn.style.display = isAdmin ? 'block' : 'none';
     if (thAction) thAction.style.display = isAdmin ? 'table-cell' : 'none';
 
-    if (typeof renderMotors === 'function') renderMotors(maq.motors || [], isAdmin);
-    if (typeof renderKardexRows === 'function') renderKardexRows(maq.kardex || [], isAdmin);
+    renderMotors(maq.motors || [], isAdmin);
+    renderKardexRows(maq.kardex || [], isAdmin);
+}
+
+// Guardar Metadatos del Kárdex en Supabase
+async function guardarCambiosKardexMeta() {
+    if (currentRole !== 'admin') return;
+
+    let metaActualizada = {
+        area: document.getElementById('k-area').value,
+        codigo: document.getElementById('k-codigo').value,
+        femision: document.getElementById('k-femision').value,
+        eq_marca: document.getElementById('k-eq-marca').value,
+        eq_capacidad: document.getElementById('k-eq-capacidad').value,
+        eq_material: document.getElementById('k-eq-material').value,
+        eq_serie: document.getElementById('k-eq-serie').value,
+        eq_modelo: document.getElementById('k-eq-modelo').value
+    };
+
+    const { error } = await dbSupabase
+        .from('maquinas')
+        .update({ meta: metaActualizada })
+        .eq('id', currentMachineId);
+
+    if (error) {
+        console.error("Error al guardar metadatos del Kárdex:", error.message);
+    }
+}
+
+// Renderizar y gestionar Motores
+function renderMotors(motors, isAdmin) {
+    let container = document.getElementById('motors-container');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    motors.forEach((motor, index) => {
+        let html = `
+            <div class="motor-block" style="border: 1px solid #ccc; padding: 8px; margin-bottom: 8px; background: #fff; border-radius: 4px;">
+                <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 10px; margin-bottom: 4px;">
+                    <span>MOTOR Nº ${index + 1}</span>
+                    ${isAdmin ? `<span style="color: red; cursor: pointer;" onclick="removeMotorBlock(${index})">Eliminar Motor</span>` : ''}
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; font-size: 9px;">
+                    <div>MARCA: <input type="text" ${!isAdmin ? 'readonly' : ''} value="${motor.marca || ''}" oninput="updateMotor(${index}, 'marca', this.value)" style="width:100%"></div>
+                    <div>HP: <input type="text" ${!isAdmin ? 'readonly' : ''} value="${motor.hp || ''}" oninput="updateMotor(${index}, 'hp', this.value)" style="width:100%"></div>
+                    <div>KW: <input type="text" ${!isAdmin ? 'readonly' : ''} value="${motor.kw || ''}" oninput="updateMotor(${index}, 'kw', this.value)" style="width:100%"></div>
+                    <div>RPM: <input type="text" ${!isAdmin ? 'readonly' : ''} value="${motor.rpm || ''}" oninput="updateMotor(${index}, 'rpm', this.value)" style="width:100%"></div>
+                    <div>VOLTIOS: <input type="text" ${!isAdmin ? 'readonly' : ''} value="${motor.voltios || ''}" oninput="updateMotor(${index}, 'voltios', this.value)" style="width:100%"></div>
+                    <div>AMP: <input type="text" ${!isAdmin ? 'readonly' : ''} value="${motor.amp || ''}" oninput="updateMotor(${index}, 'amp', this.value)" style="width:100%"></div>
+                </div>
+            </div>
+        `;
+        container.innerHTML += html;
+    });
+}
+
+async function addMotorBlock() {
+    if (currentRole !== 'admin') return;
+    const { data: maq } = await dbSupabase.from('maquinas').select('motors').eq('id', currentMachineId).single();
+    let motors = maq?.motors || [];
+    motors.push({ marca: '', hp: '', kw: '', rpm: '', voltios: '', amp: '' });
+    
+    await dbSupabase.from('maquinas').update({ motors }).eq('id', currentMachineId);
+    renderMotors(motors, true);
+}
+
+async function removeMotorBlock(index) {
+    if (currentRole !== 'admin') return;
+    const { data: maq } = await dbSupabase.from('maquinas').select('motors').eq('id', currentMachineId).single();
+    let motors = maq?.motors || [];
+    motors.splice(index, 1);
+    
+    await dbSupabase.from('maquinas').update({ motors }).eq('id', currentMachineId);
+    renderMotors(motors, true);
+}
+
+async function updateMotor(index, field, value) {
+    if (currentRole !== 'admin') return;
+    const { data: maq } = await dbSupabase.from('maquinas').select('motors').eq('id', currentMachineId).single();
+    let motors = maq?.motors || [];
+    if(motors[index]) {
+        motors[index][field] = value;
+        await dbSupabase.from('maquinas').update({ motors }).eq('id', currentMachineId);
+    }
+}
+
+// Renderizar y gestionar la tabla de repuestos
+function renderKardexRows(repuestos, isAdmin) {
+    let tbody = document.getElementById('kardex-tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    
+    repuestos.forEach((rep, index) => {
+        let row = `<tr>
+            <td>${index + 1}</td>
+            <td><input type="text" ${!isAdmin ? 'readonly' : ''} value="${rep.categoria || ''}" oninput="updateRepuesto(${index}, 'categoria', this.value)" style="width:100%"></td>
+            <td><input type="text" ${!isAdmin ? 'readonly' : ''} value="${rep.descripcion || ''}" oninput="updateRepuesto(${index}, 'descripcion', this.value)" style="width:100%"></td>
+            <td><input type="text" ${!isAdmin ? 'readonly' : ''} value="${rep.um || ''}" oninput="updateRepuesto(${index}, 'um', this.value)" style="width:100%"></td>
+            <td><input type="text" ${!isAdmin ? 'readonly' : ''} value="${rep.cantidad || ''}" oninput="updateRepuesto(${index}, 'cantidad', this.value)" style="width:100%"></td>
+            ${isAdmin ? `<td><button onclick="removeKardexRow(${index})" style="color:red; background:none; border:none; cursor:pointer;">X</button></td>` : '<td></td>'}
+        </tr>`;
+        tbody.innerHTML += row;
+    });
+}
+
+async function addKardexRow() {
+    if (currentRole !== 'admin') return;
+    const { data: maq } = await dbSupabase.from('maquinas').select('kardex').eq('id', currentMachineId).single();
+    let kardex = maq?.kardex || [];
+    kardex.push({ categoria: '', descripcion: '', um: '', cantidad: '' });
+    
+    await dbSupabase.from('maquinas').update({ kardex }).eq('id', currentMachineId);
+    renderKardexRows(kardex, true);
+}
+
+async function removeKardexRow(index) {
+    if (currentRole !== 'admin') return;
+    const { data: maq } = await dbSupabase.from('maquinas').select('kardex').eq('id', currentMachineId).single();
+    let kardex = maq?.kardex || [];
+    kardex.splice(index, 1);
+    
+    await dbSupabase.from('maquinas').update({ kardex }).eq('id', currentMachineId);
+    renderKardexRows(kardex, true);
+}
+
+async function updateRepuesto(index, field, value) {
+    if (currentRole !== 'admin') return;
+    const { data: maq } = await dbSupabase.from('maquinas').select('kardex').eq('id', currentMachineId).single();
+    let kardex = maq?.kardex || [];
+    if(kardex[index]) {
+        kardex[index][field] = value;
+        await dbSupabase.from('maquinas').update({ kardex }).eq('id', currentMachineId);
+    }
 }
 
 async function loadInstructionsData() {
@@ -1827,9 +1968,171 @@ function manejarIncompatibilidadAR() {
         renderer.xr.enabled = false;
     }
 }
+// Habilitar la función de pegar desde Excel en la tabla de repuestos del Kárdex
+document.getElementById('kardex-tbody').addEventListener('paste', function (e) {
+    // Evitar el comportamiento por defecto de pegado
+    e.preventDefault();
 
+    // Obtener el texto del portapapeles
+    const clipboardData = e.clipboardData || window.clipboardData;
+    const pastedData = clipboardData.getData('Text');
+
+    // Separar las filas y columnas del texto copiado (formato tabulado de Excel)
+    const rows = pastedData.split('\r\n').filter(row => row.trim() !== '');
+    
+    if (rows.length === 0) return;
+
+    // Obtener todas las filas actuales de la tabla de repuestos
+    const trElements = this.querySelectorAll('tr');
+    
+    rows.forEach((rowText, rowIndex) => {
+        const cellsData = rowText.split('\t'); // Las celdas en Excel se separan por tabuladores
+
+        // Si la fila ya existe en nuestra tabla HTML, la rellenamos
+        if (rowIndex < trElements.length) {
+            const inputs = trElements[rowIndex].querySelectorAll('input');
+            
+            // Suponiendo que las columnas de inputs son: [Categoria, Descripcion, UM, Cantidad]
+            // cellsData[0] suele ser el ITEM, así que podemos empezar a mapear desde el índice 1 o ajustar según tus columnas
+            let cellIndexOffset = cellsData.length > 4 ? 1 : 0; // Ajuste si Excel trae la columna de "Item"
+
+            inputs.forEach((input, inputIndex) => {
+                const dataIndex = inputIndex + cellIndexOffset;
+                if (cellsData[dataIndex] !== undefined) {
+                    input.value = cellsData[dataIndex].trim();
+                    // Disparar evento input para que se guarde automáticamente en los datos locales/Supabase
+                    input.dispatchEvent(new Event('input'));
+                }
+            });
+        } else {
+            // Opcional: Si el portapapeles tiene más filas de las que existen, puedes llamar a addKardexRow() y rellenarlas
+        }
+    });
+});
+function guardarKardexEnNube() {
+    // Recolectar datos del kárdex (metadatos, motores, repuestos)
+    const kardexData = {
+        machine_id: currentMachineId, // 🔑 Vínculo vital con la máquina actual
+        area: document.getElementById('k-area').value,
+        codigo: document.getElementById('k-codigo').value,
+        femision: document.getElementById('k-femision').value,
+        eq_marca: document.getElementById('k-eq-marca').value,
+        eq_capacidad: document.getElementById('k-eq-capacidad').value,
+        eq_material: document.getElementById('k-eq-material').value,
+        eq_serie: document.getElementById('k-eq-serie').value,
+        eq_modelo: document.getElementById('k-eq-modelo').value,
+        repuestos: obtenerDatosTablaRepuestos() // Array con las filas de repuestos
+    };
+
+    // Guardar en Supabase o localForage asociado a la máquina
+    supabaseClient
+        .from('kardex_details')
+        .upsert([kardexData], { onConflict: ['machine_id'] })
+        .then(({ error }) => {
+            if (error) console.error("Error al guardar Kárdex:", error);
+        });
+}
+// Función para procesar el texto plano tabulado de Excel y renderizar la tabla
+function procesarTextoExcel() {
+    const rawData = document.getElementById('paste-excel-input').value;
+    if (!rawData.trim()) {
+        alert("Por favor pega primero las celdas copiadas de Excel.");
+        return;
+    }
+
+    const rows = rawData.trim().split('\n');
+    let htmlTable = '<table class="repuestos-table" style="width:100%; border-collapse: collapse; font-size: 11px; text-align: left;"><tbody>';
+
+    rows.forEach((row, rowIndex) => {
+        const cells = row.split('\t');
+        htmlTable += '<tr>';
+        cells.forEach(cell => {
+            // Si es la primera fila la tratamos como encabezado visual
+            if (rowIndex === 0) {
+                htmlTable += `<th style="border: 1px solid #ddd; padding: 6px; background-color: #2b2d42; color: #fff; font-weight: bold;">${cell.trim()}</th>`;
+            } else {
+                htmlTable += `<td style="border: 1px solid #ddd; padding: 6px;">${cell.trim()}</td>`;
+            }
+        });
+        htmlTable += '</tr>';
+    });
+
+    htmlTable += '</tbody></table>';
+
+    // Renderizar en pantalla
+    document.getElementById('kardex-excel-table-container').innerHTML = htmlTable;
+    document.getElementById('paste-excel-input').value = '';
+
+    // Guardar automáticamente en Supabase para la máquina actual
+    guardarKardexEnSupabase(rawData);
+}
+
+// Guardar los datos de la tabla pegada vinculados al ID de la máquina
+async function guardarKardexEnSupabase(rawTextData) {
+    if (!currentMachineId) return;
+
+    const { error } = await supabaseClient
+        .from('machines')
+        .update({ kardex_raw: rawTextData })
+        .eq('id', currentMachineId);
+
+    if (error) {
+        console.error("Error al guardar el Kárdex:", error);
+        alert("Hubo un error al guardar en la nube.");
+    } else {
+        alert("¡Tabla de Kárdex guardada correctamente para esta máquina!");
+    }
+}
+
+// Cargar y mostrar la tabla de Kárdex al abrir la vista
+async function cargarKardexMaquina(machineId) {
+    const container = document.getElementById('kardex-excel-table-container');
+    
+    // Mostrar/ocultar zona de pegado según el rol
+    const pasteZone = document.getElementById('admin-kardex-paste-zone');
+    if (pasteZone) {
+        pasteZone.style.display = (currentRole === 'admin') ? 'block' : 'none';
+    }
+
+    const { data, error } = await supabaseClient
+        .from('machines')
+        .select('kardex_raw')
+        .eq('id', machineId)
+        .single();
+
+    if (error || !data || !data.kardex_raw) {
+        container.innerHTML = '<p style="font-size: 12px; color: #888; text-align: center; margin: 20px 0;">No hay información de Kárdex disponible para esta máquina.</p>';
+        return;
+    }
+
+    // Convertir el texto guardado a la tabla HTML
+    const rows = data.kardex_raw.trim().split('\n');
+    let htmlTable = '<table class="repuestos-table" style="width:100%; border-collapse: collapse; font-size: 11px; text-align: left;"><tbody>';
+
+    rows.forEach((row, rowIndex) => {
+        const cells = row.split('\t');
+        htmlTable += '<tr>';
+        cells.forEach(cell => {
+            if (rowIndex === 0) {
+                htmlTable += `<th style="border: 1px solid #ddd; padding: 6px; background-color: #2b2d42; color: #fff; font-weight: bold;">${cell.trim()}</th>`;
+            } else {
+                htmlTable += `<td style="border: 1px solid #ddd; padding: 6px;">${cell.trim()}</td>`;
+            }
+        });
+        htmlTable += '</tr>';
+    });
+
+    htmlTable += '</tbody></table>';
+    container.innerHTML = htmlTable;
+}
 // Exponer funciones globalmente
 window.addNewMachine = addNewMachine;
 window.subirManualPieza3D = subirManualPieza3D;
 window.eliminarManualPieza = eliminarManualPieza;
 window.subirManualPdf = subirManualPdf;
+window.addMotorBlock = addMotorBlock;
+window.removeMotorBlock = removeMotorBlock;
+window.updateMotor = updateMotor;
+window.addKardexRow = addKardexRow;
+window.removeKardexRow = removeKardexRow;
+window.updateRepuesto = updateRepuesto;
