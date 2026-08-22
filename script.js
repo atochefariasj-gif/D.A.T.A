@@ -1043,11 +1043,26 @@ async function detectarToque(x, y) {
     mouse.y = -((y - rect.top) / rect.height) * 2 + 1;
     raycaster.setFromCamera(mouse, camera);
 
-    let listaAExplorar = (modoMedicionActivo && piezaEnMedicion) ? [piezaEnMedicion] : piezasDetectadas;
+    // Incluimos todos los objetos del grupo máquina (piezas y pines de notas)
+    let todosLosObjetos = [];
+    grupoMaquina.traverse(child => {
+        if (child.isMesh) todosLosObjetos.push(child);
+    });
+
+    let listaAExplorar = (modoMedicionActivo && piezaEnMedicion) ? [piezaEnMedicion] : todosLosObjetos;
     const intersects = raycaster.intersectObjects(listaAExplorar, true);
     
     if (intersects.length > 0) {
         let interseccion = intersects[0];
+        let objetoSeleccionado = interseccion.object;
+
+        // NUEVO: Si lo que tocamos es una Nota 3D, mostramos su contenido en una alerta
+        if (objetoSeleccionado.userData && objetoSeleccionado.userData.esNota) {
+            let datos = objetoSeleccionado.userData;
+            alert(`📌 Nota 3D para el turno:\n\n"${datos.mensaje}"\n\n✍️ Escrito por: ${datos.autor}`);
+            return; // Detenemos para que no abra el panel de la pieza
+        }
+
         let puntoInterseccion = interseccion.point; 
 
         if (window.modoNotaActivo) {
@@ -1055,21 +1070,20 @@ async function detectarToque(x, y) {
             let mensajeNota = prompt("Escribe tu nota para el siguiente turno:");
             if (mensajeNota) {
                 let autorNota = prompt("Tu nombre o turno:") || "Anónimo";
-                await guardarNota3D(interseccion.object.name, puntoInterseccion, mensajeNota, autorNota);
+                await guardarNota3D(objetoSeleccionado.name, puntoInterseccion, mensajeNota, autorNota);
             }
             return;
         }
 
         if (modoMedicionActivo) {
             if (!piezaEnMedicion) {
-                aislarPiezaParaMedir(interseccion.object);
+                aislarPiezaParaMedir(objetoSeleccionado);
             } else {
-                manejarPuntoMedicionPreciso(puntoInterseccion, interseccion.object);
+                manejarPuntoMedicionPreciso(puntoInterseccion, objetoSeleccionado);
             }
             return;
         }
 
-        let objetoSeleccionado = interseccion.object;
         let nombrePieza = objetoSeleccionado.name;
         
         if (modoConfiguracionAdmin) {
@@ -1476,10 +1490,19 @@ function calcularSnappingInteligente(puntoGlobal, mesh, tolerancia) {
             let distArista = distanciaPuntoSegmento(localPoint, vA, vB, tempPuntoArista);
             if (distArista < minDist) {
                 minDist = distArista;
-                mejorPontoLocal.copy(tempPuntoArista);
+                mejorPuntoLocal.copy(tempPuntoArista);
             }
         }
     }
+
+    if (minDist <= tolerancia) {
+        let mejorPuntoGlobal = mejorPuntoLocal.clone();
+        mesh.localToWorld(mejorPuntoGlobal);
+        return { punto: mejorPuntoGlobal, esCercanoACilindro: false };
+    }
+
+    return { punto: puntoGlobal, esCercanoACilindro: true };
+}
 
     if (minDist <= tolerancia) {
         let mejorPuntoGlobal = mejorPuntoLocal.clone();
