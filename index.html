@@ -173,9 +173,11 @@
         <div id="view-visual3d" class="view-section" style="width: 100%;">
             <div style="display: flex; flex-direction: column; height: 480px; width: 100%; background: #111827; border-radius: 12px; overflow: hidden; text-align: left; position: relative;" id="visual3d-wrapper-box">
                 
+              <!-- Contenedor principal adaptable: Columna en móvil, Fila en tablet/PC -->
               <div class="flex flex-col md:flex-row w-full h-full relative">
                     
-                 <div class="w-full md:w-2/5 h-auto max-h-[50vh] md:h-full bg-gray-800 p-3 flex flex-col justify-between border-r border-gray-700 z-10 text-gray-100 overflow-y-auto">
+                 <!-- Panel Lateral Izquierdo: Altura reducida en móvil para no tapar el 3D, altura completa en tablets/PC -->
+                 <div class="w-full md:w-2/5 h-[40vh] md:h-full bg-gray-800 p-3 flex flex-col justify-between border-b md:border-b-0 md:border-r border-gray-700 z-10 text-gray-100 overflow-y-auto">
                         <div class="flex flex-col flex-shrink-0">
                         
 <div class="flex flex-wrap gap-2 my-2">
@@ -245,7 +247,8 @@
                         </div>
                     </div>
 
-                    <div class="w-3/5 h-full relative flex-1 bg-gray-900" id="canvas-3d">
+                    <!-- Lienzo 3D: Ocupa el resto de espacio disponible (flex-1) con fondo oscuro -->
+                    <div class="w-full md:w-3/5 flex-1 relative bg-gray-900 min-h-[50vh] md:min-h-full" id="canvas-3d">
                         <div id="indicador-equipo" class="absolute top-3 left-3 bg-gray-900/80 border border-gray-700 px-2.5 py-1 rounded-md text-[10px] font-medium text-blue-400 pointer-events-none z-10">
                             📍 Vista: Iniciando...
                         </div>
