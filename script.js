@@ -138,7 +138,7 @@ async function openOption(opt) {
     } else if (opt === 'Instrucciones') {
         document.getElementById('view-instructions').classList.add('active-view', 'fullscreen-mode');
         loadInstructionsData();
-    } else if (opt === 'Manuales') {
+    } else if (opt === 'Manuals') {
         document.getElementById('view-manuals').classList.add('active-view', 'fullscreen-mode');
         loadManualsData();
     } else if (opt === 'Visual3D') {
@@ -147,8 +147,8 @@ async function openOption(opt) {
         
         const innerBox = document.getElementById('visual3d-wrapper-box');
         if(innerBox) {
-            // Ajuste responsivo para celulares y escritorio
-            innerBox.style.height = window.innerWidth < 768 ? '50vh' : 'calc(100vh - 65px)';
+            // Ajuste responsivo automático: 70vh para celulares y calc(100vh - 65px) para tablets/PC
+            innerBox.style.height = window.innerWidth < 768 ? '70vh' : 'calc(100vh - 65px)';
         }
 
         const contenedorImportar = document.getElementById('contenedor-importar-3d');
@@ -172,7 +172,7 @@ async function openOption(opt) {
             // Rol VISITANTE: Ocultar importación, reportes admin, paso a paso y medición
             if (contenedorImportar) contenedorImportar.style.display = 'none';
             if (contenedorAdminBtn) contenedorAdminBtn.style.display = 'none';
-            if (btnDesensamblaje) btnDesensamblaje.style.display = 'none'; // <- Oculta la guía paso a paso
+            if (btnDesensamblaje) btnDesensamblaje.style.display = 'none';
             if (btnMedicion) btnMedicion.style.display = 'none';
         }
 
