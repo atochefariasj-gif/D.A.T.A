@@ -453,6 +453,7 @@ async function init3D() {
 
     const inputBuscador = document.querySelector('input[placeholder*="Buscar"]');
     if (inputBuscador) {
+      inputBuscador.value = "";
         inputBuscador.addEventListener('input', (e) => {
             const textoFiltro = e.target.value.toLowerCase();
             const lista = document.getElementById('lista-partes');
