@@ -1534,17 +1534,30 @@ function limpiarMedicion() {
 // ==========================================
 // 1. REALIDAD AUMENTADA (AR / WebXR)
 // ==========================================
-function iniciarRealidadAumentada() {
+async function iniciarRealidadAumentada() {
     if ('xr' in navigator) {
-        navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+        try {
+            const supported = await navigator.xr.isSessionSupported('immersive-ar');
             if (supported) {
-                alert("Iniciando modo AR. Apunte la cámara hacia una superficie plana en planta.");
+                // Iniciamos la sesión de Realidad Aumentada directamente
+                const session = await navigator.xr.requestSession('immersive-ar', {
+                    requiredFeatures: ['hit-test', 'local-floor']
+                });
+                
+                renderer.xr.enabled = true;
+                await renderer.xr.setSession(session);
+
+                session.addEventListener('end', () => {
+                    renderer.xr.enabled = false;
+                });
             } else {
+                // Si no soporta XR inmersivo, usamos el fallback
                 fallbackAR_Movil();
             }
-        }).catch(() => {
+        } catch (error) {
+            console.error("Error al iniciar WebXR:", error);
             fallbackAR_Movil();
-        });
+        }
     } else {
         fallbackAR_Movil();
     }
