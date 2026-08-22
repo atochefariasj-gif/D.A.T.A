@@ -1572,16 +1572,19 @@ async function fallbackAR_Movil() {
 
     if (data && data.modelo_url) {
         let urlModelo = data.modelo_url;
-        
-        // Detectar si es Android para abrir con Google Scene Viewer de forma nativa
         let esAndroid = /android/i.test(navigator.userAgent);
         
         if (esAndroid) {
-            // Esto abre la cámara y proyecta el 3D en el piso de manera nativa en Android
-            let intentUrl = `intent://arvr.google.com/scene-viewer/1.0?file=${encodeURIComponent(urlModelo)}&mode=ar_only#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;end;`;
-            window.location.href = intentUrl;
+            // Usamos 'ar_preferred' para garantizar que aparezca el botón de alternar a RA
+            let intentUrl = `intent://arvr.google.com/scene-viewer/1.0?file=${encodeURIComponent(urlModelo)}&mode=ar_preferred#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;end;`;
+            
+            // Creamos un elemento <a> invisible para simular el toque del usuario de forma nativa
+            let enlace = document.createElement('a');
+            enlace.href = intentUrl;
+            document.body.appendChild(enlace);
+            enlace.click();
+            document.body.removeChild(enlace);
         } else {
-            // Para otros dispositivos o PC, abre la URL o descarga
             window.open(urlModelo, '_blank');
         }
     } else {
@@ -1759,7 +1762,14 @@ async function subirManualPdf() {
         if (typeof loadManualsData === 'function') loadManualsData();
     }
 }
-
+function manejarIncompatibilidadAR() {
+    // En lugar de alertar con un error, abrimos un panel de ayuda o la vista detallada
+    let usarModeloWeb = confirm("Tu dispositivo no soporta Realidad Aumentada en vivo. ¿Deseas explorar la máquina en el visor 3D interactivo en pantalla?");
+    if (usarModeloWeb) {
+        // Cierra cualquier intento de AR y regresa al canvas 3D normal
+        renderer.xr.enabled = false;
+    }
+}
 // Exponer funciones nuevas globalmente para los eventos en el DOM HTML
 window.subirManualPieza3D = subirManualPieza3D;
 window.eliminarManualPieza = eliminarManualPieza;
