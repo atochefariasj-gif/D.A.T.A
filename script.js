@@ -583,7 +583,7 @@ child.name = nombreVisual;
                 else if (Array.isArray(child.material) && child.material[0]?.color) colorOriginal = child.material[0].color.getHex();
             }
 
-            let tieneReporte = reportes[child.name] && reportes[child.name].estado === 'mantenimiento';
+            let tieneReporte = reportesCargados[child.name] && reportesCargados[child.name].estado === 'mantenimiento';
 
             child.userData = { posOrig, posExp, colorBase: colorOriginal };
 
@@ -618,17 +618,17 @@ async function seleccionarComponente(nombrePieza) {
     const panel = document.getElementById('panel-info');
     const piezaEncontrada = piezasDetectadas.find(p => p.name === nombrePieza);
 
-    // Lógica de deselección
+    // Si clicamos la misma pieza que ya estaba seleccionada, la deseleccionamos
     if (piezaSeleccionadaActual === nombrePieza) {
         panel.classList.add('hidden');
         piezaSeleccionadaActual = null;
 
+        // Restauramos todas las piezas a su estado normal (rojo si tienen reporte, o su color base)
         piezasDetectadas.forEach(p => {
             if (p.material) {
                 p.material.transparent = true;
                 p.material.opacity = 1.0;
                 
-                // Usamos reportesCargados (la variable global) en lugar de consultar a Supabase
                 const tieneReporte = reportesCargados[p.name] && reportesCargados[p.name].estado === 'mantenimiento';
                 p.material.color.setHex(tieneReporte ? 0xef4444 : p.userData.colorBase);
             }
@@ -636,32 +636,35 @@ async function seleccionarComponente(nombrePieza) {
         return;
     }
 
-    // Lógica de selección
+    // Si seleccionamos una pieza nueva
     if (piezaEncontrada) {
         piezaSeleccionadaActual = nombrePieza;
         panel.classList.remove('hidden');
         document.getElementById('info-titulo').innerText = nombrePieza;
 
+        // AQUÍ ESTÁ LA CLAVE: Recorremos todas las piezas
         piezasDetectadas.forEach(p => {
             if (p.material) {
                 p.material.transparent = true;
                 if (p.name === nombrePieza) {
-                    p.material.color.setHex(0xfacc15);
+                    p.material.color.setHex(0xfacc15); // La seleccionada se pone AMARILLA
                     p.material.opacity = 1.0;
                 } else {
+                    // A las demás les bajamos la opacidad y les devolvemos SU color correcto (rojo o base)
                     p.material.opacity = 0.15;
+                    const tieneReporte = reportesCargados[p.name] && reportesCargados[p.name].estado === 'mantenimiento';
+                    p.material.color.setHex(tieneReporte ? 0xef4444 : p.userData.colorBase);
                 }
             }
         });
 
-        // Zoom y carga de info (esta parte sí puede ser asíncrona porque es info del reporte)
+        // Zoom y carga de información de la pieza seleccionada
         const boxPieza = new THREE.Box3().setFromObject(piezaEncontrada);
         const centroPieza = boxPieza.getCenter(new THREE.Vector3());
         targetControlsTarget = centroPieza.clone();
-        const offset = camera.position.clone().sub(controls.target).normalize().multiplyScalar(3.5);
+        const offset = camera.position.clone().sub(controls.target).normalize().multiplyScalar(1);
         targetCameraPos = centroPieza.clone().add(offset);
 
-        // Usamos la variable global
         let repInfo = reportesCargados[nombrePieza];
 
         const lblEstado = document.getElementById('info-estado');
@@ -680,8 +683,7 @@ async function seleccionarComponente(nombrePieza) {
             lblEstado.className = "text-green-400 font-bold";
             boxMotivo.classList.add('hidden');
         }
-        
-        // Botones de acción (Admin/Mant)
+
         if (currentRole === 'mantenimiento' || currentRole === 'admin') {
             if (!repInfo || repInfo.estado !== 'mantenimiento') {
                 contenedorAcciones.innerHTML = `<button onclick="abrirModalMotivoReporte('${nombrePieza}')" class="w-full py-1.5 bg-red-600 hover:bg-red-500 rounded text-white font-bold text-[11px]">⚠️ Requiere Mantenimiento</button>`;
