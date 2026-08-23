@@ -2046,10 +2046,8 @@ function renderizarTablaKardex(rawTextData) {
     htmlTable += '</tbody></table></div>';
     container.innerHTML = htmlTable;
 }
-// Configuramos el worker de PDF.js (puedes poner esto al inicio de tu archivo o junto con la función)
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-// Reemplaza tu función vieja de Excel por esta nueva función para PDF:
 document.getElementById('loadPdfBtn').addEventListener('click', async () => {
     const fileInput = document.getElementById('pdfFile');
     const pageInput = document.getElementById('pageNumber');
@@ -2089,22 +2087,29 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
         const context = canvas.getContext('2d');
         canvas.height = viewport.height;
         canvas.width = viewport.width;
-        canvas.style.maxWidth = '100%';
-        canvas.style.height = 'auto';
-        canvas.style.display = 'block';
-        canvas.style.margin = '0 auto';
-        canvas.style.border = '1px solid #ccc';
-        canvas.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
 
-        const renderContext = {
-            canvasContext: context,
-            viewport: viewport
-        };
+        await page.render({ canvasContext: context, viewport: viewport }).promise;
 
-        await page.render(renderContext).promise;
+        // Convertimos la página del PDF a una imagen en Base64 para guardarla fácilmente
+        const imageDataUrl = canvas.toDataURL('image/png');
 
-        container.innerHTML = '';
-        container.appendChild(canvas);
+        // Creamos la estructura visual con la imagen lista para mostrar
+        container.innerHTML = `<div style="width:100%; overflow:auto; text-align:center;"><img src="${imageDataUrl}" style="max-width:100%; height:auto; border:1px solid #ccc; box-shadow:0 4px 6px rgba(0,0,0,0.1);" /></div>`;
+
+        // 🔑 GUARDAR EN SUPABASE PARA QUE SE VEA EN OTRAS MÁQUINAS E INTERFACES
+        if (typeof currentMachineId !== 'undefined' && currentMachineId) {
+            const { error } = await dbSupabase
+                .from('maquinas')
+                .update({ kardex_raw: `<img src="${imageDataUrl}" style="max-width:100%; height:auto;" />` })
+                .eq('id', currentMachineId);
+
+            if (error) {
+                console.error('Error al guardar en la nube:', error);
+                alert('Hubo un error al guardar el Kárdex en la nube.');
+            } else {
+                alert('¡Kárdex en PDF cargado y guardado correctamente en la nube!');
+            }
+        }
 
     } catch (error) {
         console.error('Error al procesar el PDF:', error);
@@ -2112,7 +2117,6 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
         container.innerHTML = '';
     }
 });
-
 // Cargar la hoja guardada al abrir la máquina
 async function cargarKardexMaquina(machineId) {
     const pasteZone = document.getElementById('admin-kardex-paste-zone');
