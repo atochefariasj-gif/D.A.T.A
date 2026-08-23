@@ -2046,78 +2046,72 @@ function renderizarTablaKardex(rawTextData) {
     htmlTable += '</tbody></table></div>';
     container.innerHTML = htmlTable;
 }
-async function procesarUnaSolaHojaExcel() {
-    const fileInput = document.getElementById('excel-file-input');
-    const sheetNameInput = document.getElementById('excel-sheet-name-input');
-    
-    if (!fileInput.files || fileInput.files.length === 0) {
-        alert("Por favor selecciona un archivo de Excel.");
+// Configuramos el worker de PDF.js (puedes poner esto al inicio de tu archivo o junto con la función)
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+// Reemplaza tu función vieja de Excel por esta nueva función para PDF:
+document.getElementById('loadPdfBtn').addEventListener('click', async () => {
+    const fileInput = document.getElementById('pdfFile');
+    const pageInput = document.getElementById('pageNumber');
+    const container = document.getElementById('kardex-excel-table-container');
+
+    if (fileInput.files.length === 0) {
+        alert('Por favor selecciona un archivo PDF primero.');
         return;
     }
 
-    const targetSheetName = sheetNameInput.value.trim();
-    if (!targetSheetName) {
-        alert("Por favor escribe el nombre de la hoja que deseas extraer (ej. ZARANDA).");
+    const targetPageNum = parseInt(pageInput.value);
+    if (!targetPageNum || targetPageNum < 1) {
+        alert('Por favor ingresa un número de página válido.');
         return;
     }
 
-    const file = fileInput.files[0];
-    const reader = new FileReader();
+    container.innerHTML = '<p style="text-align:center; padding:20px;">Cargando página del PDF...</p>';
 
-    reader.onload = async function (e) {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
+    try {
+        const file = fileInput.files[0];
+        const arrayBuffer = await file.arrayBuffer();
+        
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+        const pdfDoc = await loadingTask.promise;
 
-        // Validar si la hoja existe en el archivo
-        if (!workbook.Sheets[targetSheetName]) {
-            alert(`No se encontró ninguna hoja con el nombre "${targetSheetName}". Hojas disponibles: ${workbook.SheetNames.join(', ')}`);
+        if (targetPageNum > pdfDoc.numPages) {
+            alert(`El PDF solo tiene ${pdfDoc.numPages} páginas en total.`);
+            container.innerHTML = '';
             return;
         }
 
-        // Extraer únicamente la hoja seleccionada
-const worksheet = workbook.Sheets[targetSheetName];
-        const htmlTableRaw = XLSX.utils.sheet_to_html(worksheet, { header: "" });
-        
-        // 1. Damos formato general a la tabla
-        let styledHtml = htmlTableRaw.replace(
-            '<table', 
-            '<table style="width:100%; border-collapse: collapse; font-size: 10px; font-family: Arial, sans-serif; background: #fff;"'
-        );
+        const page = await pdfDoc.getPage(targetPageNum);
+        const scale = 1.5;
+        const viewport = page.getViewport({ scale: scale });
 
-        // 2. Reemplazamos cualquier rastro de #VALUE! o la primera celda por el logo limpio
-        styledHtml = styledHtml
-            .replace(/#VALOR!/gi, '')
-            .replace(/#VALUE!/gi, '')
-            .replace(/<td[^>]*>\s*<\/td>/, '<td rowspan="3" colspan="3" style="border: 1px solid #000; text-align: center; vertical-align: middle; background: #fff;"><img src="logo.png" alt="Logo Agromar" style="max-height: 40px; width: auto;" /></td>');
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        canvas.style.maxWidth = '100%';
+        canvas.style.height = 'auto';
+        canvas.style.display = 'block';
+        canvas.style.margin = '0 auto';
+        canvas.style.border = '1px solid #ccc';
+        canvas.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
 
-        // Si la celda con el error tiene texto adentro, aseguramos el reemplazo directo de la primera celda:
-        if (styledHtml.includes('#VALUE!') || styledHtml.includes('#VALOR!')) {
-            styledHtml = styledHtml.replace(/<td[^>]*>[\s\S]*?<\/td>/, '<td rowspan="3" colspan="3" style="border: 1px solid #000; text-align: center; vertical-align: middle; background: #fff;"><img src="logo.png" alt="Logo Agromar" style="max-height: 40px; width: auto;" /></td>');
-        }
-        // Mostrar en pantalla
-        const container = document.getElementById('kardex-excel-table-container');
-        if (container) {
-            container.innerHTML = `<div style="overflow-x: auto; width: 100%;"><p style="font-weight: bold; font-size: 11px; margin-bottom: 5px; color: #2b2d42;">Hoja: ${targetSheetName}</p>${styledHtml}</div>`;
-        }
+        const renderContext = {
+            canvasContext: context,
+            viewport: viewport
+        };
 
-        // Guardar solo esta hoja HTML directamente en Supabase
-        if (currentMachineId) {
-            const { error } = await dbSupabase
-                .from('maquinas') // O 'maquinas' según tu tabla
-                .update({ kardex_raw: styledHtml })
-                .eq('id', currentMachineId);
+        await page.render(renderContext).promise;
 
-            if (error) {
-                console.error("Error al guardar en Supabase:", error);
-                alert("Hubo un error al guardar en la nube.");
-            } else {
-                alert(`¡La hoja "${targetSheetName}" se cargó y guardó correctamente!`);
-            }
-        }
-    };
+        container.innerHTML = '';
+        container.appendChild(canvas);
 
-    reader.readAsArrayBuffer(file);
-}
+    } catch (error) {
+        console.error('Error al procesar el PDF:', error);
+        alert('Ocurrió un error al leer el archivo PDF.');
+        container.innerHTML = '';
+    }
+});
 
 // Cargar la hoja guardada al abrir la máquina
 async function cargarKardexMaquina(machineId) {
