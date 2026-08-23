@@ -2077,24 +2077,6 @@ function renderizarTablaKardex(rawTextData) {
 
     htmlTable += '</tbody></table>';
     container.innerHTML = htmlTable;
-}
-// 3. Cargar Kárdex al abrir la sección
-async function cargarKardexMaquina(machineId) {
-    const pasteZone = document.getElementById('admin-kardex-paste-zone');
-    if (pasteZone) {
-        pasteZone.style.display = (currentRole === 'admin') ? 'block' : 'none';
-    }
-
-    const { data, error } = await dbSupabase
-        .from('machines')
-        .select('kardex_raw')
-        .eq('id', machineId)
-        .single();
-
-    if (error || !data) {
-        renderizarTablaKardex('');
-        return;
-    }
 
     renderizarTablaKardex(data.kardex_raw);
 }
