@@ -1958,7 +1958,7 @@ function guardarKardexEnNube() {
     };
 
     // Guardar en Supabase o localForage asociado a la máquina
-    supabaseClient
+    dbSupabase
         .from('kardex_details')
         .upsert([kardexData], { onConflict: ['machine_id'] })
         .then(({ error }) => {
@@ -1994,7 +1994,7 @@ async function procesarTextoExcel() {
 async function guardarKardexEnSupabase(rawTextData) {
     if (!currentMachineId) return;
 
-    const { error } = await supabaseClient
+    const { error } = await dbSupabase
         .from('maquina')
         .update({ kardex_raw: rawTextData })
         .eq('id', currentMachineId);
@@ -2017,7 +2017,7 @@ async function cargarKardexMaquina(machineId) {
         pasteZone.style.display = (currentRole === 'admin') ? 'block' : 'none';
     }
 
-    const { data, error } = await supabaseClient
+    const { data, error } = await dbSupabase
         .from('maquinas')
         .select('kardex_raw')
         .eq('id', machineId)
