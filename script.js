@@ -2078,17 +2078,22 @@ async function procesarUnaSolaHojaExcel() {
 const worksheet = workbook.Sheets[targetSheetName];
         const htmlTableRaw = XLSX.utils.sheet_to_html(worksheet, { header: "" });
         
-        // 1. Limpiamos y damos formato general a la tabla
+        // 1. Damos formato general a la tabla
         let styledHtml = htmlTableRaw.replace(
             '<table', 
             '<table style="width:100%; border-collapse: collapse; font-size: 10px; font-family: Arial, sans-serif; background: #fff;"'
         );
 
-        // 2. Reemplazamos de forma segura la primera celda con el logo de Agromar
-        styledHtml = styledHtml.replace(
-            /<td>[\s\S]*?<\/td>/, 
-            '<td rowspan="3" colspan="3" style="border: 1px solid #000; text-align: center; vertical-align: middle; background: #fff;"><img src="logo.png" alt="Logo Agromar" style="max-height: 40px; width: auto;" /></td>'
-        );
+        // 2. Reemplazamos cualquier rastro de #VALUE! o la primera celda por el logo limpio
+        styledHtml = styledHtml
+            .replace(/#VALOR!/gi, '')
+            .replace(/#VALUE!/gi, '')
+            .replace(/<td[^>]*>\s*<\/td>/, '<td rowspan="3" colspan="3" style="border: 1px solid #000; text-align: center; vertical-align: middle; background: #fff;"><img src="logo.png" alt="Logo Agromar" style="max-height: 40px; width: auto;" /></td>');
+
+        // Si la celda con el error tiene texto adentro, aseguramos el reemplazo directo de la primera celda:
+        if (styledHtml.includes('#VALUE!') || styledHtml.includes('#VALOR!')) {
+            styledHtml = styledHtml.replace(/<td[^>]*>[\s\S]*?<\/td>/, '<td rowspan="3" colspan="3" style="border: 1px solid #000; text-align: center; vertical-align: middle; background: #fff;"><img src="logo.png" alt="Logo Agromar" style="max-height: 40px; width: auto;" /></td>');
+        }
         // Mostrar en pantalla
         const container = document.getElementById('kardex-excel-table-container');
         if (container) {
