@@ -2060,27 +2060,31 @@ function renderizarTablaKardex(rawTextData) {
     }
 
     const rows = rawTextData.trim().split('\n');
-    let htmlTable = '<table class="repuestos-table" style="width:100%; border-collapse: collapse; font-size: 10px; text-align: left; background: #fff;"><tbody>';
+    
+    // Contenedor con scroll horizontal para mantener la estructura sin deformarse
+    let htmlTable = '<div style="overflow-x: auto; width: 100%;"><table style="width:100%; border-collapse: collapse; font-size: 10px; font-family: Arial, sans-serif; text-align: left; background: #fff;"><tbody>';
 
     rows.forEach((row, rowIndex) => {
         const cells = row.split('\t');
-        htmlTable += '<tr style="height: 22px;">';
-        
+        htmlTable += '<tr style="height: 24px;">';
+
         cells.forEach((cell, cellIndex) => {
             const cellValue = cell ? cell.trim() : '';
-            // Si es la cabecera principal o una fila de título
+            
+            // Estilo diferente para la primera fila (cabecera principal)
             if (rowIndex === 0) {
-                htmlTable += `<th style="border: 1px solid #ccc; padding: 4px; background-color: #2b2d42; color: #fff; font-weight: bold;">${cellValue}</th>`;
+                htmlTable += `<th style="border: 1px solid #b0b0b0; padding: 5px 8px; background-color: #2b2d42; color: #fff; font-weight: bold; white-space: nowrap;">${cellValue}</th>`;
             } else {
-                // Celdas normales manteniendo el borde exacto de Excel
-                htmlTable += `<td style="border: 1px solid #d3d3d3; padding: 3px 5px; color: #000; white-space: nowrap;">${cellValue}</td>`;
+                // Filas de datos normales con bordes limpios de Excel
+                let bgStyle = cellValue === "" ? "background-color: #fafafa;" : "background-color: #ffffff;";
+                htmlTable += `<td style="border: 1px solid #d3d3d3; padding: 4px 6px; color: #333; ${bgStyle}">${cellValue}</td>`;
             }
         });
-        
+
         htmlTable += '</tr>';
     });
 
-    htmlTable += '</tbody></table>';
+    htmlTable += '</tbody></table></div>';
     container.innerHTML = htmlTable;
 }
 // Exponer funciones globalmente
