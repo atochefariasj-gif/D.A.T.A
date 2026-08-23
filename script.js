@@ -84,7 +84,7 @@ async function renderMachines() {
         .eq('linea', currentLine); // <--- FILTRO INDIVIDUAL POR LÍNEA
 
     if (error) {
-        console.error("Error al cargar las máquinas:", error);
+        console.error("Error al cargar las maquinas:", error);
         return;
     }
 
@@ -1978,7 +1978,7 @@ async function procesarTextoExcel() {
 
     if (currentMachineId) {
         const { error } = await dbSupabase
-            .from('máquinas')
+            .from('maquinas')
             .update({ kardex_raw: rawData })
             .eq('id', currentMachineId);
 
