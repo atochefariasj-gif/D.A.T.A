@@ -590,10 +590,12 @@ h1 {
 #kardex-excel-table-container td:contains("F.EMISION") {
     font-weight: bold !important;
 }
+/* Estilo seguro para el logo dentro de la tabla */
+#kardex-excel-table-container td[rowspan] img,
 #kardex-excel-table-container img {
-    max-width: 140px !important;
-    max-height: 45px !important;
-    width: 100% !important;
+    max-width: 130px !important;
+    max-height: 40px !important;
+    width: auto !important;
     height: auto !important;
     display: block !important;
     margin: 0 auto !important;
