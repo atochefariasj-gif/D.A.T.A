@@ -94,7 +94,11 @@ async function rendermaquinas() {
     }
 
     let container = document.getElementById('maquinas-grid-container');
+if (container) {
     container.innerHTML = "";
+} else {
+    return; // Si no existe el contenedor en esta vista, salimos de la función de forma segura
+}
 
     maquinas.forEach(maq => { 
         let card = document.createElement('div');
