@@ -88,7 +88,7 @@ async function renderMachines() {
         return;
     }
 
-    let container = document.getElementById('machines-grid-container');
+    let container = document.getElementById('maquinas-grid-container');
     container.innerHTML = "";
 
     maquinas.forEach(maq => { 
@@ -2088,7 +2088,7 @@ async function procesarUnaSolaHojaExcel() {
         // Guardar solo esta hoja HTML directamente en Supabase
         if (currentMachineId) {
             const { error } = await dbSupabase
-                .from('machines') // O 'maquinas' según tu tabla
+                .from('maquinas') // O 'maquinas' según tu tabla
                 .update({ kardex_raw: styledHtml })
                 .eq('id', currentMachineId);
 
