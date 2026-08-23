@@ -2007,47 +2007,6 @@ async function guardarKardexEnSupabase(rawTextData) {
     }
 }
 
-// Cargar y mostrar la tabla de Kárdex al abrir la vista
-async function cargarKardexMaquina(machineId) {
-    const container = document.getElementById('kardex-excel-table-container');
-    
-    // Mostrar/ocultar zona de pegado según el rol
-    const pasteZone = document.getElementById('admin-kardex-paste-zone');
-    if (pasteZone) {
-        pasteZone.style.display = (currentRole === 'admin') ? 'block' : 'none';
-    }
-
-    const { data, error } = await dbSupabase
-        .from('maquinas')
-        .select('kardex_raw')
-        .eq('id', machineId)
-        .single();
-
-    if (error || !data || !data.kardex_raw) {
-        container.innerHTML = '<p style="font-size: 12px; color: #888; text-align: center; margin: 20px 0;">No hay información de Kárdex disponible para esta máquina.</p>';
-        return;
-    }
-
-    // Convertir el texto guardado a la tabla HTML
-    const rows = data.kardex_raw.trim().split('\n');
-    let htmlTable = '<table class="repuestos-table" style="width:100%; border-collapse: collapse; font-size: 11px; text-align: left;"><tbody>';
-
-    rows.forEach((row, rowIndex) => {
-        const cells = row.split('\t');
-        htmlTable += '<tr>';
-        cells.forEach(cell => {
-            if (rowIndex === 0) {
-                htmlTable += `<th style="border: 1px solid #ddd; padding: 6px; background-color: #2b2d42; color: #fff; font-weight: bold;">${cell.trim()}</th>`;
-            } else {
-                htmlTable += `<td style="border: 1px solid #ddd; padding: 6px;">${cell.trim()}</td>`;
-            }
-        });
-        htmlTable += '</tr>';
-    });
-
-    htmlTable += '</tbody></table>';
-    container.innerHTML = htmlTable;
-}
 
 // 2. Renderizar el texto tabulado en una tabla HTML idéntica
 function renderizarTablaKardex(rawTextData) {
@@ -2086,6 +2045,88 @@ function renderizarTablaKardex(rawTextData) {
 
     htmlTable += '</tbody></table></div>';
     container.innerHTML = htmlTable;
+}
+async function procesarUnaSolaHojaExcel() {
+    const fileInput = document.getElementById('excel-file-input');
+    const sheetNameInput = document.getElementById('excel-sheet-name-input');
+    
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert("Por favor selecciona un archivo de Excel.");
+        return;
+    }
+
+    const targetSheetName = sheetNameInput.value.trim();
+    if (!targetSheetName) {
+        alert("Por favor escribe el nombre de la hoja que deseas extraer (ej. ZARANDA).");
+        return;
+    }
+
+    const file = fileInput.files[0];
+    const reader = new FileReader();
+
+    reader.onload = async function (e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+
+        // Validar si la hoja existe en el archivo
+        if (!workbook.Sheets[targetSheetName]) {
+            alert(`No se encontró ninguna hoja con el nombre "${targetSheetName}". Hojas disponibles: ${workbook.SheetNames.join(', ')}`);
+            return;
+        }
+
+        // Extraer únicamente la hoja seleccionada
+        const worksheet = workbook.Sheets[targetSheetName];
+        const htmlTableRaw = XLSX.utils.sheet_to_html(worksheet, { header: "" });
+        const styledHtml = htmlTableRaw.replace('<table', '<table style="width:100%; border-collapse: collapse; font-size: 10px; font-family: Arial, sans-serif; background: #fff;"');
+
+        // Mostrar en pantalla
+        const container = document.getElementById('kardex-excel-table-container');
+        if (container) {
+            container.innerHTML = `<div style="overflow-x: auto; width: 100%;"><p style="font-weight: bold; font-size: 11px; margin-bottom: 5px; color: #2b2d42;">Hoja: ${targetSheetName}</p>${styledHtml}</div>`;
+        }
+
+        // Guardar solo esta hoja HTML directamente en Supabase
+        if (currentMachineId) {
+            const { error } = await dbSupabase
+                .from('machines') // O 'maquinas' según tu tabla
+                .update({ kardex_raw: styledHtml })
+                .eq('id', currentMachineId);
+
+            if (error) {
+                console.error("Error al guardar en Supabase:", error);
+                alert("Hubo un error al guardar en la nube.");
+            } else {
+                alert(`¡La hoja "${targetSheetName}" se cargó y guardó correctamente!`);
+            }
+        }
+    };
+
+    reader.readAsArrayBuffer(file);
+}
+
+// Cargar la hoja guardada al abrir la máquina
+async function cargarKardexMaquina(machineId) {
+    const pasteZone = document.getElementById('admin-kardex-paste-zone');
+    if (pasteZone) {
+        pasteZone.style.display = (currentRole === 'admin') ? 'block' : 'none';
+    }
+
+    const { data, error } = await dbSupabase
+        .from('machines') // O 'maquinas' según tu tabla
+        .select('kardex_raw')
+        .eq('id', machineId)
+        .single();
+
+    const container = document.getElementById('kardex-excel-table-container');
+    if (!container) return;
+
+    if (error || !data || !data.kardex_raw) {
+        container.innerHTML = '<p style="font-size: 12px; color: #888; text-align: center; margin: 20px 0;">No hay información de Kárdex disponible.</p>';
+        return;
+    }
+
+    // Mostrar el HTML de la hoja guardada para esta máquina
+    container.innerHTML = `<div style="overflow-x: auto; width: 100%;">${data.kardex_raw}</div>`;
 }
 // Exponer funciones globalmente
 window.addNewMachine = addNewMachine;
