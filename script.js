@@ -2060,25 +2060,28 @@ function renderizarTablaKardex(rawTextData) {
     }
 
     const rows = rawTextData.trim().split('\n');
-    let htmlTable = '<table class="repuestos-table" style="width:100%; border-collapse: collapse; font-size: 11px; text-align: left;"><tbody>';
+    let htmlTable = '<table class="repuestos-table" style="width:100%; border-collapse: collapse; font-size: 10px; text-align: left; background: #fff;"><tbody>';
 
     rows.forEach((row, rowIndex) => {
         const cells = row.split('\t');
-        htmlTable += '<tr>';
-        cells.forEach(cell => {
+        htmlTable += '<tr style="height: 22px;">';
+        
+        cells.forEach((cell, cellIndex) => {
+            const cellValue = cell ? cell.trim() : '';
+            // Si es la cabecera principal o una fila de título
             if (rowIndex === 0) {
-                htmlTable += `<th style="border: 1px solid #ddd; padding: 6px; background-color: #2b2d42; color: #fff; font-weight: bold;">${cell.trim()}</th>`;
+                htmlTable += `<th style="border: 1px solid #ccc; padding: 4px; background-color: #2b2d42; color: #fff; font-weight: bold;">${cellValue}</th>`;
             } else {
-                htmlTable += `<td style="border: 1px solid #ddd; padding: 6px;">${cell.trim()}</td>`;
+                // Celdas normales manteniendo el borde exacto de Excel
+                htmlTable += `<td style="border: 1px solid #d3d3d3; padding: 3px 5px; color: #000; white-space: nowrap;">${cellValue}</td>`;
             }
         });
+        
         htmlTable += '</tr>';
     });
 
     htmlTable += '</tbody></table>';
     container.innerHTML = htmlTable;
-
-    renderizarTablaKardex(data.kardex_raw);
 }
 // Exponer funciones globalmente
 window.addNewMachine = addNewMachine;
