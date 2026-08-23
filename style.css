@@ -590,3 +590,11 @@ h1 {
 #kardex-excel-table-container td:contains("F.EMISION") {
     font-weight: bold !important;
 }
+#kardex-excel-table-container img {
+    max-width: 140px !important;
+    max-height: 45px !important;
+    width: 100% !important;
+    height: auto !important;
+    display: block !important;
+    margin: 0 auto !important;
+}
