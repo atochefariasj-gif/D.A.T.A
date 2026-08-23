@@ -2078,10 +2078,17 @@ async function procesarUnaSolaHojaExcel() {
 const worksheet = workbook.Sheets[targetSheetName];
         const htmlTableRaw = XLSX.utils.sheet_to_html(worksheet, { header: "" });
         
-        // 🔑 Reemplaza la primera celda de manera segura insertando el logo
-        const styledHtml = htmlTableRaw
-            .replace('<table', '<table style="width:100%; border-collapse: collapse; font-size: 10px; font-family: Arial, sans-serif; background: #fff;"')
-            .replace(/<td>.*?<\/td>/, '<td rowspan="3" colspan="3" style="border: 1px solid #000; text-align: center; vertical-align: middle; background: #fff;"><img src="logo.png" alt="Agromar Industrial" /></td>');
+        // 1. Limpiamos y damos formato general a la tabla
+        let styledHtml = htmlTableRaw.replace(
+            '<table', 
+            '<table style="width:100%; border-collapse: collapse; font-size: 10px; font-family: Arial, sans-serif; background: #fff;"'
+        );
+
+        // 2. Reemplazamos de forma segura la primera celda con el logo de Agromar
+        styledHtml = styledHtml.replace(
+            /<td>[\s\S]*?<\/td>/, 
+            '<td rowspan="3" colspan="3" style="border: 1px solid #000; text-align: center; vertical-align: middle; background: #fff;"><img src="logo.png" alt="Logo Agromar" style="max-height: 40px; width: auto;" /></td>'
+        );
         // Mostrar en pantalla
         const container = document.getElementById('kardex-excel-table-container');
         if (container) {
