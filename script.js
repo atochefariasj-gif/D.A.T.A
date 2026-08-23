@@ -2078,13 +2078,10 @@ async function procesarUnaSolaHojaExcel() {
 const worksheet = workbook.Sheets[targetSheetName];
         const htmlTableRaw = XLSX.utils.sheet_to_html(worksheet, { header: "" });
         
-        // 🔑 Inyectamos la imagen asegurando la ruta y el tamaño correcto
+        // 🔑 Modificamos solo la primera celda absoluta de la tabla para colocar el logo
         const styledHtml = htmlTableRaw
             .replace('<table', '<table style="width:100%; border-collapse: collapse; font-size: 10px; font-family: Arial, sans-serif; background: #fff;"')
-            .replace(
-                '<td>', 
-                '<td style="border: 1px solid #000; text-align: center; vertical-align: middle; padding: 4px;"><img src="img/logo.jpg" alt="Logo" style="max-height: 35px; width: auto; display: block; margin: 0 auto;" /></td>'
-            );
+            .replace(/<tr>\s*<td>.*?<\/td>/s, '<tr><td style="border: 1px solid #000; text-align: center; vertical-align: middle; padding: 4px;"><img src="logo.jpg" alt="Agromar" style="max-height: 35px; width: auto; display: block; margin: 0 auto;" /></td>');
         // Mostrar en pantalla
         const container = document.getElementById('kardex-excel-table-container');
         if (container) {
