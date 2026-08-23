@@ -88,7 +88,7 @@ async function renderMachines() {
         return;
     }
 
-    let container = document.getElementById('maquinas-grid-container');
+    let container = document.getElementById('machines-grid-container');
     container.innerHTML = "";
 
     maquinas.forEach(maq => { 
