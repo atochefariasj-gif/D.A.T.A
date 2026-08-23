@@ -2112,7 +2112,7 @@ async function cargarKardexMaquina(machineId) {
     }
 
     const { data, error } = await dbSupabase
-        .from('machines') // O 'maquinas' según tu tabla
+        .from('maquinas') // O 'maquinas' según tu tabla
         .select('kardex_raw')
         .eq('id', machineId)
         .single();
