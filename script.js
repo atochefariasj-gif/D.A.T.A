@@ -63,14 +63,9 @@ async function selectRole(role) {
 
 async function openLine(lineName, icon) {
     currentLine = lineName;
-    const linesHeader = document.getElementById('lines-header-title');
-    if (linesHeader) linesHeader.innerText = `${icon} ${lineName}`;
-
-    const viewLines = document.getElementById('view-lines');
-    if (viewLines) viewLines.classList.remove('active-view');
-
-    const viewMaquinas = document.getElementById('view-maquinas');
-    if (viewMaquinas) viewMaquinas.classList.add('active-view');
+    document.getElementById('lines-header-title').innerText = `${icon} ${lineName}`;
+    document.getElementById('view-lines').classList.remove('active-view');
+    document.getElementById('view-machines').classList.add('active-view');
     
     let toolbar = document.getElementById('admin-toolbar');
     if (currentRole === 'admin') {
@@ -78,10 +73,10 @@ async function openLine(lineName, icon) {
     } else {
         toolbar.style.display = 'none';
     }
-    rendermaquinas();
+    renderMachines();
 }
 
-async function rendermaquinas() {
+async function renderMachines() {
     // 🔍 Filtramos las máquinas de Supabase según la línea actual
     const { data: maquinas, error } = await dbSupabase
         .from('maquinas')
@@ -93,12 +88,8 @@ async function rendermaquinas() {
         return;
     }
 
-    let container = document.getElementById('maquinas-grid-container');
-if (container) {
+    let container = document.getElementById('machines-grid-container');
     container.innerHTML = "";
-} else {
-    return; // Si no existe el contenedor en esta vista, salimos de la función de forma segura
-}
 
     maquinas.forEach(maq => { 
         let card = document.createElement('div');
@@ -146,7 +137,7 @@ async function addNewMachine() {
         console.error("Error al agregar máquina:", error.message);
         alert("No se pudo agregar la máquina: " + error.message);
     } else {
-        rendermaquinas();
+        renderMachines();
     }
 }
 
@@ -166,7 +157,7 @@ async function updateMachineNameInline(id, nuevoNombre) {
 async function openMachineDetail(id, name) {
     currentMachineId = id;
     document.getElementById('selected-machine-title').innerText = name;
-    document.getElementById('view-maquinas').classList.remove('active-view');
+    document.getElementById('view-machines').classList.remove('active-view');
     document.getElementById('view-machine-detail').classList.add('active-view');
 }
 
@@ -267,8 +258,8 @@ async function goBack(target) {
         document.getElementById('main-menu').classList.add('active-view');
     } else if (target === 'lines') {
         document.getElementById('view-lines').classList.add('active-view');
-    } else if (target === 'maquinas') {
-        document.getElementById('view-maquinas').classList.add('active-view');
+    } else if (target === 'machines') {
+        document.getElementById('view-machines').classList.add('active-view');
     } else if (target === 'detail') {
         document.getElementById('view-machine-detail').classList.add('active-view');
     }
@@ -306,7 +297,7 @@ async function toggleEditMode() {
             btn.innerText = "✏️ Editar Nombres";
         }
     }
-    rendermaquinas();
+    renderMachines();
 }
 
 // ==========================================
@@ -1987,7 +1978,7 @@ async function procesarTextoExcel() {
 
     if (currentMachineId) {
         const { error } = await dbSupabase
-            .from('maquinas')
+            .from('máquinas')
             .update({ kardex_raw: rawData })
             .eq('id', currentMachineId);
 
@@ -2004,7 +1995,7 @@ async function guardarKardexEnSupabase(rawTextData) {
     if (!currentMachineId) return;
 
     const { error } = await supabaseClient
-        .from('maquinas')
+        .from('maquina')
         .update({ kardex_raw: rawTextData })
         .eq('id', currentMachineId);
 
@@ -2057,32 +2048,6 @@ async function cargarKardexMaquina(machineId) {
     htmlTable += '</tbody></table>';
     container.innerHTML = htmlTable;
 }
-// 1. Procesar el texto copiado de Excel y guardarlo
-async function procesarTextoExcel() {
-    const rawData = document.getElementById('paste-excel-input').value;
-    if (!rawData.trim()) {
-        alert("Por favor pega primero las celdas copiadas de Excel.");
-        return;
-    }
-
-    renderizarTablaKardex(rawData);
-    document.getElementById('paste-excel-input').value = '';
-
-    // Guardar automáticamente en Supabase
-    if (currentMachineId) {
-        const { error } = await supabaseClient
-            .from('maquinas')
-            .update({ kardex_raw: rawData })
-            .eq('id', currentMachineId);
-
-        if (error) {
-            console.error("Error al guardar el Kárdex:", error);
-            alert("Hubo un error al guardar en la nube.");
-        } else {
-            alert("¡Tabla de Kárdex guardada correctamente!");
-        }
-    }
-}
 
 // 2. Renderizar el texto tabulado en una tabla HTML idéntica
 function renderizarTablaKardex(rawTextData) {
@@ -2121,7 +2086,7 @@ async function cargarKardexMaquina(machineId) {
     }
 
     const { data, error } = await dbSupabase
-        .from('maquinas')
+        .from('machines')
         .select('kardex_raw')
         .eq('id', machineId)
         .single();
