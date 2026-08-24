@@ -77,11 +77,11 @@ async function openLine(lineName, icon) {
 }
 
 async function renderMachines() {
-    // 🔍 Filtramos las máquinas de Supabase según la línea actual
     const { data: maquinas, error } = await dbSupabase
         .from('maquinas')
         .select('*')
-        .eq('linea', currentLine); // <--- FILTRO INDIVIDUAL POR LÍNEA
+        .eq('linea', currentLine)
+        .order('created_at', { ascending: true }); // Orden estricto por creación
 
     if (error) {
         console.error("Error al cargar las maquinas:", error);
@@ -91,27 +91,60 @@ async function renderMachines() {
     let container = document.getElementById('machines-grid-container');
     container.innerHTML = "";
 
-    maquinas.forEach(maq => { 
+    maquinas.forEach(maquina => {
         let card = document.createElement('div');
         card.className = 'card-item';
 
         if (currentRole === 'admin' && isEditMode) {
-            card.onclick = (e) => e.stopPropagation();
+            // Modo edición de nombres
             card.innerHTML = `
-                <span class="card-icon"></span>
-                <input type="text" class="mach-input" data-id="${maq.id}" value="${maq.nombre || ''}" onchange="updateMachineNameInline('${maq.id}', this.value)">
+                <span class="card-icon">✎</span>
+                <input type="text" class="mach-input" data-id="${maquina.id}" value="${maquina.nombre}" onchange="updateMachineName(this.id, this.value)">
             `;
         } else {
-            card.onclick = () => openMachineDetail(maq.id, maq.nombre);
+            // Modo normal: botón para entrar a los detalles y botón separado para eliminar
+            let deleteBtnHtml = '';
+            if (currentRole === 'admin') {
+                // 🔑 Pasamos el ID numérico SIN comillas extras para que Supabase lo reconozca bien
+                deleteBtnHtml = `
+                    <button onclick="event.stopPropagation(); eliminarMaquinaDirecto(${maquina.id}, '${maquina.nombre}')" style="background: #ff4d4d; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-left: 8px;" title="Eliminar máquina">
+                        🗑️
+                    </button>
+                `;
+            }
+
             card.innerHTML = `
-                <span class="card-icon"></span>
-                <div class="card-title">${maq.nombre || ''}</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                    <button onclick="openArchiveDetail(${maquina.id}, '${maquina.nombre}')" style="flex-grow: 1; text-align: left; background: none; border: none; cursor: pointer; font-size: 13px; font-weight: bold; color: #333; padding: 5px;">
+                        ${maquina.nombre}
+                    </button>
+                    ${deleteBtnHtml}
+                </div>
             `;
         }
         container.appendChild(card);
     });
 }
 
+async function eliminarMaquinaDirecto(idMaquina, nombreMaquina) {
+    const seguro = confirm(`¿Estás seguro de que deseas eliminar la máquina "${nombreMaquina}"?`);
+    
+    if (!seguro) return;
+
+    // Borrado directo en Supabase usando el ID numérico
+    const { error } = await dbSupabase
+        .from('maquinas')
+        .delete()
+        .eq('id', idMaquina);
+
+    if (error) {
+        console.error('Error al eliminar:', error);
+        alert('Hubo un error al intentar eliminar la máquina en la base de datos.');
+    } else {
+        alert('¡Máquina eliminada correctamente!');
+        renderMachines(); // Actualiza la lista y las siguientes suben de puesto automáticamente
+    }
+}
 // ==========================================
 // FUNCIÓN DE AGREGAR MÁQUINA INDIVIDUAL
 // ==========================================
@@ -2051,7 +2084,6 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 document.getElementById('loadPdfBtn').addEventListener('click', async () => {
     const fileInput = document.getElementById('pdfFile');
     const pageInput = document.getElementById('pageNumber');
-    const container = document.getElementById('kardex-excel-table-container');
 
     if (fileInput.files.length === 0) {
         alert('Por favor selecciona un archivo PDF primero.');
@@ -2064,7 +2096,14 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
         return;
     }
 
-    container.innerHTML = '<p style="text-align:center; padding:20px;">Cargando página del PDF...</p>';
+    // Apuntamos exclusivamente al contenedor interno de la tabla
+    const tableContainer = document.getElementById('kardex-excel-table-container');
+    if (!tableContainer) {
+        alert('No se encontró el contenedor de la tabla.');
+        return;
+    }
+
+    tableContainer.innerHTML = '<p style="text-align:center; padding:20px;">Cargando página del PDF...</p>';
 
     try {
         const file = fileInput.files[0];
@@ -2075,7 +2114,7 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
 
         if (targetPageNum > pdfDoc.numPages) {
             alert(`El PDF solo tiene ${pdfDoc.numPages} páginas en total.`);
-            container.innerHTML = '';
+            tableContainer.innerHTML = '<p style="font-size: 12px; color: #888; text-align: center; margin: 20px 0;">No hay información cargada en el Kárdex para esta máquina.</p>';
             return;
         }
 
@@ -2090,13 +2129,17 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
 
         await page.render({ canvasContext: context, viewport: viewport }).promise;
 
-        // Convertimos la página del PDF a una imagen en Base64 para guardarla fácilmente
         const imageDataUrl = canvas.toDataURL('image/png');
 
-        // Creamos la estructura visual con la imagen lista para mostrar
-        container.innerHTML = `<div style="width:100%; overflow:auto; text-align:center;"><img src="${imageDataUrl}" style="max-width:100%; height:auto; border:1px solid #ccc; box-shadow:0 4px 6px rgba(0,0,0,0.1);" /></div>`;
+        // Mostramos la imagen solo en la tabla
+        // Mostramos la imagen controlando su tamaño para que no se expanda de más
+        tableContainer.innerHTML = `
+            <div style="width: 100%; max-height: 500px; overflow: auto; text-align: center; border: 1px solid #ccc; border-radius: 6px; background: #fafafa; padding: 5px;">
+                <img src="${imageDataUrl}" style="max-width: 100%; height: auto; display: block; margin: 0 auto;" />
+            </div>
+        `;
 
-        // 🔑 GUARDAR EN SUPABASE PARA QUE SE VEA EN OTRAS MÁQUINAS E INTERFACES
+        // Guardar en Supabase
         if (typeof currentMachineId !== 'undefined' && currentMachineId) {
             const { error } = await dbSupabase
                 .from('maquinas')
@@ -2114,7 +2157,7 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
     } catch (error) {
         console.error('Error al procesar el PDF:', error);
         alert('Ocurrió un error al leer el archivo PDF.');
-        container.innerHTML = '';
+        tableContainer.innerHTML = '<p style="font-size: 12px; color: #888; text-align: center; margin: 20px 0;">Error al cargar el PDF.</p>';
     }
 });
 // Cargar la hoja guardada al abrir la máquina
