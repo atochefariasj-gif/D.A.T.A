@@ -99,31 +99,33 @@
         </div>
 
    <div id="view-kardex" class="view-section">
-    <h2 style="color: #2b2d42; margin-top: 0; font-size: 16px; margin-bottom: 5px;">📋 Kárdex de Mantenimiento</h2>
-    <p id="kardex-subtitle" style="font-size: 11px; color: #666; margin-bottom: 12px;"></p>
+<div id="kardex-view" class="view-section" style="display: flex; flex-direction: column; height: 100%; max-height: 85vh;">
+    <h2 style="color: #2b2642; margin-top: 0; font-size: 16px; margin-bottom: 5px; flex-shrink: 0;">📋 Kárdex de Mantenimiento</h2>
+    <p id="kardex-subtitle" style="font-size: 12px; color: #666; margin-bottom: 8px; flex-shrink: 0;"></p>
 
-<!-- ZONA PARA SUBIR EL PDF DEL KÁRDEX -->
-<div id="admin-kardex-paste-zone" style="display: none; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border: 2px dashed #00680d; text-align: center;">
-    <label style="font-size: 11px; font-weight: bold; color: #36da; display: block; margin-bottom: 5px;">
-        📁 Sube tu archivo PDF del Kárdex:
-    </label>
-    <input type="file" id="pdfFile" accept="application/pdf" style="font-size: 10px; display: block; margin: 0 auto 8px auto;" />
-    
-    <label for="pageNumber" style="font-size: 10px; color: #333; display: block; margin-bottom: 3px;">Escribe el número de página a extraer (ej: 1):</label>
-    <input type="number" id="pageNumber" min="1" placeholder="Ej. 1" style="font-size: 10px; padding: 4px; width: 180px; margin-bottom: 8px; border: 1px solid #ccc; border-radius: 3px;" />
-    
-    <button id="loadPdfBtn" class="btn btn-admin" style="display: block; margin: 0 auto; padding: 5px 10px; font-size: 10px; background: #2b2642; color: #fff; border: none; border-radius: 3px; cursor: pointer;">Cargar Página del PDF</button>
-</div>
-    <!-- Contenedor donde se dibuja la tabla del Kárdex -->
-    <div class="kardex-sheet-wrapper" style="overflow-x: auto; background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+    <!-- Zona de administrador para subir el PDF (Solo la ve el admin) -->
+    <div id="admin-kardex-paste-zone" style="display: none; margin-bottom: 8px; padding: 8px; background: #f8f9fa; border: 2px dashed #00680d; text-align: center; flex-shrink: 0;">
+        <label style="font-size: 11px; font-weight: bold; color: #36da; display: block; margin-bottom: 4px;">
+            📁 Sube tu archivo PDF del Kárdex:
+        </label>
+        <input type="file" id="pdfFile" accept="application/pdf" style="font-size: 10px; display: block; margin: 0 auto 6px auto;" />
+        
+        <label for="pageNumber" style="font-size: 10px; color: #333; display: block; margin-bottom: 2px;">Escribe el número de página a extraer (ej: 1):</label>
+        <input type="number" id="pageNumber" min="1" placeholder="Ej. 1" style="font-size: 10px; padding: 3px; width: 160px; margin-bottom: 6px; border: 1px solid #ccc; border-radius: 3px;" />
+        
+        <button id="loadPdfBtn" class="btn btn-admin" style="display: block; margin: 0 auto; padding: 4px 8px; font-size: 10px; background: #2b2642; color: #fff; border: none; border-radius: 3px; cursor: pointer;">Cargar Página del PDF</button>
+    </div>
+
+    <!-- Contenedor de la tabla / imagen del Kárdex (CON SCROLL INTERNO PARA QUE NO EMPUJE) -->
+    <div class="kardex-sheet-wrapper" style="flex-grow: 1; overflow-y: auto; overflow-x: auto; background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 10px;">
         <div id="kardex-excel-table-container">
             <p style="font-size: 12px; color: #888; text-align: center; margin: 20px 0;">No hay información cargada en el Kárdex para esta máquina.</p>
         </div>
     </div>
 
-    <button class="back-btn" style="margin-top: 15px;" onclick="salirKardex()">⬅ Volver a Opciones</button>
+    <!-- BOTÓN FIJO ABAJO QUE NUNCA SERÁ EMPUJADO -->
+    <button class="back-btn" style="flex-shrink: 0; width: 100%; padding: 8px; background: #f0f2f5; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; text-align: center; font-weight: bold;" onclick="salirKardex()">⬅ Volver a Opciones</button>
 </div>
-
         <div id="view-instructions" class="view-section">
             <h2 style="color: #2b2d42; margin-top: 0; font-size: 16px; margin-bottom: 5px;">📖 Instrucciones de Uso</h2>
             <p id="inst-subtitle" style="font-size: 11px; color: #666; margin-bottom: 10px;"></p>
