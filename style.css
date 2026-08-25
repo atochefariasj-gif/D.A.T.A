@@ -521,3 +521,7 @@ h1 {
 .active-view { display: block; }
 .back-btn { background: #e9ecef; border: none; color: #495057; font-weight: bold; padding: 10px 20px; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 5px; }
 .back-btn:hover { background-color: #dee2e6; }
+/* Si el body o el contenedor tiene una clase de admin, forzar la visibilidad */
+body.is-admin #admin-kardex-upload {
+    display: block !important;
+}
