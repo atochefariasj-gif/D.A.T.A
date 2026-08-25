@@ -20,11 +20,17 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="style.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- Librería PDF.js para renderizar páginas PDF en canvas / imágenes -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>
+        // Configurar worker de PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    </script>
 </head>
 <body>
 
     <div class="container" id="main-app-container">
+        <!-- MENÚ PRINCIPAL -->
         <div id="main-menu" class="view-section active-view">
             <span class="icon-gear">⚙️</span>
             <h1>D.A.T.A</h1>
@@ -37,6 +43,7 @@
             <button class="btn btn-admin" onclick="solicitarPassword('admin')">🛡️ Administrador</button>
         </div>
 
+        <!-- SECCIÓN LÍNEAS -->
         <div id="view-lines" class="view-section">
             <h2 id="lines-header-title" style="margin-top: 0; font-size: 18px;">Líneas de Proceso</h2>
             <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Selecciona una línea:</p>
@@ -63,11 +70,11 @@
             <button class="back-btn" onclick="goBack('main')">⬅ Volver al Menú</button>
         </div>
 
+        <!-- SECCIÓN MÁQUINAS -->
         <div id="view-machines" class="view-section">
             <h2 id="line-title" style="color: #2b2d42; margin-top: 0; font-size: 16px;">Línea</h2>
             <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Lista de máquinas:</p>
             
-            <!-- 🛠️ Barra de herramientas actualizada para manejar la adición y edición en línea -->
             <div id="admin-toolbar" class="admin-toolbar" style="display:none; gap: 8px; margin-bottom: 10px;">
                 <button class="btn-action" onclick="addNewMachine()">➕ Agregar Máquina</button>
                 <button id="toggle-edit-btn" class="btn-action" onclick="toggleEditMode()">✏️ Editar Nombres</button>
@@ -78,6 +85,7 @@
             <button class="back-btn" onclick="goBack('lines')">⬅ Volver a Líneas</button>
         </div>
 
+        <!-- SECCIÓN DETALLE DE MÁQUINA -->
         <div id="view-machine-detail" class="view-section">
             <h2 id="selected-machine-title" style="color: #00b4d8; margin-top: 0; font-size: 18px;">Máquina</h2>
             <p style="font-size: 12px; color: #666; margin-bottom: 15px;">Selecciona una opción:</p>
@@ -98,47 +106,45 @@
             <button class="back-btn" onclick="goBack('machines')">⬅ Volver a Máquinas</button>
         </div>
 
-   <div id="view-kardex" class="view-section">
-<div id="kardex-view" class="view-section" style="display: flex; flex-direction: column; height: 100%; max-height: 85vh;">
-    <h2 style="color: #2b2642; margin-top: 0; font-size: 16px; margin-bottom: 5px; flex-shrink: 0;">📋 Kárdex de Mantenimiento</h2>
-    <p id="kardex-subtitle" style="font-size: 12px; color: #666; margin-bottom: 8px; flex-shrink: 0;"></p>
+        <!-- SECCIÓN KÁRDEX -->
+        <div id="view-kardex" class="view-section">
+            <h2 style="color: #2b2d42; margin-top: 0; font-size: 14px; margin-bottom: 5px;">📋 Kárdex de Mantenimiento</h2>
+            <p id="kardex-subtitle" style="font-size: 11px; color: #666; margin-bottom: 8px;"></p>
 
-    <!-- Zona de administrador para subir el PDF (Solo la ve el admin) -->
-    <div id="admin-kardex-paste-zone" style="display: none; margin-bottom: 8px; padding: 8px; background: #f8f9fa; border: 2px dashed #00680d; text-align: center; flex-shrink: 0;">
-        <label style="font-size: 11px; font-weight: bold; color: #36da; display: block; margin-bottom: 4px;">
-            📁 Sube tu archivo PDF del Kárdex:
-        </label>
-        <input type="file" id="pdfFile" accept="application/pdf" style="font-size: 10px; display: block; margin: 0 auto 6px auto;" />
-        
-        <label for="pageNumber" style="font-size: 10px; color: #333; display: block; margin-bottom: 2px;">Escribe el número de página a extraer (ej: 1):</label>
-        <input type="number" id="pageNumber" min="1" placeholder="Ej. 1" style="font-size: 10px; padding: 3px; width: 160px; margin-bottom: 6px; border: 1px solid #ccc; border-radius: 3px;" />
-        
-        <button id="loadPdfBtn" class="btn btn-admin" style="display: block; margin: 0 auto; padding: 4px 8px; font-size: 10px; background: #2b2642; color: #fff; border: none; border-radius: 3px; cursor: pointer;">Cargar Página del PDF</button>
-    </div>
-
-    <!-- Contenedor de la tabla / imagen del Kárdex (CON SCROLL INTERNO PARA QUE NO EMPUJE) -->
-    <div class="kardex-sheet-wrapper" style="flex-grow: 1; overflow-y: auto; overflow-x: auto; background: #fff; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 10px;">
-        <div id="kardex-excel-table-container">
-            <p style="font-size: 12px; color: #888; text-align: center; margin: 20px 0;">No hay información cargada en el Kárdex para esta máquina.</p>
-        </div>
-    </div>
-
-    <!-- BOTÓN FIJO ABAJO QUE NUNCA SERÁ EMPUJADO -->
-    <button class="back-btn" style="flex-shrink: 0; width: 100%; padding: 8px; background: #f0f2f5; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; text-align: center; font-weight: bold;" onclick="salirKardex()">⬅ Volver a Opciones</button>
-</div>
-        <div id="view-instructions" class="view-section">
-            <h2 style="color: #2b2d42; margin-top: 0; font-size: 16px; margin-bottom: 5px;">📖 Instrucciones de Uso</h2>
-            <p id="inst-subtitle" style="font-size: 11px; color: #666; margin-bottom: 10px;"></p>
-
-            <div id="admin-img-upload" style="display: none; margin-bottom: 10px; text-align: left; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 1px dashed #f77f00;">
-                <label style="font-size: 11px; font-weight: bold; display: block; margin-bottom: 5px; color: #f77f00;">Subir Instrucciones:</label>
-                <input type="file" id="img-file-input" accept="image/*" multiple style="font-size: 11px; width: 100%;" onchange="uploadInstructionImages(event)">
+            <div id="admin-kardex-upload" style="display: none; margin-bottom: 10px; text-align: left; background: #f8f9fa; padding: 10px; border-radius: 8px; border: 2px dashed #22c55e;">
+                <label style="font-size: 11px; font-weight: bold; display: block; margin-bottom: 5px; color: #15803d;">📄 Subir Kárdex en PDF:</label>
+                <input type="file" id="pdf-kardex-file" accept=".pdf" style="font-size: 11px; width: 100%; margin-bottom: 6px;">
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="number" id="pdf-page-num" min="1" value="1" placeholder="Página" style="width: 70px; padding: 4px; font-size: 11px; border: 1px solid #ccc; border-radius: 4px;">
+                    <button onclick="procesarYSubirKardexPdf()" style="background: #15803d; color: white; border: none; padding: 6px 12px; font-size: 11px; border-radius: 4px; font-weight: bold; cursor: pointer;">Cargar Página del PDF</button>
+                </div>
             </div>
 
-            <div class="instructions-gallery-container" id="instructions-gallery-wrapper"></div>
+            <div id="kardex-content-wrapper" style="max-height: 55vh; overflow-y: auto; border: 2px dashed #22c55e; border-radius: 8px; padding: 5px; background: #fff; margin-bottom: 10px; text-align: center;">
+                <div id="kardex-empty-msg" style="padding: 20px; color: #666; font-size: 12px;">No hay información cargada en el Kárdex para esta máquina.</div>
+                <img id="kardex-rendered-img" src="" alt="Kárdex PDF" style="max-width: 100%; height: auto; display: none; margin: 0 auto; border-radius: 4px;">
+            </div>
+
+            <button class="back-btn" onclick="salirKardex()">⬅ Volver a Opciones</button>
+        </div>
+
+        <!-- SECCIÓN INSTRUCCIONES DE USO -->
+        <div id="view-instructions" class="view-section">
+            <h2 style="color: #2026A0; margin-top: 0; font-size: 16px; margin-bottom: 5px;">Instrucciones de Uso</h2>
+            <p id="inst-subtitle" style="font-size: 11px; color: #666; margin-bottom: 10px;"></p>
+
+            <div id="admin-instructions-toolbar" style="display: none; gap: 8px; margin-bottom: 15px;">
+                <button onclick="agregarNuevaInstruccion()" style="background: #2563eb; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 11px;">
+                    ➕ Nueva Instrucción
+                </button>
+            </div>
+
+            <div id="instructions-gallery-wrapper" style="margin-bottom: 15px;"></div>
+
             <button class="back-btn" onclick="salirInstrucciones()">⬅ Volver a Opciones</button>
         </div>
 
+        <!-- SECCIÓN MANUALES -->
         <div id="view-manuals" class="view-section">
             <h2 style="color: #2b2d42; margin-top: 0; font-size: 16px; margin-bottom: 5px;">📚 Manuales Técnicos</h2>
             <p id="man-subtitle" style="font-size: 11px; color: #666; margin-bottom: 10px;"></p>
@@ -152,55 +158,52 @@
             <button class="back-btn" onclick="salirManuales()">⬅ Volver a Opciones</button>
         </div>
 
+        <!-- SECCIÓN VISUAL 3D -->
         <div id="view-visual3d" class="view-section" style="width: 100%;">
             <div style="display: flex; flex-direction: column; height: 480px; width: 100%; background: #111827; border-radius: 12px; overflow: hidden; text-align: left; position: relative;" id="visual3d-wrapper-box">
                 
-              <!-- ⚠️ AVISO FLOTANTE DE MODELO EN CREACIÓN / DISPONIBLE -->
               <div id="aviso-estado-modelo" style="display: none; position: absolute; top: 15px; left: 50%; transform: translateX(-50%); background: rgba(31, 41, 55, 0.95); border: 2px solid #f77f00; color: #fff; padding: 10px 16px; border-radius: 8px; z-index: 50; font-size: 12px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); backdrop-filter: blur(4px);">
                   <span id="texto-aviso-modelo" style="font-weight: bold;">⚠️ Este modelo 3D se encuentra actualmente en proceso de creación.</span>
               </div>
 
-              <!-- Contenedor principal adaptable: Columna en móvil, Fila en tablet/PC -->
               <div class="flex flex-col md:flex-row w-full h-full relative">
                     
-                 <!-- Panel Lateral Izquierdo -->
                  <div class="w-full md:w-2/5 h-[40vh] md:h-full bg-gray-800 p-3 flex flex-col justify-between border-b md:border-b-0 md:border-r border-gray-700 z-10 text-gray-100 overflow-y-auto">
                         <div class="flex flex-col flex-shrink-0">
                         
-<div class="flex flex-wrap gap-2 my-2">
-    <button onclick="toggleVistaExplosionada()" id="btn-explo" class="px-2 py-1 bg-blue-600 rounded text-white text-xs">💥 Activar Vista Explosionada</button>
-    <button id="btn-iniciar-desensamblaje" onclick="iniciarDesensamblaje()" class="px-2 py-1 bg-purple-600 rounded text-white text-xs">🧭 Guía Paso a Paso</button>
-    <button onclick="toggleModoMedicion()" id="btn-medir" class="px-2 py-1 bg-amber-600 rounded text-white text-xs">📏 Medir Distancia</button>
-    <!-- 📱 NUEVO: Botón para Realidad Aumentada -->
-    <button onclick="iniciarRealidadAumentada()" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 rounded text-white text-xs">📱 Ver en AR</button>
-    <!-- 📌 NUEVO: Botón para Cargar Anotaciones 3D -->
-    <button onclick="cargarNotas3DEnModelo()" class="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 rounded text-white text-xs">📌 Notas 3D</button>
-</div>
-<div id="panel-medicion" class="hidden bg-gray-900 border border-amber-500 p-2 rounded my-2 text-xs text-white">
-    <div class="font-bold text-amber-400">📏 Herramienta de Medición</div>
-    <div id="resultado-medicion" class="mt-1">Haz clic en dos puntos del modelo.</div>
-    <button onclick="limpiarMedicion()" class="mt-2 w-full py-1 bg-gray-700 hover:bg-gray-600 rounded text-[10px]">Limpiar Medición</button>
-</div>
-<!-- Controles de navegación del paso a paso -->
-<div id="panel-paso-a-paso" class="hidden bg-gray-900 border border-purple-500 p-2 rounded my-2 text-xs text-white">
-    <div id="texto-paso-actual" class="font-bold mb-2 text-purple-300">Paso 0: Preparación</div>
-    <div class="flex gap-2">
-        <button onclick="pasoAnterior()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-1 rounded">⬅️ Anterior</button>
-        <button onclick="pasoSiguiente()" class="flex-1 bg-purple-700 hover:bg-purple-600 py-1 rounded">Siguiente ➡️</button>
-        <button onclick="cerrarDesensamblaje()" class="bg-red-700 px-2 py-1 rounded">❌ Salir</button>
-    </div>
-</div>
-<!-- Controles para el Administrador -->
-<div id="panel-admin-secuencia" class="hidden bg-gray-900 border border-yellow-500 p-2 rounded my-2 text-xs text-white">
-    <div class="font-bold text-yellow-400 mb-1">🛠️ Configurar Secuencia de Desmontaje (Admin)</div>
-    <div class="text-[10px] text-gray-300 mb-2">Haz clic en las piezas en el orden en que deben retirarse (Paso 1, Paso 2...).</div>
-    <div class="flex gap-2">
-        <button onclick="guardarSecuenciaPersonalizada()" class="bg-yellow-600 hover:bg-yellow-500 px-2 py-1 rounded text-black font-bold">💾 Guardar Secuencia en la Nube</button>
-        <button onclick="limpiarSecuenciaActual()" class="bg-gray-700 px-2 py-1 rounded">🔄 Reiniciar Selección</button>
-        <button onclick="borrarSecuenciaGuardada()" class="bg-red-700 hover:bg-red-600 text-white px-3 py-1 rounded text-xs">🗑️ Borrar Secuencia Anterior</button>
-    </div>
-    <div id="lista-secuencia-admin" class="mt-2 max-h-24 overflow-y-auto text-[10px] text-gray-400"></div>
-</div>
+                            <div class="flex flex-wrap gap-2 my-2">
+                                <button onclick="toggleVistaExplosionada()" id="btn-explo" class="px-2 py-1 bg-blue-600 rounded text-white text-xs">💥 Activar Vista Explosionada</button>
+                                <button id="btn-iniciar-desensamblaje" onclick="iniciarDesensamblaje()" class="px-2 py-1 bg-purple-600 rounded text-white text-xs">🧭 Guía Paso a Paso</button>
+                                <button onclick="toggleModoMedicion()" id="btn-medir" class="px-2 py-1 bg-amber-600 rounded text-white text-xs">📏 Medir Distancia</button>
+                                <button onclick="iniciarRealidadAumentada()" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 rounded text-white text-xs">📱 Ver en AR</button>
+                                <button onclick="cargarNotas3DEnModelo()" class="px-2 py-1 bg-indigo-600 hover:bg-indigo-500 rounded text-white text-xs">📌 Notas 3D</button>
+                            </div>
+                            <div id="panel-medicion" class="hidden bg-gray-900 border border-amber-500 p-2 rounded my-2 text-xs text-white">
+                                <div class="font-bold text-amber-400">📏 Herramienta de Medición</div>
+                                <div id="resultado-medicion" class="mt-1">Haz clic en dos puntos del modelo.</div>
+                                <button onclick="limpiarMedicion()" class="mt-2 w-full py-1 bg-gray-700 hover:bg-gray-600 rounded text-[10px]">Limpiar Medición</button>
+                            </div>
+                            
+                            <div id="panel-paso-a-paso" class="hidden bg-gray-900 border border-purple-500 p-2 rounded my-2 text-xs text-white">
+                                <div id="texto-paso-actual" class="font-bold mb-2 text-purple-300">Paso 0: Preparación</div>
+                                <div class="flex gap-2">
+                                    <button onclick="pasoAnterior()" class="flex-1 bg-gray-700 hover:bg-gray-600 py-1 rounded">⬅️ Anterior</button>
+                                    <button onclick="pasoSiguiente()" class="flex-1 bg-purple-700 hover:bg-purple-600 py-1 rounded">Siguiente ➡️</button>
+                                    <button onclick="cerrarDesensamblaje()" class="bg-red-700 px-2 py-1 rounded">❌ Salir</button>
+                                </div>
+                            </div>
+
+                            <div id="panel-admin-secuencia" class="hidden bg-gray-900 border border-yellow-500 p-2 rounded my-2 text-xs text-white">
+                                <div class="font-bold text-yellow-400 mb-1">🛠️ Configurar Secuencia de Desmontaje (Admin)</div>
+                                <div class="text-[10px] text-gray-300 mb-2">Haz clic en las piezas en el orden en que deben retirarse (Paso 1, Paso 2...).</div>
+                                <div class="flex gap-2">
+                                    <button onclick="guardarSecuenciaPersonalizada()" class="bg-yellow-600 hover:bg-yellow-500 px-2 py-1 rounded text-black font-bold">💾 Guardar Secuencia en la Nube</button>
+                                    <button onclick="limpiarSecuenciaActual()" class="bg-gray-700 px-2 py-1 rounded">🔄 Reiniciar Selección</button>
+                                    <button onclick="borrarSecuenciaGuardada()" class="bg-red-700 hover:bg-red-600 text-white px-3 py-1 rounded text-xs">🗑️ Borrar Secuencia Anterior</button>
+                                </div>
+                                <div id="lista-secuencia-admin" class="mt-2 max-h-24 overflow-y-auto text-[10px] text-gray-400"></div>
+                            </div>
+
                             <div id="contenedor-importar-3d" class="mb-3">
                                 <label for="input-archivo" class="w-full py-2 bg-blue-600 hover:bg-blue-500 rounded-md text-white font-bold text-xs shadow transition flex items-center justify-center cursor-pointer">
                                     📂 Importar Ensamblaje (.glb)
@@ -253,8 +256,6 @@
                             </div>
 
                             <div id="panel-acciones-pieza" class="flex flex-col gap-1.5"></div>
-                            
-                            <!-- 📦 NUEVO: Contenedor para la Información de Inventario / SKU -->
                             <div id="panel-inventario-pieza"></div>
                         </div>
                     </div>
@@ -328,6 +329,25 @@
         </div>
     </div>
 
+    <!-- MODAL PARA NUEVO PASO DE INSTRUCCIONES -->
+    <div id="modal-agregar-paso" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 9999;">
+        <div style="background: white; padding: 20px; border-radius: 8px; width: 90%; max-width: 400px; box-shadow: 0 4px 6px rgba(0,0,0,0.3);">
+            <h3 style="color: #2026A0; margin-top: 0; font-size: 14px;">Añadir Nuevo Paso</h3>
+            
+            <label style="font-size: 12px; font-weight: bold; color: #333; display: block; margin-bottom: 5px;">Descripción:</label>
+            <textarea id="input-paso-desc" placeholder="Escribe los detalles del paso..." style="width: 100%; height: 70px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; margin-bottom: 10px; resize: none;"></textarea>
+            
+            <label style="font-size: 12px; font-weight: bold; color: #333; display: block; margin-bottom: 5px;">Imagen ilustrativa:</label>
+            <input type="file" id="input-paso-img" accept="image/*" style="width: 100%; margin-bottom: 15px; font-size: 11px;" />
+            
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button onclick="cerrarModalPaso()" style="background: #64748b; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">Cancelar</button>
+                <button onclick="guardarNuevoPasoConImagen()" style="background: #2563eb; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px;">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL DE IMAGEN GENERAL -->
     <div class="image-modal" id="img-modal" onclick="closeImageModal()">
         <div class="image-modal-content" onclick="event.stopPropagation()">
             <button class="modal-close-btn" onclick="closeImageModal()">✕</button>
