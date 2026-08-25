@@ -488,7 +488,20 @@ window.eliminarPasoDeInstruccion = async function(instIndex, pasoIndex) {
 // MANUALES PDF
 // ==========================================
 async function loadManualsData() {
-    const { data: maq } = await dbSupabase.from('maquinas').select('manuals_pdf').eq('id', currentMachineId).single();
+    console.log("Cargando manuales para la máquina ID:", currentMachineId);
+    
+    const { data: maq, error } = await dbSupabase
+        .from('maquinas')
+        .select('manuals_pdf')
+        .eq('id', currentMachineId)
+        .maybeSingle();
+
+    if (error) {
+        console.error("Error al consultar Supabase:", error);
+    }
+
+    console.log("Datos obtenidos de la máquina:", maq);
+
     let isAdmin = (currentRole === 'admin');
     const adminPdfUpload = document.getElementById('admin-pdf-upload');
     if (adminPdfUpload) adminPdfUpload.style.display = isAdmin ? 'block' : 'none';
@@ -496,28 +509,125 @@ async function loadManualsData() {
     let wrapper = document.getElementById('manuals-list-wrapper');
     wrapper.innerHTML = '';
 
-    let manuals = maq?.manuals_pdf || [];
+    // Verificamos si manuals_pdf viene como array o como string JSON guardado por error
+    let manuals = maq?.manuals_pdf;
+    if (typeof manuals === 'string') {
+        try {
+            manuals = JSON.parse(manuals);
+        } catch (e) {
+            manuals = [];
+        }
+    }
+    manuals = manuals || [];
+
+    let searchInputHTML = `
+        <div style="margin-bottom: 12px;">
+            <input type="text" id="input-buscar-manual" placeholder="🔍 Buscar manual por nombre..." oninput="filtrarManualesPDF()" style="width: 100%; padding: 8px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box;">
+        </div>
+    `;
+
     if (manuals.length === 0) {
-        wrapper.innerHTML = `<span style="color: #888; font-size: 11px; padding: 20px;">No hay manuales PDF cargados.</span>`;
+        wrapper.innerHTML = searchInputHTML + `<div style="color: #888; font-size: 11px; padding: 20px; text-align: center;">No hay manuales PDF cargados.</div>`;
         return;
     }
 
+    let listHTML = searchInputHTML + '<div id="manuals-items-container" style="display: flex; flex-direction: column; gap: 8px;">';
+
     manuals.forEach((man, idx) => {
-        let row = document.createElement('div');
-        row.className = 'manual-item-row';
-        row.innerHTML = `
-            <div class="manual-info">
-                <span class="manual-icon">📄</span>
-                <span class="manual-name" title="${man.name || man.nombre}">${man.name || man.nombre}</span>
-            </div>
-            <div class="manual-actions">
-                <a href="${man.url}" target="_blank" class="btn-pdf-download">📥 Ver / Descargar</a>
-                ${isAdmin ? `<button class="btn-pdf-del" onclick="removeManualPdf(${idx})">Eliminar</button>` : ''}
+        let nombreManual = man.name || man.nombre || `Manual ${idx + 1}`;
+        let urlManual = man.url || man.enlace || '#';
+        listHTML += `
+            <div class="manual-item-row" data-name="${nombreManual.toLowerCase()}" style="display: flex; justify-content: space-between; align-items: center; background: #ffffff; padding: 10px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                <div class="manual-info" style="display: flex; align-items: center; gap: 8px; overflow: hidden;">
+                    <span class="manual-icon" style="font-size: 16px;">📄</span>
+                    <span class="manual-name" style="font-size: 12px; color: #1e293b; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${nombreManual}">${nombreManual}</span>
+                </div>
+                <div class="manual-actions" style="display: flex; gap: 6px; flex-shrink: 0;">
+                    <button onclick="verPdfEnVisor('${urlManual}', '${nombreManual}')" style="background: #2563eb; color: white; border: none; padding: 5px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;">👁️ Ver Visor</button>
+                    <a href="${urlManual}" target="_blank" style="background: #64748b; color: white; text-decoration: none; padding: 5px 8px; border-radius: 4px; font-size: 11px; display: inline-flex; align-items: center;">📥 Descargar</a>
+                    ${isAdmin ? `<button onclick="removeManualPdf(${idx})" style="background: #dc2626; color: white; border: none; padding: 5px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;">🗑️</button>` : ''}
+                </div>
             </div>
         `;
-        wrapper.appendChild(row);
+    });
+
+    listHTML += '</div>';
+    wrapper.innerHTML = listHTML;
+}
+
+// Función auxiliar para el filtro rápido de manuales
+function filtrarManualesPDF() {
+    let filtro = document.getElementById('input-buscar-manual').value.toLowerCase();
+    let filas = document.querySelectorAll('#manuals-items-container > div');
+    filas.forEach(fila => {
+        let nombre = fila.getAttribute('data-name');
+        if (nombre.includes(filtro)) {
+            fila.style.display = 'flex';
+        } else {
+            fila.style.display = 'none';
+        }
     });
 }
+
+// Función para abrir el PDF en un visor interactivo dentro de la misma plataforma (modal o iframe superpuesto)
+function verPdfEnVisor(urlPdf, titulo) {
+    let modalId = 'modal-visor-pdf-global';
+    let modal = document.getElementById(modalId);
+
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = modalId;
+        modal.style.cssText = "position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.75); z-index: 9999; display: flex; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box;";
+        
+        modal.innerHTML = `
+            <div style="background: #ffffff; width: 100%; max-width: 1000px; height: 90vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
+                <!-- Barra superior del visor -->
+                <div style="background: #1e293b; color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center;">
+                    <span id="visor-pdf-titulo" style="font-weight: bold; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80%;"></span>
+                    <button onclick="cerrarVisorPdfGlobal()" style="background: #dc2626; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px;">✕ Cerrar</button>
+                </div>
+                <!-- Contenedor del PDF embebido -->
+                <div style="flex-grow: 1; background: #e2e8f0; width: 100%; position: relative;">
+                    <iframe id="iframe-pdf-visor" style="width: 100%; height: 100%; border: none;"></iframe>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    document.getElementById('visor-pdf-titulo').innerText = `📄 ${titulo}`;
+    const iframe = document.getElementById('iframe-pdf-visor');
+    
+    // Usamos el visor de Google integrado para forzar la visualización directa sin descargas
+    const urlVisualizador = `https://docs.google.com/gview?url=${encodeURIComponent(urlPdf)}&embedded=true`;
+    
+    iframe.src = urlVisualizador;
+    modal.style.display = 'flex';
+}
+
+function cerrarVisorPdfGlobal() {
+    let modal = document.getElementById('modal-visor-pdf-global');
+    if (modal) {
+        modal.style.display = 'none';
+        let iframe = document.getElementById('iframe-pdf-visor');
+        if (iframe) iframe.src = '';
+    }
+}
+
+function cerrarVisorPdfGlobal() {
+    let modal = document.getElementById('modal-visor-pdf-global');
+    if (modal) {
+        modal.style.display = 'none';
+        document.getElementById('iframe-pdf-visor').src = '';
+    }
+}
+
+// Asegúrate de exponer las funciones necesarias globalmente si usas módulos o type="module"
+window.subirManualPdf = subirManualPdf;
+window.loadManualsData = loadManualsData;
+window.filtrarManualesPDF = filtrarManualesPDF;
+window.verPdfEnVisor = verPdfEnVisor;
+window.cerrarVisorPdfGlobal = cerrarVisorPdfGlobal;
 
 async function openImageModal(src) {
     document.getElementById('modal-img-tag').src = src;
@@ -1894,42 +2004,69 @@ window.removeManualPdf = typeof removeManualPdf !== 'undefined' ? removeManualPd
     loadManualsData();
 };
 
-async function subirManualPdf() {
+async function subirManualPdf(event) {
     const fileInput = document.getElementById('pdf-file-input');
-    if (!fileInput || !fileInput.files[0]) {
-        alert("Por favor selecciona un archivo PDF primero.");
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+        alert("Por favor selecciona al menos un archivo PDF.");
         return;
     }
 
-    const file = fileInput.files[0];
-    const fileName = `manual_${currentMachineId}_${Date.now()}.pdf`;
-    
-    const { error } = await dbSupabase.storage
-        .from('manuales')
-        .upload(fileName, file);
-
-    if (error) {
-        alert("Error al subir el PDF: " + error.message);
+    const files = fileInput.files;
+    let isAdmin = (currentRole === 'admin');
+    if (!isAdmin) {
+        alert("No tienes permisos para realizar esta acción.");
         return;
     }
 
-    const { data: { publicUrl } } = dbSupabase.storage
-        .from('manuales')
-        .getPublicUrl(fileName);
+    alert(`Subiendo ${files.length} archivo(s) PDF. Por favor espera...`);
 
-    const { data: maq } = await dbSupabase.from('maquinas').select('manuals_pdf').eq('id', currentMachineId).maybeSingle();
+    // Obtenemos los manuales actuales de la máquina
+    const { data: maq, error: fetchError } = await dbSupabase
+        .from('maquinas')
+        .select('manuals_pdf')
+        .eq('id', currentMachineId)
+        .maybeSingle();
+
+    if (fetchError) {
+        console.error("Error al obtener manuales previos:", fetchError);
+        alert("Error al conectar con la base de datos.");
+        return;
+    }
+
     let manuals = maq?.manuals_pdf || [];
-    manuals.push({ name: file.name, url: publicUrl });
 
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileName = `manual_${currentMachineId}_${Date.now()}_${i}.pdf`;
+
+        // Subir al bucket 'manuales'
+        const { error: uploadError } = await dbSupabase.storage
+            .from('manuales')
+            .upload(fileName, file);
+
+        if (uploadError) {
+            console.error(`Error al subir ${file.name}:`, uploadError.message);
+            continue; // Continuamos con los demás si uno falla
+        }
+
+        // Obtener URL pública
+        const { data: { publicUrl } } = dbSupabase.storage
+            .from('manuales')
+            .getPublicUrl(fileName);
+
+        manuals.push({ name: file.name, url: publicUrl });
+    }
+
+    // Actualizar la tabla maquinas con el nuevo array de manuales
     const { error: updateError } = await dbSupabase
         .from('maquinas')
         .update({ manuals_pdf: manuals })
         .eq('id', currentMachineId);
 
     if (updateError) {
-        alert("Error al guardar la referencia del manual: " + updateError.message);
+        alert("Error al guardar las referencias de los manuales: " + updateError.message);
     } else {
-        alert("¡Manual PDF subido y guardado con éxito!");
+        alert("¡Manuales PDF subidos y guardados con éxito!");
         fileInput.value = ""; 
         if (typeof loadManualsData === 'function') loadManualsData();
     }
