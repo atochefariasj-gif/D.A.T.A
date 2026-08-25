@@ -8,6 +8,7 @@ const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentRole = 'visitante';
 let currentLine = '';
 let currentMachineId = null;
+let currentMachineName = null; 
 let isEditMode = false;
 let rolPendiente = '';
 let mapaNombres = {}; // Aquí se guardarán los nombres del JSON[cite: 1]
@@ -56,7 +57,7 @@ async function verificarPassword() {
 }
 
 async function selectRole(role) {
-    currentRole = role;
+    currentRole = role; 
     document.getElementById('main-menu').classList.remove('active-view');
     document.getElementById('view-lines').classList.add('active-view');
 }
@@ -81,80 +82,44 @@ async function renderMachines() {
         .from('maquinas')
         .select('*')
         .eq('linea', currentLine)
-        .order('created_at', { ascending: true }); // Orden estricto por creación
+        .order('id', { ascending: true });
 
     if (error) {
-        console.error("Error al cargar las maquinas:", error);
+        console.error("Error al cargar las máquinas:", error);
         return;
     }
 
     let container = document.getElementById('machines-grid-container');
     container.innerHTML = "";
 
-    maquinas.forEach(maquina => {
+    maquinas.forEach(maq => { 
         let card = document.createElement('div');
         card.className = 'card-item';
 
         if (currentRole === 'admin' && isEditMode) {
-            // Modo edición de nombres
+            card.onclick = (e) => e.stopPropagation();
             card.innerHTML = `
-                <span class="card-icon">✎</span>
-                <input type="text" class="mach-input" data-id="${maquina.id}" value="${maquina.nombre}" onchange="updateMachineName(this.id, this.value)">
+                <span class="card-icon"></span>
+                <input type="text" class="mach-input" data-id="${maq.id}" value="${maq.nombre || ''}" onchange="updateMachineNameInline('${maq.id}', this.value)">
+                <button class="btn-delete-mach" onclick="deleteMachine('${maq.id}')" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin-top: 5px; font-size: 10px;">🗑️ Eliminar</button>
             `;
         } else {
-            // Modo normal: botón para entrar a los detalles y botón separado para eliminar
-            let deleteBtnHtml = '';
-            if (currentRole === 'admin') {
-                // 🔑 Pasamos el ID numérico SIN comillas extras para que Supabase lo reconozca bien
-                deleteBtnHtml = `
-                    <button onclick="event.stopPropagation(); eliminarMaquinaDirecto(${maquina.id}, '${maquina.nombre}')" style="background: #ff4d4d; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-left: 8px;" title="Eliminar máquina">
-                        🗑️
-                    </button>
-                `;
-            }
-
+            card.onclick = () => openMachineDetail(maq.id, maq.nombre);
             card.innerHTML = `
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                    <button onclick="openArchiveDetail(${maquina.id}, '${maquina.nombre}')" style="flex-grow: 1; text-align: left; background: none; border: none; cursor: pointer; font-size: 13px; font-weight: bold; color: #333; padding: 5px;">
-                        ${maquina.nombre}
-                    </button>
-                    ${deleteBtnHtml}
-                </div>
+                <span class="card-icon"></span>
+                <div class="card-title">${maq.nombre || ''}</div>
             `;
         }
         container.appendChild(card);
     });
 }
 
-async function eliminarMaquinaDirecto(idMaquina, nombreMaquina) {
-    const seguro = confirm(`¿Estás seguro de que deseas eliminar la máquina "${nombreMaquina}"?`);
-    
-    if (!seguro) return;
-
-    // Borrado directo en Supabase usando el ID numérico
-    const { error } = await dbSupabase
-        .from('maquinas')
-        .delete()
-        .eq('id', idMaquina);
-
-    if (error) {
-        console.error('Error al eliminar:', error);
-        alert('Hubo un error al intentar eliminar la máquina en la base de datos.');
-    } else {
-        alert('¡Máquina eliminada correctamente!');
-        renderMachines(); // Actualiza la lista y las siguientes suben de puesto automáticamente
-    }
-}
-// ==========================================
-// FUNCIÓN DE AGREGAR MÁQUINA INDIVIDUAL
-// ==========================================
 async function addNewMachine() {
     if (currentRole !== 'admin') {
         alert("No tienes permisos para realizar esta acción.");
         return;
     }
 
-    // ➕ Insertamos la máquina vinculada estrictamente a la línea actual
     const { data, error } = await dbSupabase
         .from('maquinas')
         .insert([
@@ -162,7 +127,7 @@ async function addNewMachine() {
                 nombre: "Nueva Máquina",
                 modelo_url: "EMPTY",
                 manual_url: "EMPTY",
-                linea: currentLine // <--- GUARDAMOS LA LÍNEA ACTUAL
+                linea: currentLine 
             }
         ]);
 
@@ -189,6 +154,7 @@ async function updateMachineNameInline(id, nuevoNombre) {
 
 async function openMachineDetail(id, name) {
     currentMachineId = id;
+    currentMachineName = name; 
     document.getElementById('selected-machine-title').innerText = name;
     document.getElementById('view-machines').classList.remove('active-view');
     document.getElementById('view-machine-detail').classList.add('active-view');
@@ -199,10 +165,10 @@ async function openOption(opt) {
     
     if (opt === 'Kardex') {
         document.getElementById('view-kardex').classList.add('active-view', 'fullscreen-mode');
-        loadKardexData();
+        abrirKardexDeMaquina(currentMachineName); 
     } else if (opt === 'Instrucciones') {
         document.getElementById('view-instructions').classList.add('active-view', 'fullscreen-mode');
-        loadInstructionsData();
+        loadInstructionsData(); 
     } else if (opt === 'Manuals') {
         document.getElementById('view-manuals').classList.add('active-view', 'fullscreen-mode');
         loadManualsData();
@@ -334,184 +300,193 @@ async function toggleEditMode() {
 }
 
 // ==========================================
-// CARGA Y EDICIÓN DEL KÁRDEX
+// MÓDULO DE INSTRUCCIONES Y PASOS (JSONB)
 // ==========================================
-async function loadKardexData() {
-    const targetId = typeof currentMachineId !== 'undefined' ? currentMachineId : null;
-    if (!targetId) return;
+async function loadInstructionsData() {
+    let wrapper = document.getElementById('instructions-gallery-wrapper');
+    if (!wrapper) return;
 
-    // Usamos 'dbSupabase' que es el nombre correcto en tu código
-    const { data, error } = await dbSupabase
+    // Sincronizar datos desde Supabase
+    const { data: maq, error } = await dbSupabase
         .from('maquinas')
-        .select('*')
-        .eq('id', targetId)
+        .select('instrucciones')
+        .eq('id', currentMachineId)
         .single();
 
-    if (error || !data) return;
-
-    const sub = document.getElementById('kardex-subtitle');
-    if (sub) sub.innerText = `Activo: ${data.nombre}`;
-
-    await cargarKardexMaquina(targetId);
-}
-// Guardar Metadatos del Kárdex en Supabase
-async function guardarCambiosKardexMeta() {
-    if (currentRole !== 'admin') return;
-
-    let metaActualizada = {
-        area: document.getElementById('k-area').value,
-        codigo: document.getElementById('k-codigo').value,
-        femision: document.getElementById('k-femision').value,
-        eq_marca: document.getElementById('k-eq-marca').value,
-        eq_capacidad: document.getElementById('k-eq-capacidad').value,
-        eq_material: document.getElementById('k-eq-material').value,
-        eq_serie: document.getElementById('k-eq-serie').value,
-        eq_modelo: document.getElementById('k-eq-modelo').value
-    };
-
-    const { error } = await dbSupabase
-        .from('maquinas')
-        .update({ meta: metaActualizada })
-        .eq('id', currentMachineId);
-
     if (error) {
-        console.error("Error al guardar metadatos del Kárdex:", error.message);
+        console.error("Error al cargar instrucciones:", error);
     }
-}
 
-// Renderizar y gestionar Motores
-function renderMotors(motors, isAdmin) {
-    let container = document.getElementById('motors-container');
-    if (!container) return;
-    container.innerHTML = '';
-    
-    motors.forEach((motor, index) => {
-        let html = `
-            <div class="motor-block" style="border: 1px solid #ccc; padding: 8px; margin-bottom: 8px; background: #fff; border-radius: 4px;">
-                <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 10px; margin-bottom: 4px;">
-                    <span>MOTOR Nº ${index + 1}</span>
-                    ${isAdmin ? `<span style="color: red; cursor: pointer;" onclick="removeMotorBlock(${index})">Eliminar Motor</span>` : ''}
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; font-size: 9px;">
-                    <div>MARCA: <input type="text" ${!isAdmin ? 'readonly' : ''} value="${motor.marca || ''}" oninput="updateMotor(${index}, 'marca', this.value)" style="width:100%"></div>
-                    <div>HP: <input type="text" ${!isAdmin ? 'readonly' : ''} value="${motor.hp || ''}" oninput="updateMotor(${index}, 'hp', this.value)" style="width:100%"></div>
-                    <div>KW: <input type="text" ${!isAdmin ? 'readonly' : ''} value="${motor.kw || ''}" oninput="updateMotor(${index}, 'kw', this.value)" style="width:100%"></div>
-                    <div>RPM: <input type="text" ${!isAdmin ? 'readonly' : ''} value="${motor.rpm || ''}" oninput="updateMotor(${index}, 'rpm', this.value)" style="width:100%"></div>
-                    <div>VOLTIOS: <input type="text" ${!isAdmin ? 'readonly' : ''} value="${motor.voltios || ''}" oninput="updateMotor(${index}, 'voltios', this.value)" style="width:100%"></div>
-                    <div>AMP: <input type="text" ${!isAdmin ? 'readonly' : ''} value="${motor.amp || ''}" oninput="updateMotor(${index}, 'amp', this.value)" style="width:100%"></div>
-                </div>
-            </div>
-        `;
-        container.innerHTML += html;
-    });
-}
+    window.currentInstructionsList = maq?.instrucciones || [];
+    let instrucciones = window.currentInstructionsList;
 
-async function addMotorBlock() {
-    if (currentRole !== 'admin') return;
-    const { data: maq } = await dbSupabase.from('maquinas').select('motors').eq('id', currentMachineId).single();
-    let motors = maq?.motors || [];
-    motors.push({ marca: '', hp: '', kw: '', rpm: '', voltios: '', amp: '' });
-    
-    await dbSupabase.from('maquinas').update({ motors }).eq('id', currentMachineId);
-    renderMotors(motors, true);
-}
-
-async function removeMotorBlock(index) {
-    if (currentRole !== 'admin') return;
-    const { data: maq } = await dbSupabase.from('maquinas').select('motors').eq('id', currentMachineId).single();
-    let motors = maq?.motors || [];
-    motors.splice(index, 1);
-    
-    await dbSupabase.from('maquinas').update({ motors }).eq('id', currentMachineId);
-    renderMotors(motors, true);
-}
-
-async function updateMotor(index, field, value) {
-    if (currentRole !== 'admin') return;
-    const { data: maq } = await dbSupabase.from('maquinas').select('motors').eq('id', currentMachineId).single();
-    let motors = maq?.motors || [];
-    if(motors[index]) {
-        motors[index][field] = value;
-        await dbSupabase.from('maquinas').update({ motors }).eq('id', currentMachineId);
-    }
-}
-
-// Renderizar y gestionar la tabla de repuestos
-function renderKardexRows(repuestos, isAdmin) {
-    let tbody = document.getElementById('kardex-tbody');
-    if (!tbody) return;
-    tbody.innerHTML = '';
-    
-    repuestos.forEach((rep, index) => {
-        let row = `<tr>
-            <td>${index + 1}</td>
-            <td><input type="text" ${!isAdmin ? 'readonly' : ''} value="${rep.categoria || ''}" oninput="updateRepuesto(${index}, 'categoria', this.value)" style="width:100%"></td>
-            <td><input type="text" ${!isAdmin ? 'readonly' : ''} value="${rep.descripcion || ''}" oninput="updateRepuesto(${index}, 'descripcion', this.value)" style="width:100%"></td>
-            <td><input type="text" ${!isAdmin ? 'readonly' : ''} value="${rep.um || ''}" oninput="updateRepuesto(${index}, 'um', this.value)" style="width:100%"></td>
-            <td><input type="text" ${!isAdmin ? 'readonly' : ''} value="${rep.cantidad || ''}" oninput="updateRepuesto(${index}, 'cantidad', this.value)" style="width:100%"></td>
-            ${isAdmin ? `<td><button onclick="removeKardexRow(${index})" style="color:red; background:none; border:none; cursor:pointer;">X</button></td>` : '<td></td>'}
-        </tr>`;
-        tbody.innerHTML += row;
-    });
-}
-
-async function addKardexRow() {
-    if (currentRole !== 'admin') return;
-    const { data: maq } = await dbSupabase.from('maquinas').select('kardex').eq('id', currentMachineId).single();
-    let kardex = maq?.kardex || [];
-    kardex.push({ categoria: '', descripcion: '', um: '', cantidad: '' });
-    
-    await dbSupabase.from('maquinas').update({ kardex }).eq('id', currentMachineId);
-    renderKardexRows(kardex, true);
-}
-
-async function removeKardexRow(index) {
-    if (currentRole !== 'admin') return;
-    const { data: maq } = await dbSupabase.from('maquinas').select('kardex').eq('id', currentMachineId).single();
-    let kardex = maq?.kardex || [];
-    kardex.splice(index, 1);
-    
-    await dbSupabase.from('maquinas').update({ kardex }).eq('id', currentMachineId);
-    renderKardexRows(kardex, true);
-}
-
-async function updateRepuesto(index, field, value) {
-    if (currentRole !== 'admin') return;
-    const { data: maq } = await dbSupabase.from('maquinas').select('kardex').eq('id', currentMachineId).single();
-    let kardex = maq?.kardex || [];
-    if(kardex[index]) {
-        kardex[index][field] = value;
-        await dbSupabase.from('maquinas').update({ kardex }).eq('id', currentMachineId);
-    }
-}
-
-async function loadInstructionsData() {
-    const { data: maq } = await dbSupabase.from('maquinas').select('instruction_images').eq('id', currentMachineId).single();
     let isAdmin = (currentRole === 'admin');
-    const adminImgUpload = document.getElementById('admin-img-upload');
-    if (adminImgUpload) adminImgUpload.style.display = isAdmin ? 'block' : 'none';
+    const adminPanel = document.getElementById('admin-instructions-toolbar');
+    if (adminPanel) adminPanel.style.display = isAdmin ? 'flex' : 'none';
 
-    let wrapper = document.getElementById('instructions-gallery-wrapper');
-    wrapper.innerHTML = '';
-    
-    let images = maq?.instruction_images || [];
-    if (images.length === 0) {
-        wrapper.innerHTML = `<span style="color: #888; font-size: 11px; grid-column: span 2; padding: 20px;">No hay instrucciones registradas.</span>`;
+    if (instrucciones.length === 0) {
+        wrapper.innerHTML = `<div style="padding: 20px; text-align: center; color: #666;">No hay instrucciones cargadas para esta máquina.</div>`;
         return;
     }
 
-    images.forEach((imgUrl, idx) => {
-        let card = document.createElement('div');
-        card.className = 'instruction-card';
-        card.innerHTML = `
-            ${isAdmin ? `<button class="btn-img-del" onclick="event.stopPropagation(); removeInstructionImage(${idx})">✕</button>` : ''}
-            <img src="${imgUrl}" class="instruction-card-thumb" onclick="openImageModal('${imgUrl}')">
-            <div class="instruction-card-info">Paso ${idx + 1}</div>
+    let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
+    
+    instrucciones.forEach((inst, index) => {
+        html += `
+            <div style="background: #1e293b; color: white; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                <span onclick="abrirDetalleInstruccion(${index})" style="font-weight: bold; font-size: 14px; cursor: pointer; flex-grow: 1;">🔧 ${inst.titulo}</span>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button onclick="abrirDetalleInstruccion(${index})" style="background: #2563eb; color: white; border: none; padding: 5px 10px; border-radius: 4px; font-size: 12px; cursor: pointer;">Ver Pasos ➡️</button>
+                    ${isAdmin ? `<button onclick="eliminarInstruccionCompleta(${index})" style="background: #dc2626; color: white; border: none; padding: 5px 8px; border-radius: 4px; font-size: 12px; cursor: pointer;">🗑️</button>` : ''}
+                </div>
+            </div>
         `;
-        wrapper.appendChild(card);
     });
+    
+    html += '</div>';
+    wrapper.innerHTML = html;
 }
 
+window.abrirDetalleInstruccion = function(index) {
+    let instrucciones = window.currentInstructionsList || [];
+    let inst = instrucciones[index];
+    let wrapper = document.getElementById('instructions-gallery-wrapper');
+    if (!wrapper || !inst) return;
+
+    let isAdmin = (currentRole === 'admin');
+    let botonAgregarPasoHTML = isAdmin ? `
+        <button onclick="abrirModalAgregarPaso(${index})" style="background: #10b981; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-bottom: 15px;">
+            ➕ Añadir Paso con Imagen
+        </button>
+    ` : '';
+    
+    let pasosHTML = '';
+    if (inst.pasos && inst.pasos.length > 0) {
+        inst.pasos.forEach((paso, pIndex) => {
+            pasosHTML += `
+                <div style="background: white; color: #333; padding: 12px; margin-bottom: 10px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #cbd5e1;">
+                    <div style="flex-grow: 1; padding-right: 15px;">
+                        <strong style="color: #2563eb;">Paso ${pIndex + 1}:</strong> ${paso.descripcion}
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        ${paso.imagen ? `<img src="${paso.imagen}" style="width: 100px; height: 70px; object-fit: cover; border-radius: 6px; border: 1px solid #94a3b8; cursor: pointer;" onclick="openImageModal('${paso.imagen}')" />` : '<span style="font-size: 11px; color: #94a3b8;">Sin imagen</span>'}
+                        ${isAdmin ? `<button onclick="eliminarPasoDeInstruccion(${index}, ${pIndex})" style="background: #dc2626; color: white; border: none; padding: 5px 8px; border-radius: 4px; font-size: 11px; cursor: pointer;">🗑️</button>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+    } else {
+        pasosHTML = `<p style="color: #666; font-style: italic;">No hay pasos definidos para esta instrucción.</p>`;
+    }
+
+    wrapper.innerHTML = `
+        <button onclick="loadInstructionsData()" style="background: #64748b; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; margin-bottom: 15px; font-weight: bold;">
+            ⬅️ Volver a Instrucciones
+        </button>
+        <h3 style="color: #2026A0; margin-bottom: 15px; border-bottom: 2px solid #2026A0; padding-bottom: 5px;">${inst.titulo}</h3>
+        ${botonAgregarPasoHTML}
+        <div style="display: flex; flex-direction: column;">
+            ${pasosHTML}
+        </div>
+    `;
+};
+
+async function guardarInstruccionesEnSupabase() {
+    const { error } = await dbSupabase
+        .from('maquinas')
+        .update({ instrucciones: window.currentInstructionsList })
+        .eq('id', currentMachineId);
+
+    if (error) {
+        console.error("Error al sincronizar instrucciones:", error);
+        alert("Error al guardar cambios en la base de datos.");
+    }
+}
+
+window.agregarNuevaInstruccion = async function() {
+    let titulo = prompt("Ingrese el título de la nueva instrucción:");
+    if (!titulo || !titulo.trim()) return;
+
+    if (!window.currentInstructionsList) window.currentInstructionsList = [];
+    window.currentInstructionsList.push({
+        titulo: titulo.trim(),
+        pasos: []
+    });
+
+    await guardarInstruccionesEnSupabase();
+    loadInstructionsData();
+};
+
+window.eliminarInstruccionCompleta = async function(index) {
+    if (!confirm("¿Está seguro de eliminar esta instrucción completa?")) return;
+    
+    window.currentInstructionsList.splice(index, 1);
+    await guardarInstruccionesEnSupabase();
+    loadInstructionsData();
+};
+
+let instruccionActivaIndex = null;
+
+window.abrirModalAgregarPaso = function(index) {
+    instruccionActivaIndex = index;
+    document.getElementById('input-paso-desc').value = '';
+    document.getElementById('input-paso-img').value = '';
+    document.getElementById('modal-agregar-paso').style.display = 'flex';
+};
+
+window.cerrarModalPaso = function() {
+    document.getElementById('modal-agregar-paso').style.display = 'none';
+    instruccionActivaIndex = null;
+};
+
+window.guardarNuevoPasoConImagen = async function() {
+    let descripcion = document.getElementById('input-paso-desc').value.trim();
+    let fileInput = document.getElementById('input-paso-img');
+    
+    if (!descripcion) {
+        alert("Por favor, ingresa una descripción para el paso.");
+        return;
+    }
+
+    let guardarPasoData = async (imagenUrl = '') => {
+        let inst = window.currentInstructionsList[instruccionActivaIndex];
+        if (!inst.pasos) inst.pasos = [];
+        
+        inst.pasos.push({
+            descripcion: descripcion,
+            imagen: imagenUrl
+        });
+
+        await guardarInstruccionesEnSupabase();
+        cerrarModalPaso();
+        abrirDetalleInstruccion(instruccionActivaIndex);
+    };
+
+    if (fileInput.files && fileInput.files[0]) {
+        let reader = new FileReader();
+        reader.onload = async function(e) {
+            await guardarPasoData(e.target.result);
+        };
+        reader.readAsDataURL(fileInput.files[0]);
+    } else {
+        await guardarPasoData(''); 
+    }
+};
+
+window.eliminarPasoDeInstruccion = async function(instIndex, pasoIndex) {
+    if (!confirm("¿Eliminar este paso?")) return;
+
+    let inst = window.currentInstructionsList[instIndex];
+    if (inst && inst.pasos) {
+        inst.pasos.splice(pasoIndex, 1);
+        await guardarInstruccionesEnSupabase();
+        abrirDetalleInstruccion(instIndex);
+    }
+};
+
+// ==========================================
+// MANUALES PDF
+// ==========================================
 async function loadManualsData() {
     const { data: maq } = await dbSupabase.from('maquinas').select('manuals_pdf').eq('id', currentMachineId).single();
     let isAdmin = (currentRole === 'admin');
@@ -1911,14 +1886,6 @@ window.vincularSkuAhora = typeof vincularSkuAhora !== 'undefined' ? vincularSkuA
     });
 };
 
-window.removeInstructionImage = typeof removeInstructionImage !== 'undefined' ? removeInstructionImage : async function(idx) {
-    const { data: maq } = await dbSupabase.from('maquinas').select('instruction_images').eq('id', currentMachineId).single();
-    let images = maq?.instruction_images || [];
-    images.splice(idx, 1);
-    await dbSupabase.from('maquinas').update({ instruction_images: images }).eq('id', currentMachineId);
-    loadInstructionsData();
-};
-
 window.removeManualPdf = typeof removeManualPdf !== 'undefined' ? removeManualPdf : async function(idx) {
     const { data: maq } = await dbSupabase.from('maquinas').select('manuals_pdf').eq('id', currentMachineId).single();
     let manuals = maq?.manuals_pdf || [];
@@ -1968,160 +1935,33 @@ async function subirManualPdf() {
     }
 }
 
-function manejarIncompatibilidadAR() {
-    let usarModeloWeb = confirm("Tu dispositivo no soporta Realidad Aumentada en vivo. ¿Deseas explorar la máquina en el visor 3D interactivo en pantalla?");
-    if (usarModeloWeb) {
-        renderer.xr.enabled = false;
-    }
-}
-
-function guardarKardexEnNube() {
-    // Recolectar datos del kárdex (metadatos, motores, repuestos)
-    const kardexData = {
-        machine_id: currentMachineId, // 🔑 Vínculo vital con la máquina actual
-        area: document.getElementById('k-area').value,
-        codigo: document.getElementById('k-codigo').value,
-        femision: document.getElementById('k-femision').value,
-        eq_marca: document.getElementById('k-eq-marca').value,
-        eq_capacidad: document.getElementById('k-eq-capacidad').value,
-        eq_material: document.getElementById('k-eq-material').value,
-        eq_serie: document.getElementById('k-eq-serie').value,
-        eq_modelo: document.getElementById('k-eq-modelo').value,
-        repuestos: obtenerDatosTablaRepuestos() // Array con las filas de repuestos
-    };
-
-    // Guardar en Supabase o localForage asociado a la máquina
-    dbSupabase
-        .from('kardex_details')
-        .upsert([kardexData], { onConflict: ['machine_id'] })
-        .then(({ error }) => {
-            if (error) console.error("Error al guardar Kárdex:", error);
-        });
-}
-// Función para procesar el texto plano tabulado de Excel y renderizar la tabla
-async function procesarTextoExcel() {
-    const rawData = document.getElementById('paste-excel-input').value;
-    if (!rawData.trim()) {
-        alert("Por favor pega primero las celdas copiadas de Excel.");
-        return;
-    }
-
-    renderizarTablaKardex(rawData);
-    document.getElementById('paste-excel-input').value = '';
-
-    if (currentMachineId) {
-        const { error } = await dbSupabase
-            .from('maquinas')
-            .update({ kardex_raw: rawData })
-            .eq('id', currentMachineId);
-
-        if (error) {
-            console.error("Error al guardar el Kárdex:", error);
-            alert("Hubo un error al guardar en la nube.");
-        } else {
-            alert("¡Tabla de Kárdex guardada correctamente!");
-        }
-    }
-}
-// Guardar los datos de la tabla pegada vinculados al ID de la máquina
-async function guardarKardexEnSupabase(rawTextData) {
-    if (!currentMachineId) return;
-
-    const { error } = await dbSupabase
-        .from('maquina')
-        .update({ kardex_raw: rawTextData })
-        .eq('id', currentMachineId);
-
-    if (error) {
-        console.error("Error al guardar el Kárdex:", error);
-        alert("Hubo un error al guardar en la nube.");
-    } else {
-        alert("¡Tabla de Kárdex guardada correctamente para esta máquina!");
-    }
-}
-
-
-// 2. Renderizar el texto tabulado en una tabla HTML idéntica
-function renderizarTablaKardex(rawTextData) {
-    const container = document.getElementById('kardex-excel-table-container');
-    if (!container) return;
-
-    if (!rawTextData || !rawTextData.trim()) {
-        container.innerHTML = '<p style="font-size: 12px; color: #888; text-align: center; margin: 20px 0;">No hay información de Kárdex disponible para esta máquina.</p>';
-        return;
-    }
-
-    const rows = rawTextData.trim().split('\n');
+async function procesarYSubirKardexPdf() {
+    const fileInput = document.getElementById('pdf-kardex-file');
+    const pageInput = document.getElementById('pdf-page-num');
     
-    // Contenedor con scroll horizontal para mantener la estructura sin deformarse
-    let htmlTable = '<div style="overflow-x: auto; width: 100%;"><table style="width:100%; border-collapse: collapse; font-size: 10px; font-family: Arial, sans-serif; text-align: left; background: #fff;"><tbody>';
-
-    rows.forEach((row, rowIndex) => {
-        const cells = row.split('\t');
-        htmlTable += '<tr style="height: 24px;">';
-
-        cells.forEach((cell, cellIndex) => {
-            const cellValue = cell ? cell.trim() : '';
-            
-            // Estilo diferente para la primera fila (cabecera principal)
-            if (rowIndex === 0) {
-                htmlTable += `<th style="border: 1px solid #b0b0b0; padding: 5px 8px; background-color: #2b2d42; color: #fff; font-weight: bold; white-space: nowrap;">${cellValue}</th>`;
-            } else {
-                // Filas de datos normales con bordes limpios de Excel
-                let bgStyle = cellValue === "" ? "background-color: #fafafa;" : "background-color: #ffffff;";
-                htmlTable += `<td style="border: 1px solid #d3d3d3; padding: 4px 6px; color: #333; ${bgStyle}">${cellValue}</td>`;
-            }
-        });
-
-        htmlTable += '</tr>';
-    });
-
-    htmlTable += '</tbody></table></div>';
-    container.innerHTML = htmlTable;
-}
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
-document.getElementById('loadPdfBtn').addEventListener('click', async () => {
-    const fileInput = document.getElementById('pdfFile');
-    const pageInput = document.getElementById('pageNumber');
-
     if (fileInput.files.length === 0) {
-        alert('Por favor selecciona un archivo PDF primero.');
+        alert("Por favor selecciona un archivo PDF.");
         return;
     }
 
-    const targetPageNum = parseInt(pageInput.value);
-    if (!targetPageNum || targetPageNum < 1) {
-        alert('Por favor ingresa un número de página válido.');
-        return;
-    }
+    const file = fileInput.files[0];
+    const pageNumber = parseInt(pageInput.value) || 1;
 
-    // Apuntamos exclusivamente al contenedor interno de la tabla
-    const tableContainer = document.getElementById('kardex-excel-table-container');
-    if (!tableContainer) {
-        alert('No se encontró el contenedor de la tabla.');
-        return;
-    }
-
-    tableContainer.innerHTML = '<p style="text-align:center; padding:20px;">Cargando página del PDF...</p>';
+    alert("Cargando página del PDF...");
 
     try {
-        const file = fileInput.files[0];
         const arrayBuffer = await file.arrayBuffer();
-        
         const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
         const pdfDoc = await loadingTask.promise;
 
-        if (targetPageNum > pdfDoc.numPages) {
-            alert(`El PDF solo tiene ${pdfDoc.numPages} páginas en total.`);
-            tableContainer.innerHTML = '<p style="font-size: 12px; color: #888; text-align: center; margin: 20px 0;">No hay información cargada en el Kárdex para esta máquina.</p>';
+        if (pageNumber > pdfDoc.numPages || pageNumber < 1) {
+            alert(`El PDF solo tiene ${pdfDoc.numPages} páginas.`);
             return;
         }
 
-        const page = await pdfDoc.getPage(targetPageNum);
-        const scale = 1.5;
-        const viewport = page.getViewport({ scale: scale });
-
+        const page = await pdfDoc.getPage(pageNumber);
+        const viewport = page.getViewport({ scale: 1.5 });
+        
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d');
         canvas.height = viewport.height;
@@ -2129,69 +1969,110 @@ document.getElementById('loadPdfBtn').addEventListener('click', async () => {
 
         await page.render({ canvasContext: context, viewport: viewport }).promise;
 
-        const imageDataUrl = canvas.toDataURL('image/png');
+        const base64Image = canvas.toDataURL('image/jpeg', 0.85);
 
-        // Mostramos la imagen solo en la tabla
-        // Mostramos la imagen controlando su tamaño para que no se expanda de más
-        tableContainer.innerHTML = `
-            <div style="width: 100%; max-height: 500px; overflow: auto; text-align: center; border: 1px solid #ccc; border-radius: 6px; background: #fafafa; padding: 5px;">
-                <img src="${imageDataUrl}" style="max-width: 100%; height: auto; display: block; margin: 0 auto;" />
-            </div>
-        `;
+        const imgElement = document.getElementById('kardex-rendered-img');
+        const emptyMsg = document.getElementById('kardex-empty-msg');
+        
+        imgElement.src = base64Image;
+        imgElement.style.display = 'block';
+        emptyMsg.style.display = 'none';
 
-        // Guardar en Supabase
-        if (typeof currentMachineId !== 'undefined' && currentMachineId) {
-            const { error } = await dbSupabase
-                .from('maquinas')
-                .update({ kardex_raw: `<img src="${imageDataUrl}" style="max-width:100%; height:auto;" />` })
-                .eq('id', currentMachineId);
+        await guardarKardexEnSupabase(base64Image);
 
-            if (error) {
-                console.error('Error al guardar en la nube:', error);
-                alert('Hubo un error al guardar el Kárdex en la nube.');
-            } else {
-                alert('¡Kárdex en PDF cargado y guardado correctamente en la nube!');
-            }
-        }
+        alert("¡Kárdex en PDF guardado y sincronizado correctamente en la nube!");
 
     } catch (error) {
-        console.error('Error al procesar el PDF:', error);
-        alert('Ocurrió un error al leer el archivo PDF.');
-        tableContainer.innerHTML = '<p style="font-size: 12px; color: #888; text-align: center; margin: 20px 0;">Error al cargar el PDF.</p>';
+        console.error("Error al procesar el PDF:", error);
+        alert("Hubo un error al procesar el archivo PDF.");
     }
-});
-// Cargar la hoja guardada al abrir la máquina
-async function cargarKardexMaquina(machineId) {
-    const pasteZone = document.getElementById('admin-kardex-paste-zone');
-    if (pasteZone) {
-        pasteZone.style.display = (currentRole === 'admin') ? 'block' : 'none';
-    }
+}
 
-    const { data, error } = await dbSupabase
-        .from('maquinas') // O 'maquinas' según tu tabla
-        .select('kardex_raw')
-        .eq('id', machineId)
-        .single();
-
-    const container = document.getElementById('kardex-excel-table-container');
-    if (!container) return;
-
-    if (error || !data || !data.kardex_raw) {
-        container.innerHTML = '<p style="font-size: 12px; color: #888; text-align: center; margin: 20px 0;">No hay información de Kárdex disponible.</p>';
+async function guardarKardexEnSupabase(base64Data) {
+    if (!currentMachineName && !currentMachineId) {
+        console.error("No hay una máquina activa seleccionada.");
         return;
     }
 
-    // Mostrar el HTML de la hoja guardada para esta máquina
-    container.innerHTML = `<div style="overflow-x: auto; width: 100%;">${data.kardex_raw}</div>`;
+    const { error } = await dbSupabase
+        .from('maquinas')
+        .update({ kardex_raw: base64Data })
+        .eq('nombre', currentMachineName);
+
+    if (error) {
+        console.error("Error al guardar en Supabase:", error);
+        alert("Error al sincronizar con la base de datos.");
+    }
 }
+
+async function abrirKardexDeMaquina(nombreMaquina) {
+    currentMachineName = nombreMaquina;
+    
+    const adminUploadPanel = document.getElementById('admin-kardex-upload');
+    if (adminUploadPanel) {
+        if (currentRole === 'admin') {
+            adminUploadPanel.style.display = 'block';
+        } else {
+            adminUploadPanel.style.display = 'none';
+        }
+    }
+
+    const { data, error } = await dbSupabase
+        .from('maquinas')
+        .select('kardex_raw')
+        .eq('nombre', nombreMaquina)
+        .single();
+
+    const imgElement = document.getElementById('kardex-rendered-img');
+    const emptyMsg = document.getElementById('kardex-empty-msg');
+
+    if (data && data.kardex_raw) {
+        imgElement.src = data.kardex_raw;
+        imgElement.style.display = 'block';
+        emptyMsg.style.display = 'none';
+    } else {
+        imgElement.style.display = 'none';
+        emptyMsg.style.display = 'block';
+    }
+}
+
+async function deleteMachine(id) {
+    if (currentRole !== 'admin') {
+        alert("No tienes permisos para eliminar máquinas.");
+        return;
+    }
+
+    if (!confirm("¿Estás seguro de eliminar esta máquina? Esta acción no se puede deshacer.")) {
+        return;
+    }
+
+    const { error } = await dbSupabase
+        .from('maquinas')
+        .delete()
+        .eq('id', id);
+
+    if (error) {
+        console.error("Error al eliminar la máquina:", error.message);
+        alert("No se pudo eliminar la máquina: " + error.message);
+    } else {
+        renderMachines();
+    }
+}
+
 // Exponer funciones globalmente
 window.addNewMachine = addNewMachine;
 window.subirManualPieza3D = subirManualPieza3D;
 window.eliminarManualPieza = eliminarManualPieza;
 window.subirManualPdf = subirManualPdf;
-window.addMotorBlock = addMotorBlock;
-window.removeMotorBlock = removeMotorBlock;
-window.updateMotor = updateMotor;
-window.addKardexRow = addKardexRow;
-window.removeKardexRow = removeKardexRow;
-window.updateRepuesto = updateRepuesto;
+window.procesarYSubirKardexPdf = procesarYSubirKardexPdf;
+window.deleteMachine = deleteMachine;
+window.agregarNuevaInstruccion = agregarNuevaInstruccion;
+window.abrirModalAgregarPaso = abrirModalAgregarPaso;
+window.cerrarModalPaso = cerrarModalPaso;
+window.guardarNuevoPasoConImagen = guardarNuevoPasoConImagen;
+window.eliminarPasoDeInstruccion = eliminarPasoDeInstruccion;
+window.eliminarInstruccionCompleta = eliminarInstruccionCompleta;
+window.abrirDetalleInstruccion = abrirDetalleInstruccion;
+window.loadInstructionsData = loadInstructionsData;
+window.openImageModal = openImageModal;
+window.closeImageModal = closeImageModal;
