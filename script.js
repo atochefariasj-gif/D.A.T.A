@@ -21,6 +21,12 @@ const PASSWORDS = {
     'mantenimiento': '123',
     'admin': 'admin123'
 };
+// Detecta y guarda la máquina de la URL apenas carga la página
+const urlParams = new URLSearchParams(window.location.search);
+const maquinaQR = urlParams.get('maquina');
+if (maquinaQR) {
+    sessionStorage.setItem('maquina_qr_pendiente', maquinaQR);
+}
 
 // Función para cargar los nombres desde el archivo JSON[cite: 1]
 async function cargarTraducciones() {
@@ -61,24 +67,24 @@ async function selectRole(role) {
     document.getElementById('main-menu').classList.remove('active-view');
     document.getElementById('view-lines').classList.add('active-view');
 
-    // Control de elementos de admin que agregamos antes
-    const elementosAdmin = document.querySelectorAll('.admin-only');
-    if (currentRole === 'admin' || currentRole === 'Administrador') {
-        elementosAdmin.forEach(el => el.style.display = 'flex');
-    } else {
-        elementosAdmin.forEach(el => el.style.display = 'none');
-    }
+    // ... (todo el código que ya tienes para mostrar el menú o toolbar)
 
-    // 🟢 AGREGA ESTO AQUÍ AL FINAL DE selectRole:
-    // Verificamos si hay una máquina pendiente guardada al escanear el QR
-    const idMaquinaPendiente = localStorage.getItem('qr_pending_machine');
-    
-    if (idMaquinaPendiente) {
-        // Limpiamos el almacenamiento para que no se repita en el futuro
-        localStorage.removeItem('qr_pending_machine');
+    // 🟢 VERIFICAR SI HABÍA UN QR PENDIENTE TRAS SELECCIONAR ROL
+    const idPendiente = sessionStorage.getItem('maquina_qr_pendiente');
+    if (idPendiente) {
+        sessionStorage.removeItem('maquina_qr_pendiente'); // Lo borramos para que no se repita
         
-        // Llamamos a la función que abre el detalle de la máquina por su ID
-        abrirDetalleMaquinaPorID(idMaquinaPendiente);
+        // Consultamos a Supabase los datos de esa máquina específica
+        const { data, error } = await dbSupabase
+            .from('maquinas')
+            .select('*')
+            .eq('id', idPendiente)
+            .maybeSingle();
+
+        if (data && !error) {
+            // Abrimos el detalle de la máquina usando tu función existente
+            openMachineDetail(data.id, data.nombre);
+        }
     }
 }
 
