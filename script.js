@@ -9,6 +9,7 @@ let currentRole = 'visitante';
 let currentLine = '';
 let currentMachineId = null;
 let currentMachineName = null; 
+let currentMachineToken = null;
 let isEditMode = false;
 let rolPendiente = '';
 let mapaNombres = {}; // Aquí se guardarán los nombres del JSON[cite: 1]
@@ -21,6 +22,42 @@ const PASSWORDS = {
     'mantenimiento': '123',
     'admin': 'admin123'
 };
+
+// ==========================================
+// NUEVO: DETECCIÓN DE QR AL CARGAR LA PÁGINA
+// ==========================================
+window.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const maquinaEscaneada = urlParams.get('maquina');
+
+    if (maquinaEscaneada) {
+        // Guardamos la máquina en el sessionStorage para usarla después de autenticar el rol
+        sessionStorage.setItem('maquina_qr_pendiente', maquinaEscaneada);
+    }
+
+    if (localStorage.getItem('modo_oscuro') === 'true') {
+        document.body.classList.add('dark-mode');
+        const btn = document.getElementById('btn-modo-oscuro');
+        if (btn) btn.innerText = '☀️ Modo Claro';
+        aplicarEstilosModoOscuro(true);
+    }
+});
+
+// Función para restringir descargas/impresiones de QR solo a administradores
+function verificarPermisoQRAdmin() {
+    if (currentRole !== 'admin') {
+        alert("Acceso denegado: Solo el Administrador puede descargar o imprimir códigos QR.");
+        return false;
+    }
+    return true;
+}
+
+// Ejemplo de función global protegida para tus botones de descarga/impresión de QR
+function descargarOImprimirQR(idMaquina) {
+    if (!verificarPermisoQRAdmin()) return;
+    // Lógica actual de descarga o impresión de tu QR
+    console.log("Generando descarga de QR para la máquina:", idMaquina);
+}
 
 // Función para cargar los nombres desde el archivo JSON[cite: 1]
 async function cargarTraducciones() {
@@ -59,13 +96,12 @@ async function verificarPassword() {
 
 async function selectRole(role) {
     currentRole = role;
+// ¡Llama a esta función aquí mismo para que el botón aparezca!
+     actualizarVisibilidadQR();
     document.getElementById('main-menu').classList.remove('active-view');
     document.getElementById('view-lines').classList.add('active-view');
 
-// Si el usuario es administrador, muestra la sección del QR
-
-
-    // 🟢 VERIFICAR SI HABÍA UN QR PENDIENTE TRAS SELECCIONAR ROL
+    // 🟢 VERIFICAR SI HABÍA UN QR PENDIENTE TRAS SELECCIONAR CUALQUIER ROL
     const idPendiente = sessionStorage.getItem('maquina_qr_pendiente');
     if (idPendiente) {
         sessionStorage.removeItem('maquina_qr_pendiente'); // Lo borramos para que no se repita
@@ -78,23 +114,17 @@ async function selectRole(role) {
             .maybeSingle();
 
         if (data && !error) {
-            // Abrimos el detalle de la máquina usando tu función existente
+            // Saltamos automáticamente a la línea de la máquina y luego a su detalle
+            currentLine = data.linea;
+            document.getElementById('lines-header-title').innerText = `⚙️ ${data.linea}`;
+            document.getElementById('view-lines').classList.remove('active-view');
+            document.getElementById('view-machine-detail').classList.add('active-view');
             openMachineDetail(data.id, data.nombre);
-        }
-    }
-    actualizarVisibilidadQR();
-}
-function actualizarVisibilidadQR() {
-    const seccionAdminQR = document.getElementById('seccion-admin-qr');
-    if (seccionAdminQR) {
-        // Comparamos en minúsculas y aceptamos variaciones comunes
-        if (currentRole && currentRole.toLowerCase() === 'admin') {
-            seccionAdminQR.style.display = 'block'; 
-        } else {
-            seccionAdminQR.style.display = 'none';
+            return;
         }
     }
 }
+
 async function openLine(lineName, icon) {
     currentLine = lineName;
     document.getElementById('lines-header-title').innerText = `${icon} ${lineName}`;
@@ -113,7 +143,7 @@ async function openLine(lineName, icon) {
 async function renderMachines() {
     const { data: maquinas, error } = await dbSupabase
     .from('maquinas')
-    .select('id, nombre, modelo_url, manual_url, linea, estado_alerta') // Añade estado_alerta aquí
+    .select('id, nombre, modelo_url, manual_url, linea, estado_alerta')
     .eq('linea', currentLine)
     .order('id', { ascending: true });
 
@@ -128,16 +158,13 @@ async function renderMachines() {
     maquinas.forEach(maq => { 
         let card = document.createElement('div');
         card.className = 'card-item';
-function obtenerColorEstadoAlerta(estado) {
-    if (estado === 'falla') return '#dc2626';     // Rojo
-    if (estado === 'revision') return '#d97706';  // Amarillo
-    return '#16a34a';                             // Verde
-}
-function obtenerClaseLed(estado) {
-    if (estado === 'falla') return 'led-indicator led-rojo';
-    if (estado === 'revision') return 'led-indicator led-amarillo';
-    return 'led-indicator led-verde';
-}
+        
+        function obtenerClaseLed(estado) {
+            if (estado === 'falla') return 'led-indicator led-rojo';
+            if (estado === 'revision') return 'led-indicator led-amarillo';
+            return 'led-indicator led-verde';
+        }
+
         if (currentRole === 'admin' && isEditMode) {
             card.onclick = (e) => e.stopPropagation();
             card.innerHTML = `
@@ -145,16 +172,16 @@ function obtenerClaseLed(estado) {
                 <input type="text" class="mach-input" data-id="${maq.id}" value="${maq.nombre || ''}" onchange="updateMachineNameInline('${maq.id}', this.value)">
                 <button class="btn-delete-mach" onclick="deleteMachine('${maq.id}')" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin-top: 5px; font-size: 10px;">🗑️ Eliminar</button>
             `;
-} else {
-    card.onclick = () => openMachineDetail(maq.id, maq.nombre);
-    card.innerHTML = `
-        <span class="card-icon">⚙️</span>
-        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-            <div class="card-title">${maq.nombre}</div>
-           <span class="${obtenerClaseLed(maq.estado_alerta)}" title="Estado: ${maq.estado_alerta || 'normal'}"></span>
-        </div>
-    `;
-}
+        } else {
+            card.onclick = () => openMachineDetail(maq.id, maq.nombre);
+            card.innerHTML = `
+                <span class="card-icon">⚙️</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                   <div class="card-title">${maq.nombre}</div>
+                   <span class="${obtenerClaseLed(maq.estado_alerta)}" title="Estado: ${maq.estado_alerta || 'normal'}"></span>
+                </div>
+            `;
+        }
         
         container.appendChild(card);
     });
@@ -198,11 +225,21 @@ async function updateMachineNameInline(id, nuevoNombre) {
     if (error) console.error("Error al actualizar nombre:", error.message);
 }
 
-async function openMachineDetail(id, name) {
+async function openMachineDetail(id, name, token) {
     currentMachineId = id;
     currentMachineName = name; 
+    // Consultamos el token de esta máquina específica en Supabase
+    const { data, error } = await dbSupabase
+        .from('maquinas')
+        .select('qr_token')
+        .eq('id', id)
+        .maybeSingle();
+
+    if (data) {
+        currentMachineToken = data.qr_token; // <--- Guardamos el token aquí
+    }
     document.getElementById('selected-machine-title').innerText = name;
-    document.getElementById('view-machines').classList.remove('active-view');
+    document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
     document.getElementById('view-machine-detail').classList.add('active-view');
 }
 
@@ -352,7 +389,6 @@ async function loadInstructionsData() {
     let wrapper = document.getElementById('instructions-gallery-wrapper');
     if (!wrapper) return;
 
-    // Sincronizar datos desde Supabase
     const { data: maq, error } = await dbSupabase
         .from('maquinas')
         .select('instrucciones')
@@ -534,19 +570,11 @@ window.eliminarPasoDeInstruccion = async function(instIndex, pasoIndex) {
 // MANUALES PDF
 // ==========================================
 async function loadManualsData() {
-    console.log("Cargando manuales para la máquina ID:", currentMachineId);
-    
     const { data: maq, error } = await dbSupabase
         .from('maquinas')
         .select('manuals_pdf')
         .eq('id', currentMachineId)
         .maybeSingle();
-
-    if (error) {
-        console.error("Error al consultar Supabase:", error);
-    }
-
-    console.log("Datos obtenidos de la máquina:", maq);
 
     let isAdmin = (currentRole === 'admin');
     const adminPdfUpload = document.getElementById('admin-pdf-upload');
@@ -555,7 +583,6 @@ async function loadManualsData() {
     let wrapper = document.getElementById('manuals-list-wrapper');
     wrapper.innerHTML = '';
 
-    // Verificamos si manuals_pdf viene como array o como string JSON guardado por error
     let manuals = maq?.manuals_pdf;
     if (typeof manuals === 'string') {
         try {
@@ -601,7 +628,6 @@ async function loadManualsData() {
     wrapper.innerHTML = listHTML;
 }
 
-// Función auxiliar para el filtro rápido de manuales
 function filtrarManualesPDF() {
     let filtro = document.getElementById('input-buscar-manual').value.toLowerCase();
     let filas = document.querySelectorAll('#manuals-items-container > div');
@@ -615,7 +641,6 @@ function filtrarManualesPDF() {
     });
 }
 
-// Función para abrir el PDF en un visor interactivo dentro de la misma plataforma (modal o iframe superpuesto)
 function verPdfEnVisor(urlPdf, titulo) {
     let modalId = 'modal-visor-pdf-global';
     let modal = document.getElementById(modalId);
@@ -627,12 +652,10 @@ function verPdfEnVisor(urlPdf, titulo) {
         
         modal.innerHTML = `
             <div style="background: #ffffff; width: 100%; max-width: 1000px; height: 90vh; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.3);">
-                <!-- Barra superior del visor -->
                 <div style="background: #1e293b; color: white; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center;">
                     <span id="visor-pdf-titulo" style="font-weight: bold; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 80%;"></span>
                     <button onclick="cerrarVisorPdfGlobal()" style="background: #dc2626; color: white; border: none; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px;">✕ Cerrar</button>
                 </div>
-                <!-- Contenedor del PDF embebido -->
                 <div style="flex-grow: 1; background: #e2e8f0; width: 100%; position: relative;">
                     <iframe id="iframe-pdf-visor" style="width: 100%; height: 100%; border: none;"></iframe>
                 </div>
@@ -643,8 +666,6 @@ function verPdfEnVisor(urlPdf, titulo) {
 
     document.getElementById('visor-pdf-titulo').innerText = `📄 ${titulo}`;
     const iframe = document.getElementById('iframe-pdf-visor');
-    
-    // Usamos el visor de Google integrado para forzar la visualización directa sin descargas
     const urlVisualizador = `https://docs.google.com/gview?url=${encodeURIComponent(urlPdf)}&embedded=true`;
     
     iframe.src = urlVisualizador;
@@ -659,21 +680,6 @@ function cerrarVisorPdfGlobal() {
         if (iframe) iframe.src = '';
     }
 }
-
-function cerrarVisorPdfGlobal() {
-    let modal = document.getElementById('modal-visor-pdf-global');
-    if (modal) {
-        modal.style.display = 'none';
-        document.getElementById('iframe-pdf-visor').src = '';
-    }
-}
-
-// Asegúrate de exponer las funciones necesarias globalmente si usas módulos o type="module"
-window.subirManualPdf = subirManualPdf;
-window.loadManualsData = loadManualsData;
-window.filtrarManualesPDF = filtrarManualesPDF;
-window.verPdfEnVisor = verPdfEnVisor;
-window.cerrarVisorPdfGlobal = cerrarVisorPdfGlobal;
 
 async function openImageModal(src) {
     document.getElementById('modal-img-tag').src = src;
@@ -1885,60 +1891,6 @@ function limpiarMedicion() {
     if (res && modoMedicionActivo) res.innerText = "Haga clic en una pieza para aislarla y medir con precisión.";
 }
 
-async function iniciarRealidadAumentada() {
-    if ('xr' in navigator) {
-        try {
-            const supported = await navigator.xr.isSessionSupported('immersive-ar');
-            if (supported) {
-                const session = await navigator.xr.requestSession('immersive-ar', {
-                    requiredFeatures: ['hit-test', 'local-floor']
-                });
-                
-                renderer.xr.enabled = true;
-                await renderer.xr.setSession(session);
-
-                session.addEventListener('end', () => {
-                    renderer.xr.enabled = false;
-                });
-            } else {
-                fallbackAR_Movil();
-            }
-        } catch (error) {
-            console.error("Error al iniciar WebXR:", error);
-            fallbackAR_Movil();
-        }
-    } else {
-        fallbackAR_Movil();
-    }
-}
-
-async function fallbackAR_Movil() {
-    const { data, error } = await dbSupabase
-        .from('maquinas')
-        .select('modelo_url')
-        .eq('id', currentMachineId)
-        .single();
-
-    if (data && data.modelo_url) {
-        let urlModelo = data.modelo_url;
-        let esAndroid = /android/i.test(navigator.userAgent);
-        
-        if (esAndroid) {
-            let intentUrl = `intent://arvr.google.com/scene-viewer/1.0?file=${encodeURIComponent(urlModelo)}&mode=ar_preferred#Intent;scheme=https;package=com.google.ar.core;action=android.intent.action.VIEW;end;`;
-            
-            let enlace = document.createElement('a');
-            enlace.href = intentUrl;
-            document.body.appendChild(enlace);
-            enlace.click();
-            document.body.removeChild(enlace);
-        } else {
-            window.open(urlModelo, '_blank');
-        }
-    } else {
-        alert("Este dispositivo o modelo no soporta AR directo en este momento.");
-    }
-}
-
 async function cargarDatosInventarioPieza(nombrePieza) {
     const { data: rep, error } = await dbSupabase
         .from('repuestos_inventario')
@@ -1946,10 +1898,6 @@ async function cargarDatosInventarioPieza(nombrePieza) {
         .eq('maquina_id', currentMachineId)
         .eq('nombre_pieza', nombrePieza)
         .maybeSingle();
-
-    if (error) {
-        console.warn("Aviso al cargar inventario de pieza:", error.message);
-    }
 
     const contenedorInventario = document.getElementById('panel-inventario-pieza');
     if (!contenedorInventario) return;
@@ -2028,7 +1976,7 @@ async function cargarNotas3DEnModelo() {
     });
 }
 
-window.vincularSkuAhora = typeof vincularSkuAhora !== 'undefined' ? vincularSkuAhora : function(nombrePieza) {
+window.vincularSkuAhora = function(nombrePieza) {
     let sku = prompt(`Ingrese el SKU para la pieza "${nombrePieza}":`);
     if (!sku) return;
     dbSupabase.from('repuestos_inventario').insert([
@@ -2042,7 +1990,7 @@ window.vincularSkuAhora = typeof vincularSkuAhora !== 'undefined' ? vincularSkuA
     });
 };
 
-window.removeManualPdf = typeof removeManualPdf !== 'undefined' ? removeManualPdf : async function(idx) {
+window.removeManualPdf = async function(idx) {
     const { data: maq } = await dbSupabase.from('maquinas').select('manuals_pdf').eq('id', currentMachineId).single();
     let manuals = maq?.manuals_pdf || [];
     manuals.splice(idx, 1);
@@ -2066,7 +2014,6 @@ async function subirManualPdf(event) {
 
     alert(`Subiendo ${files.length} archivo(s) PDF. Por favor espera...`);
 
-    // Obtenemos los manuales actuales de la máquina
     const { data: maq, error: fetchError } = await dbSupabase
         .from('maquinas')
         .select('manuals_pdf')
@@ -2074,7 +2021,6 @@ async function subirManualPdf(event) {
         .maybeSingle();
 
     if (fetchError) {
-        console.error("Error al obtener manuales previos:", fetchError);
         alert("Error al conectar con la base de datos.");
         return;
     }
@@ -2085,17 +2031,12 @@ async function subirManualPdf(event) {
         const file = files[i];
         const fileName = `manual_${currentMachineId}_${Date.now()}_${i}.pdf`;
 
-        // Subir al bucket 'manuales'
         const { error: uploadError } = await dbSupabase.storage
             .from('manuales')
             .upload(fileName, file);
 
-        if (uploadError) {
-            console.error(`Error al subir ${file.name}:`, uploadError.message);
-            continue; // Continuamos con los demás si uno falla
-        }
+        if (uploadError) continue;
 
-        // Obtener URL pública
         const { data: { publicUrl } } = dbSupabase.storage
             .from('manuales')
             .getPublicUrl(fileName);
@@ -2103,14 +2044,13 @@ async function subirManualPdf(event) {
         manuals.push({ name: file.name, url: publicUrl });
     }
 
-    // Actualizar la tabla maquinas con el nuevo array de manuales
     const { error: updateError } = await dbSupabase
         .from('maquinas')
         .update({ manuals_pdf: manuals })
         .eq('id', currentMachineId);
 
     if (updateError) {
-        alert("Error al guardar las referencias de los manuales: " + updateError.message);
+        alert("Error al guardar referencias: " + updateError.message);
     } else {
         alert("¡Manuales PDF subidos y guardados con éxito!");
         fileInput.value = ""; 
@@ -2129,8 +2069,6 @@ async function procesarYSubirKardexPdf() {
 
     const file = fileInput.files[0];
     const pageNumber = parseInt(pageInput.value) || 1;
-
-    alert("Cargando página del PDF...");
 
     try {
         const arrayBuffer = await file.arrayBuffer();
@@ -2151,7 +2089,6 @@ async function procesarYSubirKardexPdf() {
         canvas.width = viewport.width;
 
         await page.render({ canvasContext: context, viewport: viewport }).promise;
-
         const base64Image = canvas.toDataURL('image/jpeg', 0.85);
 
         const imgElement = document.getElementById('kardex-rendered-img');
@@ -2162,30 +2099,19 @@ async function procesarYSubirKardexPdf() {
         emptyMsg.style.display = 'none';
 
         await guardarKardexEnSupabase(base64Image);
-
         alert("¡Kárdex en PDF guardado y sincronizado correctamente en la nube!");
-
     } catch (error) {
-        console.error("Error al procesar el PDF:", error);
         alert("Hubo un error al procesar el archivo PDF.");
     }
 }
 
 async function guardarKardexEnSupabase(base64Data) {
-    if (!currentMachineName && !currentMachineId) {
-        console.error("No hay una máquina activa seleccionada.");
-        return;
-    }
+    if (!currentMachineName && !currentMachineId) return;
 
-    const { error } = await dbSupabase
+    await dbSupabase
         .from('maquinas')
         .update({ kardex_raw: base64Data })
         .eq('nombre', currentMachineName);
-
-    if (error) {
-        console.error("Error al guardar en Supabase:", error);
-        alert("Error al sincronizar con la base de datos.");
-    }
 }
 
 async function abrirKardexDeMaquina(nombreMaquina) {
@@ -2193,14 +2119,10 @@ async function abrirKardexDeMaquina(nombreMaquina) {
     
     const adminUploadPanel = document.getElementById('admin-kardex-upload');
     if (adminUploadPanel) {
-        if (currentRole === 'admin') {
-            adminUploadPanel.style.display = 'block';
-        } else {
-            adminUploadPanel.style.display = 'none';
-        }
+        adminUploadPanel.style.display = (currentRole === 'admin') ? 'block' : 'none';
     }
 
-    const { data, error } = await dbSupabase
+    const { data } = await dbSupabase
         .from('maquinas')
         .select('kardex_raw')
         .eq('nombre', nombreMaquina)
@@ -2225,22 +2147,16 @@ async function deleteMachine(id) {
         return;
     }
 
-    if (!confirm("¿Estás seguro de eliminar esta máquina? Esta acción no se puede deshacer.")) {
-        return;
-    }
+    if (!confirm("¿Estás seguro de eliminar esta máquina?")) return;
 
-    const { error } = await dbSupabase
-        .from('maquinas')
-        .delete()
-        .eq('id', id);
-
+    const { error } = await dbSupabase.from('maquinas').delete().eq('id', id);
     if (error) {
-        console.error("Error al eliminar la máquina:", error.message);
-        alert("No se pudo eliminar la máquina: " + error.message);
+        alert("No se pudo eliminar: " + error.message);
     } else {
         renderMachines();
     }
 }
+
 function toggleModoOscuro() {
     document.body.classList.toggle('dark-mode');
     const isDark = document.body.classList.contains('dark-mode');
@@ -2248,35 +2164,20 @@ function toggleModoOscuro() {
     
     const btn = document.getElementById('btn-modo-oscuro');
     if (btn) btn.innerText = isDark ? '☀️ Modo Claro' : '🌙 Modo Oscuro';
-    
     aplicarEstilosModoOscuro(isDark);
 }
 
 function aplicarEstilosModoOscuro(isDark) {
-    // Ajuste dinámico de colores principales para contenedores e inputs si usas estilos en línea
     let bgMain = isDark ? '#0f172a' : '#f1f5f9';
-    let bgCard = isDark ? '#1e293b' : '#ffffff';
     let textCol = isDark ? '#f8fafc' : '#1e293b';
-    
     document.body.style.backgroundColor = bgMain;
     document.body.style.color = textCol;
 }
-
-// Al cargar la página, verificar si estaba activo
-window.addEventListener('DOMContentLoaded', () => {
-    if (localStorage.getItem('modo_oscuro') === 'true') {
-        document.body.classList.add('dark-mode');
-        const btn = document.getElementById('btn-modo-oscuro');
-        if (btn) btn.innerText = '☀️ Modo Claro';
-        aplicarEstilosModoOscuro(true);
-    }
-});
 
 let maquinaIdActualBuzon = null;
 
 function abrirBuzonMaquina(idMaquina, nombreMaquina) {
     maquinaIdActualBuzon = idMaquina;
-    // Si tienes un título en el modal de máquina, puedes actualizarlo aquí:
     document.getElementById('titulo-modal-maquina').innerText = `💡 Sugerencias de la Máquina: ${nombreMaquina || ''}`;
     document.getElementById('modal-buzon-maquina').style.display = 'flex';
     cargarSugerenciasMaquina();
@@ -2287,7 +2188,7 @@ function cerrarBuzonMaquina() {
 }
 
 async function cargarSugerenciasMaquina() {
-    const { data, error } = await dbSupabase
+    const { data } = await dbSupabase
         .from('maquinas')
         .select('sugerencias')
         .eq('id', maquinaIdActualBuzon)
@@ -2298,7 +2199,7 @@ async function cargarSugerenciasMaquina() {
     contenedor.innerHTML = '';
 
     if (sugerencias.length === 0) {
-        contenedor.innerHTML = `<div style="color: #64748b; font-size: 12px; text-align: center; padding: 15px;">No hay sugerencias registradas para esta máquina todavía.</div>`;
+        contenedor.innerHTML = `<div style="color: #64748b; font-size: 12px; text-align: center; padding: 15px;">No hay sugerencias registradas todavía.</div>`;
         return;
     }
 
@@ -2312,27 +2213,15 @@ async function cargarSugerenciasMaquina() {
     });
 }
 
-// --- GUARDAR SUGERENCIA DE MÁQUINA ---
 async function enviarSugerenciaMaquina() {
     const textoSugerencia = document.getElementById('input-nueva-sugerencia-maquina').value.trim();
-    if (!textoSugerencia) {
-        alert("Escribe una sugerencia antes de enviar.");
-        return;
-    }
+    if (!textoSugerencia) return alert("Escribe una sugerencia.");
 
-    console.log("Buscando máquina ID:", maquinaIdActualBuzon);
-
-    const { data: maqData, error: errorFetch } = await dbSupabase
+    const { data: maqData } = await dbSupabase
         .from('maquinas')
         .select('sugerencias')
         .eq('id', maquinaIdActualBuzon)
         .maybeSingle();
-
-    if (errorFetch) {
-        console.error("Error al buscar máquina:", errorFetch);
-        alert("Error al conectar con la base de datos.");
-        return;
-    }
 
     let lista = maqData?.sugerencias || [];
     lista.push({
@@ -2341,23 +2230,21 @@ async function enviarSugerenciaMaquina() {
         autor: window.currentUser || window.currentRole || 'Usuario'
     });
 
-    const { error: errorUpdate } = await dbSupabase
+    const { error } = await dbSupabase
         .from('maquinas')
         .update({ sugerencias: lista })
         .eq('id', maquinaIdActualBuzon);
 
-    if (errorUpdate) {
-        console.error("Error al actualizar máquina:", errorUpdate);
-        alert("No se pudo guardar la sugerencia.");
-    } else {
+    if (!error) {
         document.getElementById('input-nueva-sugerencia-maquina').value = '';
         await cargarSugerenciasMaquina();
     }
 }
+
 let lineaActualBuzon = '';
 
 function abrirBuzonPorLinea(nombreLinea) {
-    lineaActualBuzon = nombreLinea || currentLine; // Usa la línea activa actual
+    lineaActualBuzon = nombreLinea || currentLine;
     document.getElementById('modal-buzon').style.display = 'flex';
     cargarSugerenciasPorLinea();
 }
@@ -2367,9 +2254,8 @@ function cerrarBuzonSugerencias() {
 }
 
 async function cargarSugerenciasPorLinea() {
-    // Consultamos las sugerencias de la tabla 'lineas' filtrando por el nombre de la línea
-    const { data, error } = await dbSupabase
-        .from('lineas') // Cambia al nombre de tu tabla de líneas
+    const { data } = await dbSupabase
+        .from('lineas')
         .select('sugerencias')
         .eq('nombre', lineaActualBuzon)
         .maybeSingle();
@@ -2379,7 +2265,7 @@ async function cargarSugerenciasPorLinea() {
     contenedor.innerHTML = '';
 
     if (sugerencias.length === 0) {
-        contenedor.innerHTML = `<div style="color: #64748b; font-size: 12px; text-align: center; padding: 15px;">No hay sugerencias registradas para la línea ${lineaActualBuzon} todavía.</div>`;
+        contenedor.innerHTML = `<div style="color: #64748b; font-size: 12px; text-align: center; padding: 15px;">No hay sugerencias para la línea ${lineaActualBuzon}.</div>`;
         return;
     }
 
@@ -2393,27 +2279,15 @@ async function cargarSugerenciasPorLinea() {
     });
 }
 
-// --- GUARDAR SUGERENCIA DE LÍNEA ---
 async function enviarSugerenciaLinea() {
     const textoSugerencia = document.getElementById('input-nueva-sugerencia').value.trim();
-    if (!textoSugerencia) {
-        alert("Escribe una sugerencia antes de enviar.");
-        return;
-    }
+    if (!textoSugerencia) return alert("Escribe una sugerencia.");
 
-    console.log("Buscando línea:", lineaActualBuzon);
-
-    const { data: lineaData, error: errorFetch } = await dbSupabase
+    const { data: lineaData } = await dbSupabase
         .from('lineas')
         .select('sugerencias')
         .eq('nombre', lineaActualBuzon)
         .maybeSingle();
-
-    if (errorFetch) {
-        console.error("Error al buscar línea:", errorFetch);
-        alert("Error al conectar con la base de datos.");
-        return;
-    }
 
     let lista = lineaData?.sugerencias || [];
     lista.push({
@@ -2422,103 +2296,57 @@ async function enviarSugerenciaLinea() {
         autor: window.currentUser || window.currentRole || 'Usuario'
     });
 
-    const { error: errorUpdate } = await dbSupabase
+    const { error } = await dbSupabase
         .from('lineas')
         .update({ sugerencias: lista })
         .eq('nombre', lineaActualBuzon);
 
-    if (errorUpdate) {
-        console.error("Error al actualizar línea:", errorUpdate);
-        alert("No se pudo guardar la sugerencia.");
-    } else {
+    if (!error) {
         document.getElementById('input-nueva-sugerencia').value = '';
         await cargarSugerenciasPorLinea();
     }
 }
-function generarQRMaquina(idMaquina, qrToken) {
-    document.getElementById('contenedor-codigo-qr').innerHTML = ''; 
-    document.getElementById('modal-qr-dinamico').style.display = 'flex';
+// Variable global para guardar el token de la máquina actual (si no la tienes, agrégala arriba con tus let)
 
-    // ⚠️ REEMPLAZA window.location.origin por tu dominio real o tu IP local si estás en desarrollo local
-    // Ejemplo si usas IP local: const urlServidor = "http://192.168.1.X:8158";
+
+// Función para generar y mostrar el código QR
+function generarQRMaquina() {
+    const contenedorQR = document.getElementById('contenedor-codigo-qr');
+    const modalQR = document.getElementById('modal-qr-dinamico');
+    
+    // Limpiamos contenido previo
+    contenedorQR.innerHTML = '';
+    
+    // Validamos que tengamos el token cargado
+    if (!currentMachineToken) {
+        alert("No se encontró el token de esta máquina.");
+        return;
+    }
+
+    // Mostramos el modal
+    modalQR.style.display = 'flex';
+
+    // Construimos la URL base de tu GitHub Pages o entorno actual
     const urlBase = window.location.origin + window.location.pathname;
+    const urlApp = `${urlBase}?qr=${currentMachineToken}`;
 
-    // Construimos la URL usando el parámetro ?qr= y el token único de la máquina
-    const urlApp = `${urlBase}?qr=${qrToken}`;
-
-    // Generar el código QR visualmente
-    new QRCode(document.getElementById("contenedor-codigo-qr"), {
+    // Generamos el código QR visualmente usando la librería QRCode
+    new QRCode(contenedorQR, {
         text: urlApp,
         width: 180,
         height: 180
     });
 }
-
-function cerrarModalQR() {
-    document.getElementById('modal-qr-dinamico').style.display = 'none';
-}
-// Variable global para almacenar temporalmente la máquina del QR escaneado
-let maquinaQrPendiente = null;
-
-async function verificarParametroQR() {
-    const params = new URLSearchParams(window.location.search);
-    const qrToken = params.get('qr');
-
-    if (qrToken) {
-        // Buscamos a qué máquina pertenece este token en Supabase
-        const { data: maquina, error } = await dbSupabase
-            .from('maquinas')
-            .select('*')
-            .eq('qr_token', qrToken)
-            .maybeSingle();
-
-        if (maquina) {
-            maquinaQrPendiente = maquina; // Guardamos el objeto máquina
-            console.log("QR detectado para la máquina:", maquina.nombre);
-            
-            // Ocultamos la vista normal y mostramos el selector de roles especial para el QR
-            mostrarSelectorRolesQR(maquina.nombre);
-        } else {
-            alert("El código QR escaneado no es válido o la máquina no existe.");
-        }
-    }
-}
-
-function mostrarSelectorRolesQR(nombreMaquina) {
-    // Aquí puedes mostrar un contenedor especial en tu pantalla de bienvenida
-    // Indicando: "Escaneaste el QR de [Nombre de Máquina]. Selecciona tu rol para continuar:"
-    const pantallaInicio = document.getElementById('pantalla-seleccion-rol'); // O tu contenedor principal de roles
-    if(pantallaInicio) {
-        pantallaInicio.innerHTML = `
-            <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; max-width: 400px; margin: auto;">
-                <h3 style="color: #0284c7; margin-bottom: 5px;">📲 Acceso por Escaneo QR</h3>
-                <p style="font-size: 13px; color: #334155; margin-bottom: 15px;">Máquina detectada: <b>${nombreMaquina}</b></p>
-                <p style="font-size: 12px; color: #64748b; margin-bottom: 20px;">Selecciona el rol con el que deseas ingresar:</p>
-                
-                <div style="display: flex; flex-direction: column; gap: 10px;">
-                    <button onclick="seleccionarRolQR('visitante')" style="background: #0ea5e9; color: white; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">👤 Visitante</button>
-                    <button onclick="seleccionarRolQR('mantenimiento')" style="background: #f59e0b; color: white; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">🔧 Mantenimiento</button>
-                    <button onclick="seleccionarRolQR('administrador')" style="background: #10b981; color: white; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">🛡️ Administrador</button>
-                </div>
-            </div>
-        `;
-    }
-}
-
-function seleccionarRolQR(rol) {
-    window.currentUserRole = rol; // Guardas el rol seleccionado
+function actualizarVisibilidadQR() {
+    const seccionAdminQR = document.getElementById('seccion-admin-qr');
     
-    // Una vez elegido el rol, redirigimos de forma automática directamente a los detalles de esa máquina
-    if (maquinaQrPendiente) {
-        // Llamas a tu función existente que abre el menú de opciones de la máquina (Kardex, Buzón, etc.)
-        abrirMenuOpcionesMaquinaDirecto(maquinaQrPendiente);
+    // Si el rol actual es administrador, lo mostramos; si es visitante, lo ocultamos
+    if (currentRole === 'admin') {
+        seccionAdminQR.style.display = 'block'; // Muestra el botón de QR
+    } else {
+        seccionAdminQR.style.display = 'none';  // Lo oculta para visitantes
     }
 }
-
-// Ejecutar esta verificación al cargar la página
-window.addEventListener('DOMContentLoaded', () => {
-    verificarParametroQR();
-});
 // Exponer funciones globalmente
 window.addNewMachine = addNewMachine;
 window.subirManualPieza3D = subirManualPieza3D;
@@ -2536,3 +2364,4 @@ window.abrirDetalleInstruccion = abrirDetalleInstruccion;
 window.loadInstructionsData = loadInstructionsData;
 window.openImageModal = openImageModal;
 window.closeImageModal = closeImageModal;
+window.descargarOImprimirQR = descargarOImprimirQR;
