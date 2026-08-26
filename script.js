@@ -21,11 +21,41 @@ const PASSWORDS = {
     'mantenimiento': '123',
     'admin': 'admin123'
 };
-// Detecta y guarda la máquina de la URL apenas carga la página
+// 1. Detectar si la URL trae una máquina escaneada por QR
 const urlParams = new URLSearchParams(window.location.search);
-const maquinaQR = urlParams.get('maquina');
-if (maquinaQR) {
-    sessionStorage.setItem('maquina_qr_pendiente', maquinaQR);
+const idMaquinaEscaneada = urlParams.get('maquina');
+
+if (idMaquinaEscaneada) {
+    // Guardamos temporalmente el ID de la máquina en sessionStorage
+    sessionStorage.setItem('maquinaPendienteQR', idMaquinaEscaneada);
+}
+
+// 2. Función que se ejecuta cuando el usuario presiona su rol (Visitante, Mantenimiento, Admin)
+async function seleccionarRol(rolUsuario) {
+    window.currentRole = rolUsuario; // O tu variable de sesión actual
+    
+    // Verificamos si hay una máquina pendiente por el escaneo de un QR
+    const maquinaPendiente = sessionStorage.getItem('maquinaPendienteQR');
+    
+    if (maquinaPendiente) {
+        sessionStorage.removeItem('maquinaPendienteQR'); // Limpiamos la memoria
+        
+        // Consultamos los datos de esa máquina en Supabase para abrirla de inmediato
+        const { data: maq, error } = await dbSupabase
+            .from('maquinas')
+            .select('*')
+            .eq('id', maquinaPendiente)
+            .single();
+            
+        if (maq) {
+            // Llamamos a tu función existente que abre los detalles de la máquina
+            abrirVistaDetalleMaquina(maq);
+            return;
+        }
+    }
+    
+    // Si no hay QR escaneado, continúa a la pantalla normal de selección de líneas
+    mostrarPantallaLineas();
 }
 
 // Función para cargar los nombres desde el archivo JSON[cite: 1]
@@ -2428,79 +2458,22 @@ async function enviarSugerenciaLinea() {
         await cargarSugerenciasPorLinea();
     }
 }
-// 1. Generar el código QR apuntando a la URL actual con el ID de la máquina
-function generarQRPrueba(idMaquina, nombreMaquina) {
-    // Usa comillas invertidas (backticks) aquí:
-    document.getElementById('qr-titulo-maquina').innerText = `QR: ${nombreMaquina}`;
+function generarCodigoQR(idMaquina, nombreMaquina) {
+    const contenedorQr = document.getElementById('contenedor-qr');
+    contenedorQr.innerHTML = ''; // Limpiar anterior
     
-    const contenedorQR = document.getElementById('contenedor-codigo-qr');
-    contenedorQR.innerHTML = ''; 
-
-    const urlAppConMaquina = `${window.location.origin}${window.location.pathname}?maquina=${idMaquina}`;
-
-    new QRCode(contenedorQR, {
-        text: urlAppConMaquina,
+    // URL que abrirá el celular al escanear el QR
+    const urlApp = `https://tu-sitio-web.com/index.html?maquina=${idMaquina}`;
+    
+    // Usando una librería tipo qrcode.js
+    new QRCode(contenedorQr, {
+        text: urlApp,
         width: 180,
-        height: 180,
-        colorDark : "#000000",
-        colorLight : "#ffffff",
-        correctLevel : QRCode.CorrectLevel.H
+        height: 180
     });
-
-    document.getElementById('modal-qr').style.display = 'flex';
-}
-
-function cerrarModalQR() {
-    document.getElementById('modal-qr').style.display = 'none';
-}
-
-// 2. Detectar al cargar la página si se abrió escaneando un QR
-window.addEventListener('DOMContentLoaded', () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const idMaquinaEscaneada = urlParams.get('maquina');
-
-    if (idMaquinaEscaneada) {
-        // Guardamos temporalmente el ID de la máquina a la que se quería ir
-        localStorage.setItem('qr_pending_machine', idMaquinaEscaneada);
-        console.log("QR detectado para la máquina ID:", idMaquinaEscaneada);
-    }
-});
-function seleccionarRol(rol) {
-    window.currentRole = rol; // Asignas el rol elegido
     
-    // Verificamos si hay una máquina pendiente por escaneo de QR
-    const idMaquinaPendiente = localStorage.getItem('qr_pending_machine');
-
-    if (idMaquinaPendiente) {
-        localStorage.removeItem('qr_pending_machine'); // Limpiamos
-        
-        // Llamamos a tu función existente que abre el detalle de la máquina por su ID
-        abrirDetalleMaquinaPorId(idMaquinaPendiente);
-    } else {
-        // Comportamiento normal: muestra la lista de líneas o menú principal
-        mostrarVistaPrincipal(); 
-    }
-}
-async function verificarMaquinaEscaneadaPorURL() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const idMaquina = urlParams.get('maquina');
-
-    if (idMaquina) {
-        // Consultamos directamente a Supabase los datos de esa máquina
-        const { data, error } = await dbSupabase
-            .from('maquinas')
-            .select('*')
-            .eq('id', idMaquina)
-            .maybeSingle();
-
-        if (data && !error) {
-            // Si la máquina existe en Supabase, abrimos su detalle automáticamente
-            // Reemplaza 'openMachineDetail' con la función exacta que usas para abrir la máquina
-            openMachineDetail(data.id, data.nombre);
-        } else {
-            console.error("No se encontró la máquina en Supabase o hubo un error", error);
-        }
-    }
+    document.getElementById('titulo-qr-maquina').innerText = `QR para: ${nombreMaquina}`;
+    document.getElementById('modal-qr').style.display = 'flex';
 }
 // Exponer funciones globalmente
 window.addNewMachine = addNewMachine;
