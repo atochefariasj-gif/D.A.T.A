@@ -2436,12 +2436,15 @@ async function enviarSugerenciaLinea() {
     }
 }
 function generarQRMaquina(idMaquina, qrToken) {
-    document.getElementById('contenedor-codigo-qr').innerHTML = ''; // Limpiar anterior
+    document.getElementById('contenedor-codigo-qr').innerHTML = ''; 
     document.getElementById('modal-qr-dinamico').style.display = 'flex';
 
-    // URL base de tu aplicación alojada (ej. GitHub Pages, Vercel o tu IP local)
-    // Usamos un parámetro ?qr=TOKEN_UNICO
-    const urlApp = `${window.location.origin}${window.location.pathname}?qr=${qrToken}`;
+    // ⚠️ REEMPLAZA window.location.origin por tu dominio real o tu IP local si estás en desarrollo local
+    // Ejemplo si usas IP local: const urlServidor = "http://192.168.1.X:8158";
+    const urlBase = window.location.origin + window.location.pathname;
+
+    // Construimos la URL usando el parámetro ?qr= y el token único de la máquina
+    const urlApp = `${urlBase}?qr=${qrToken}`;
 
     // Generar el código QR visualmente
     new QRCode(document.getElementById("contenedor-codigo-qr"), {
