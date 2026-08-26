@@ -2475,6 +2475,27 @@ function seleccionarRol(rol) {
         mostrarVistaPrincipal(); 
     }
 }
+async function verificarMaquinaEscaneadaPorURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const idMaquina = urlParams.get('maquina');
+
+    if (idMaquina) {
+        // Consultamos directamente a Supabase los datos de esa máquina
+        const { data, error } = await dbSupabase
+            .from('maquinas')
+            .select('*')
+            .eq('id', idMaquina)
+            .maybeSingle();
+
+        if (data && !error) {
+            // Si la máquina existe en Supabase, abrimos su detalle automáticamente
+            // Reemplaza 'openMachineDetail' con la función exacta que usas para abrir la máquina
+            openMachineDetail(data.id, data.nombre);
+        } else {
+            console.error("No se encontró la máquina en Supabase o hubo un error", error);
+        }
+    }
+}
 // Exponer funciones globalmente
 window.addNewMachine = addNewMachine;
 window.subirManualPieza3D = subirManualPieza3D;
