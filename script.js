@@ -37,7 +37,7 @@ async function cargarTraducciones() {
 
 async function solicitarPassword(rol) {
     rolPendiente = rol;
-    document.getElementById('modal-password-title').innerText = `Contraseña para ${rol.toUpperCase()}`;
+    document.getElementById('modal-password-title').innerText = `🔐Contraseña para ${rol.toUpperCase()}`;
     document.getElementById('input-password-val').value = '';
     document.getElementById('modal-password').style.display = 'flex';
 }
@@ -57,9 +57,17 @@ async function verificarPassword() {
 }
 
 async function selectRole(role) {
-    currentRole = role; 
+    currentRole = role;
     document.getElementById('main-menu').classList.remove('active-view');
     document.getElementById('view-lines').classList.add('active-view');
+
+    // 🟢 AGREGA ESTO AQUÍ:
+    const elementosAdmin = document.querySelectorAll('.admin-only');
+    if (currentRole === 'admin' || currentRole === 'Administrador') {
+        elementosAdmin.forEach(el => el.style.display = 'flex');
+    } else {
+        elementosAdmin.forEach(el => el.style.display = 'none');
+    }
 }
 
 async function openLine(lineName, icon) {
@@ -79,10 +87,10 @@ async function openLine(lineName, icon) {
 
 async function renderMachines() {
     const { data: maquinas, error } = await dbSupabase
-        .from('maquinas')
-        .select('*')
-        .eq('linea', currentLine)
-        .order('id', { ascending: true });
+    .from('maquinas')
+    .select('id, nombre, modelo_url, manual_url, linea, estado_alerta') // Añade estado_alerta aquí
+    .eq('linea', currentLine)
+    .order('id', { ascending: true });
 
     if (error) {
         console.error("Error al cargar las máquinas:", error);
@@ -95,7 +103,16 @@ async function renderMachines() {
     maquinas.forEach(maq => { 
         let card = document.createElement('div');
         card.className = 'card-item';
-
+function obtenerColorEstadoAlerta(estado) {
+    if (estado === 'falla') return '#dc2626';     // Rojo
+    if (estado === 'revision') return '#d97706';  // Amarillo
+    return '#16a34a';                             // Verde
+}
+function obtenerClaseLed(estado) {
+    if (estado === 'falla') return 'led-indicator led-rojo';
+    if (estado === 'revision') return 'led-indicator led-amarillo';
+    return 'led-indicator led-verde';
+}
         if (currentRole === 'admin' && isEditMode) {
             card.onclick = (e) => e.stopPropagation();
             card.innerHTML = `
@@ -103,13 +120,17 @@ async function renderMachines() {
                 <input type="text" class="mach-input" data-id="${maq.id}" value="${maq.nombre || ''}" onchange="updateMachineNameInline('${maq.id}', this.value)">
                 <button class="btn-delete-mach" onclick="deleteMachine('${maq.id}')" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin-top: 5px; font-size: 10px;">🗑️ Eliminar</button>
             `;
-        } else {
-            card.onclick = () => openMachineDetail(maq.id, maq.nombre);
-            card.innerHTML = `
-                <span class="card-icon"></span>
-                <div class="card-title">${maq.nombre || ''}</div>
-            `;
-        }
+} else {
+    card.onclick = () => openMachineDetail(maq.id, maq.nombre);
+    card.innerHTML = `
+        <span class="card-icon">⚙️</span>
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <div class="card-title">${maq.nombre}</div>
+           <span class="${obtenerClaseLed(maq.estado_alerta)}" title="Estado: ${maq.estado_alerta || 'normal'}"></span>
+        </div>
+    `;
+}
+        
         container.appendChild(card);
     });
 }
@@ -119,12 +140,12 @@ async function addNewMachine() {
         alert("No tienes permisos para realizar esta acción.");
         return;
     }
-
+ 
     const { data, error } = await dbSupabase
         .from('maquinas')
         .insert([
             { 
-                nombre: "Nueva Máquina",
+                nombre: "⚙️Nueva Máquina",
                 modelo_url: "EMPTY",
                 manual_url: "EMPTY",
                 linea: currentLine 
@@ -162,7 +183,7 @@ async function openMachineDetail(id, name) {
 
 async function openOption(opt) {
     document.getElementById('view-machine-detail').classList.remove('active-view');
-    
+
     if (opt === 'Kardex') {
         document.getElementById('view-kardex').classList.add('active-view', 'fullscreen-mode');
         abrirKardexDeMaquina(currentMachineName); 
@@ -2195,7 +2216,253 @@ async function deleteMachine(id) {
         renderMachines();
     }
 }
+function toggleModoOscuro() {
+    document.body.classList.toggle('dark-mode');
+    const isDark = document.body.classList.contains('dark-mode');
+    localStorage.setItem('modo_oscuro', isDark);
+    
+    const btn = document.getElementById('btn-modo-oscuro');
+    if (btn) btn.innerText = isDark ? '☀️ Modo Claro' : '🌙 Modo Oscuro';
+    
+    aplicarEstilosModoOscuro(isDark);
+}
 
+function aplicarEstilosModoOscuro(isDark) {
+    // Ajuste dinámico de colores principales para contenedores e inputs si usas estilos en línea
+    let bgMain = isDark ? '#0f172a' : '#f1f5f9';
+    let bgCard = isDark ? '#1e293b' : '#ffffff';
+    let textCol = isDark ? '#f8fafc' : '#1e293b';
+    
+    document.body.style.backgroundColor = bgMain;
+    document.body.style.color = textCol;
+}
+
+// Al cargar la página, verificar si estaba activo
+window.addEventListener('DOMContentLoaded', () => {
+    if (localStorage.getItem('modo_oscuro') === 'true') {
+        document.body.classList.add('dark-mode');
+        const btn = document.getElementById('btn-modo-oscuro');
+        if (btn) btn.innerText = '☀️ Modo Claro';
+        aplicarEstilosModoOscuro(true);
+    }
+});
+
+let maquinaIdActualBuzon = null;
+
+function abrirBuzonMaquina(idMaquina, nombreMaquina) {
+    maquinaIdActualBuzon = idMaquina;
+    // Si tienes un título en el modal de máquina, puedes actualizarlo aquí:
+    document.getElementById('titulo-modal-maquina').innerText = `💡 Sugerencias de la Máquina: ${nombreMaquina || ''}`;
+    document.getElementById('modal-buzon-maquina').style.display = 'flex';
+    cargarSugerenciasMaquina();
+}
+
+function cerrarBuzonMaquina() {
+    document.getElementById('modal-buzon-maquina').style.display = 'none';
+}
+
+async function cargarSugerenciasMaquina() {
+    const { data, error } = await dbSupabase
+        .from('maquinas')
+        .select('sugerencias')
+        .eq('id', maquinaIdActualBuzon)
+        .maybeSingle();
+
+    let sugerencias = data?.sugerencias || [];
+    let contenedor = document.getElementById('lista-sugerencias-maquina');
+    contenedor.innerHTML = '';
+
+    if (sugerencias.length === 0) {
+        contenedor.innerHTML = `<div style="color: #64748b; font-size: 12px; text-align: center; padding: 15px;">No hay sugerencias registradas para esta máquina todavía.</div>`;
+        return;
+    }
+
+    sugerencias.forEach((item, index) => {
+        contenedor.innerHTML += `
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; margin-bottom: 6px; font-size: 12px; color: #1e293b;">
+                <b>${index + 1}.</b> ${item.texto} <br>
+                <span style="font-size: 10px; color: #64748b;">🕒 ${item.fecha} - 👤 ${item.autor || 'Usuario'}</span>
+            </div>
+        `;
+    });
+}
+
+// --- GUARDAR SUGERENCIA DE MÁQUINA ---
+async function enviarSugerenciaMaquina() {
+    const textoSugerencia = document.getElementById('input-nueva-sugerencia-maquina').value.trim();
+    if (!textoSugerencia) {
+        alert("Escribe una sugerencia antes de enviar.");
+        return;
+    }
+
+    console.log("Buscando máquina ID:", maquinaIdActualBuzon);
+
+    const { data: maqData, error: errorFetch } = await dbSupabase
+        .from('maquinas')
+        .select('sugerencias')
+        .eq('id', maquinaIdActualBuzon)
+        .maybeSingle();
+
+    if (errorFetch) {
+        console.error("Error al buscar máquina:", errorFetch);
+        alert("Error al conectar con la base de datos.");
+        return;
+    }
+
+    let lista = maqData?.sugerencias || [];
+    lista.push({
+        texto: textoSugerencia,
+        fecha: new Date().toLocaleString(),
+        autor: window.currentUser || window.currentRole || 'Usuario'
+    });
+
+    const { error: errorUpdate } = await dbSupabase
+        .from('maquinas')
+        .update({ sugerencias: lista })
+        .eq('id', maquinaIdActualBuzon);
+
+    if (errorUpdate) {
+        console.error("Error al actualizar máquina:", errorUpdate);
+        alert("No se pudo guardar la sugerencia.");
+    } else {
+        document.getElementById('input-nueva-sugerencia-maquina').value = '';
+        await cargarSugerenciasMaquina();
+    }
+}
+let lineaActualBuzon = '';
+
+function abrirBuzonPorLinea(nombreLinea) {
+    lineaActualBuzon = nombreLinea || currentLine; // Usa la línea activa actual
+    document.getElementById('modal-buzon').style.display = 'flex';
+    cargarSugerenciasPorLinea();
+}
+
+function cerrarBuzonSugerencias() {
+    document.getElementById('modal-buzon').style.display = 'none';
+}
+
+async function cargarSugerenciasPorLinea() {
+    // Consultamos las sugerencias de la tabla 'lineas' filtrando por el nombre de la línea
+    const { data, error } = await dbSupabase
+        .from('lineas') // Cambia al nombre de tu tabla de líneas
+        .select('sugerencias')
+        .eq('nombre', lineaActualBuzon)
+        .maybeSingle();
+
+    let sugerencias = data?.sugerencias || [];
+    let contenedor = document.getElementById('lista-sugerencias-linea');
+    contenedor.innerHTML = '';
+
+    if (sugerencias.length === 0) {
+        contenedor.innerHTML = `<div style="color: #64748b; font-size: 12px; text-align: center; padding: 15px;">No hay sugerencias registradas para la línea ${lineaActualBuzon} todavía.</div>`;
+        return;
+    }
+
+    sugerencias.forEach((item, index) => {
+        contenedor.innerHTML += `
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 8px 12px; border-radius: 6px; margin-bottom: 6px; font-size: 12px; color: #1e293b;">
+                <b>${index + 1}.</b> ${item.texto} <br>
+                <span style="font-size: 10px; color: #64748b;">🕒 ${item.fecha} - 👤 ${item.autor || 'Usuario'}</span>
+            </div>
+        `;
+    });
+}
+
+// --- GUARDAR SUGERENCIA DE LÍNEA ---
+async function enviarSugerenciaLinea() {
+    const textoSugerencia = document.getElementById('input-nueva-sugerencia').value.trim();
+    if (!textoSugerencia) {
+        alert("Escribe una sugerencia antes de enviar.");
+        return;
+    }
+
+    console.log("Buscando línea:", lineaActualBuzon);
+
+    const { data: lineaData, error: errorFetch } = await dbSupabase
+        .from('lineas')
+        .select('sugerencias')
+        .eq('nombre', lineaActualBuzon)
+        .maybeSingle();
+
+    if (errorFetch) {
+        console.error("Error al buscar línea:", errorFetch);
+        alert("Error al conectar con la base de datos.");
+        return;
+    }
+
+    let lista = lineaData?.sugerencias || [];
+    lista.push({
+        texto: textoSugerencia,
+        fecha: new Date().toLocaleString(),
+        autor: window.currentUser || window.currentRole || 'Usuario'
+    });
+
+    const { error: errorUpdate } = await dbSupabase
+        .from('lineas')
+        .update({ sugerencias: lista })
+        .eq('nombre', lineaActualBuzon);
+
+    if (errorUpdate) {
+        console.error("Error al actualizar línea:", errorUpdate);
+        alert("No se pudo guardar la sugerencia.");
+    } else {
+        document.getElementById('input-nueva-sugerencia').value = '';
+        await cargarSugerenciasPorLinea();
+    }
+}
+// 1. Generar el código QR apuntando a la URL actual con el ID de la máquina
+function generarQRPrueba(idMaquina, nombreMaquina) {
+    // Usa comillas invertidas (backticks) aquí:
+    document.getElementById('qr-titulo-maquina').innerText = `QR: ${nombreMaquina}`;
+    
+    const contenedorQR = document.getElementById('contenedor-codigo-qr');
+    contenedorQR.innerHTML = ''; 
+
+    const urlAppConMaquina = `${window.location.origin}${window.location.pathname}?maquina=${idMaquina}`;
+
+    new QRCode(contenedorQR, {
+        text: urlAppConMaquina,
+        width: 180,
+        height: 180,
+        colorDark : "#000000",
+        colorLight : "#ffffff",
+        correctLevel : QRCode.CorrectLevel.H
+    });
+
+    document.getElementById('modal-qr').style.display = 'flex';
+}
+
+function cerrarModalQR() {
+    document.getElementById('modal-qr').style.display = 'none';
+}
+
+// 2. Detectar al cargar la página si se abrió escaneando un QR
+window.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const idMaquinaEscaneada = urlParams.get('maquina');
+
+    if (idMaquinaEscaneada) {
+        // Guardamos temporalmente el ID de la máquina a la que se quería ir
+        localStorage.setItem('qr_pending_machine', idMaquinaEscaneada);
+        console.log("QR detectado para la máquina ID:", idMaquinaEscaneada);
+    }
+});
+function seleccionarRol(rol) {
+    window.currentRole = rol; // Asignas el rol elegido
+    
+    // Verificamos si hay una máquina pendiente por escaneo de QR
+    const idMaquinaPendiente = localStorage.getItem('qr_pending_machine');
+
+    if (idMaquinaPendiente) {
+        localStorage.removeItem('qr_pending_machine'); // Limpiamos
+        
+        // Llamamos a tu función existente que abre el detalle de la máquina por su ID
+        abrirDetalleMaquinaPorId(idMaquinaPendiente);
+    } else {
+        // Comportamiento normal: muestra la lista de líneas o menú principal
+        mostrarVistaPrincipal(); 
+    }
+}
 // Exponer funciones globalmente
 window.addNewMachine = addNewMachine;
 window.subirManualPieza3D = subirManualPieza3D;
