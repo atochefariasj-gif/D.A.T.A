@@ -26,7 +26,7 @@
         // Configurar worker de PDF.js
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -95,9 +95,10 @@
         <div id="view-machine-detail" class="view-section">
             <h2 id="selected-machine-title" style="color: #00b4d8; margin-top: 0; font-size: 18px;">Máquina</h2>
             <p style="font-size: 12px; color: #666; margin-bottom: 15px;">Selecciona una opción:</p>
-           <div class="btn-option admin-only" onclick="generarQRPrueba(currentMachineId, currentMachineName)" style="background: #475569; color: white;">
-    <span>🖨️ Generar Código QR</span>
-</div>
+          <!-- Botón en el panel de la máquina (solo visible o accesible para el admin) para ver el QR -->
+<button onclick="generarCodigoQR('${maq.id}', '${maq.nombre}')" style="background: #0f172a; color: white; border: none; padding: 8px; border-radius: 6px; cursor: pointer; font-size: 12px;">
+    🖨️ Generar / Ver Código QR
+</button>
             <div class="btn-option" onclick="abrirBuzonMaquina(currentMachineId, currentMachineName)" style="background: #0284c7; color: white;">
                <span>💡 Buzón de Máquina</span>
             </div>
@@ -395,12 +396,15 @@
         </div>
     </div>
 </div>
+<!-- Sección o Modal dentro de la vista de administrador de la máquina -->
 <div id="modal-qr" style="display:none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); z-index: 9999; justify-content: center; align-items: center;">
-    <div style="background: white; padding: 25px; border-radius: 12px; text-align: center; max-width: 320px; width: 90%;">
-        <h3 id="qr-titulo-maquina" style="margin-top: 0; color: #1e293b; font-size: 16px;">Código QR de Máquina</h3>
-        <div id="contenedor-codigo-qr" style="display: flex; justify-content: center; margin: 15px 0;"></div>
-        <p style="font-size: 11px; color: #64748b;">Imprime este código y pégalo en la máquina física en planta.</p>
-        <button onclick="cerrarModalQR()" style="background: #dc2626; color: white; border: none; padding: 6px 16px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold;">Cerrar</button>
+    <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; max-width: 300px;">
+        <h3 id="titulo-qr-maquina" style="font-size: 14px; color: #1e293b; margin-bottom: 10px;">Código QR</h3>
+        
+        <!-- Aquí se dibujará el código QR -->
+        <div id="contenedor-qr" style="display: flex; justify-content: center; margin-bottom: 15px;"></div>
+        
+        <button onclick="document.getElementById('modal-qr').style.display='none'" style="background: #dc2626; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer;">Cerrar</button>
     </div>
 </div>
     <script src="script.js"></script>
