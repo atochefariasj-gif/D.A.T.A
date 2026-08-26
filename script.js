@@ -28,11 +28,10 @@ const PASSWORDS = {
 // ==========================================
 window.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
-    const maquinaEscaneada = urlParams.get('qr');
+    const qrTokenEscaneado = urlParams.get('qr'); // <--- Debe decir 'qr'
 
-    if (maquinaEscaneada) {
-        // Guardamos la máquina en el sessionStorage para usarla después de autenticar el rol
-        sessionStorage.setItem('maquina_qr_pendiente', maquinaEscaneada);
+    if (qrTokenEscaneado) {
+        sessionStorage.setItem('maquina_qr_pendiente', qrTokenEscaneado);
     }
 
     if (localStorage.getItem('modo_oscuro') === 'true') {
@@ -2346,6 +2345,12 @@ function actualizarVisibilidadQR() {
         seccionAdminQR.style.display = 'none';  // Lo oculta para visitantes
     }
 }
+function cerrarModalQR() {
+    const modalQR = document.getElementById('modal-qr-dinamico');
+    if (modalQR) {
+        modalQR.style.display = 'none';
+    }
+}
 // Exponer funciones globalmente
 window.addNewMachine = addNewMachine;
 window.subirManualPieza3D = subirManualPieza3D;
@@ -2364,3 +2369,4 @@ window.loadInstructionsData = loadInstructionsData;
 window.openImageModal = openImageModal;
 window.closeImageModal = closeImageModal;
 window.descargarOImprimirQR = descargarOImprimirQR;
+window.cerrarModalQR = cerrarModalQR;
