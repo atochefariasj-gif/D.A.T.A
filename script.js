@@ -96,16 +96,19 @@ async function verificarPassword() {
 
 async function selectRole(role) {
     currentRole = role;
-    actualizarVisibilidadQR();
+    actualizarVisibilidadQR(); // Actualiza el botón de admin
+
     document.getElementById('main-menu').classList.remove('active-view');
     document.getElementById('view-lines').classList.add('active-view');
 
-    // 🟢 VERIFICAR SI HABÍA UN QR PENDIENTE TRAS SELECCIONAR CUALQUIER ROL
-    const idPendiente = sessionStorage.getItem('maquina_qr_pendiente');
-    if (idPendiente) {
-        sessionStorage.removeItem('maquina_qr_pendiente'); // Lo borramos para que no se repita
-        
-        // Consultamos a Supabase los datos de esa máquina específica
+    // 🟢 VERIFICAR SI HABÍA UN QR PENDIENTE TRAS SELECCIONAR ROL
+    const tokenPendiente = sessionStorage.getItem('maquina_qr_pendiente'); 
+
+    if (tokenPendiente) {
+        // Lo borramos para que no se repita al navegar después
+        sessionStorage.removeItem('maquina_qr_pendiente'); 
+
+        // Consultamos a Supabase usando el token (qr_token) de la máquina
         const { data, error } = await dbSupabase
             .from('maquinas')
             .select('id, nombre')
