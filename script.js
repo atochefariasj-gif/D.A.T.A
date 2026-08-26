@@ -61,12 +61,24 @@ async function selectRole(role) {
     document.getElementById('main-menu').classList.remove('active-view');
     document.getElementById('view-lines').classList.add('active-view');
 
-    // 🟢 AGREGA ESTO AQUÍ:
+    // Control de elementos de admin que agregamos antes
     const elementosAdmin = document.querySelectorAll('.admin-only');
     if (currentRole === 'admin' || currentRole === 'Administrador') {
         elementosAdmin.forEach(el => el.style.display = 'flex');
     } else {
         elementosAdmin.forEach(el => el.style.display = 'none');
+    }
+
+    // 🟢 AGREGA ESTO AQUÍ AL FINAL DE selectRole:
+    // Verificamos si hay una máquina pendiente guardada al escanear el QR
+    const idMaquinaPendiente = localStorage.getItem('qr_pending_machine');
+    
+    if (idMaquinaPendiente) {
+        // Limpiamos el almacenamiento para que no se repita en el futuro
+        localStorage.removeItem('qr_pending_machine');
+        
+        // Llamamos a la función que abre el detalle de la máquina por su ID
+        abrirDetalleMaquinaPorID(idMaquinaPendiente);
     }
 }
 
