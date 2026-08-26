@@ -21,42 +21,6 @@ const PASSWORDS = {
     'mantenimiento': '123',
     'admin': 'admin123'
 };
-// 1. Detectar si la URL trae una máquina escaneada por QR
-const urlParams = new URLSearchParams(window.location.search);
-const idMaquinaEscaneada = urlParams.get('maquina');
-
-if (idMaquinaEscaneada) {
-    // Guardamos temporalmente el ID de la máquina en sessionStorage
-    sessionStorage.setItem('maquinaPendienteQR', idMaquinaEscaneada);
-}
-
-// 2. Función que se ejecuta cuando el usuario presiona su rol (Visitante, Mantenimiento, Admin)
-async function seleccionarRol(rolUsuario) {
-    window.currentRole = rolUsuario; // O tu variable de sesión actual
-    
-    // Verificamos si hay una máquina pendiente por el escaneo de un QR
-    const maquinaPendiente = sessionStorage.getItem('maquinaPendienteQR');
-    
-    if (maquinaPendiente) {
-        sessionStorage.removeItem('maquinaPendienteQR'); // Limpiamos la memoria
-        
-        // Consultamos los datos de esa máquina en Supabase para abrirla de inmediato
-        const { data: maq, error } = await dbSupabase
-            .from('maquinas')
-            .select('*')
-            .eq('id', maquinaPendiente)
-            .single();
-            
-        if (maq) {
-            // Llamamos a tu función existente que abre los detalles de la máquina
-            abrirVistaDetalleMaquina(maq);
-            return;
-        }
-    }
-    
-    // Si no hay QR escaneado, continúa a la pantalla normal de selección de líneas
-    mostrarPantallaLineas();
-}
 
 // Función para cargar los nombres desde el archivo JSON[cite: 1]
 async function cargarTraducciones() {
@@ -90,6 +54,7 @@ async function verificarPassword() {
     } else {
         alert("Contraseña incorrecta");
     }
+    actualizarVisibilidadQR();
 }
 
 async function selectRole(role) {
@@ -97,7 +62,8 @@ async function selectRole(role) {
     document.getElementById('main-menu').classList.remove('active-view');
     document.getElementById('view-lines').classList.add('active-view');
 
-    // ... (todo el código que ya tienes para mostrar el menú o toolbar)
+// Si el usuario es administrador, muestra la sección del QR
+
 
     // 🟢 VERIFICAR SI HABÍA UN QR PENDIENTE TRAS SELECCIONAR ROL
     const idPendiente = sessionStorage.getItem('maquina_qr_pendiente');
@@ -116,8 +82,19 @@ async function selectRole(role) {
             openMachineDetail(data.id, data.nombre);
         }
     }
+    actualizarVisibilidadQR();
 }
-
+function actualizarVisibilidadQR() {
+    const seccionAdminQR = document.getElementById('seccion-admin-qr');
+    if (seccionAdminQR) {
+        // Comparamos en minúsculas y aceptamos variaciones comunes
+        if (currentRole && currentRole.toLowerCase() === 'admin') {
+            seccionAdminQR.style.display = 'block'; 
+        } else {
+            seccionAdminQR.style.display = 'none';
+        }
+    }
+}
 async function openLine(lineName, icon) {
     currentLine = lineName;
     document.getElementById('lines-header-title').innerText = `${icon} ${lineName}`;
@@ -2458,23 +2435,87 @@ async function enviarSugerenciaLinea() {
         await cargarSugerenciasPorLinea();
     }
 }
-function generarCodigoQR(idMaquina, nombreMaquina) {
-    const contenedorQr = document.getElementById('contenedor-qr');
-    contenedorQr.innerHTML = ''; // Limpiar anterior
-    
-    // URL que abrirá el celular al escanear el QR
-    const urlApp = `https://tu-sitio-web.com/index.html?maquina=${idMaquina}`;
-    
-    // Usando una librería tipo qrcode.js
-    new QRCode(contenedorQr, {
+function generarQRMaquina(idMaquina, qrToken) {
+    document.getElementById('contenedor-codigo-qr').innerHTML = ''; // Limpiar anterior
+    document.getElementById('modal-qr-dinamico').style.display = 'flex';
+
+    // URL base de tu aplicación alojada (ej. GitHub Pages, Vercel o tu IP local)
+    // Usamos un parámetro ?qr=TOKEN_UNICO
+    const urlApp = `${window.location.origin}${window.location.pathname}?qr=${qrToken}`;
+
+    // Generar el código QR visualmente
+    new QRCode(document.getElementById("contenedor-codigo-qr"), {
         text: urlApp,
         width: 180,
         height: 180
     });
-    
-    document.getElementById('titulo-qr-maquina').innerText = `QR para: ${nombreMaquina}`;
-    document.getElementById('modal-qr').style.display = 'flex';
 }
+
+function cerrarModalQR() {
+    document.getElementById('modal-qr-dinamico').style.display = 'none';
+}
+// Variable global para almacenar temporalmente la máquina del QR escaneado
+let maquinaQrPendiente = null;
+
+async function verificarParametroQR() {
+    const params = new URLSearchParams(window.location.search);
+    const qrToken = params.get('qr');
+
+    if (qrToken) {
+        // Buscamos a qué máquina pertenece este token en Supabase
+        const { data: maquina, error } = await dbSupabase
+            .from('maquinas')
+            .select('*')
+            .eq('qr_token', qrToken)
+            .maybeSingle();
+
+        if (maquina) {
+            maquinaQrPendiente = maquina; // Guardamos el objeto máquina
+            console.log("QR detectado para la máquina:", maquina.nombre);
+            
+            // Ocultamos la vista normal y mostramos el selector de roles especial para el QR
+            mostrarSelectorRolesQR(maquina.nombre);
+        } else {
+            alert("El código QR escaneado no es válido o la máquina no existe.");
+        }
+    }
+}
+
+function mostrarSelectorRolesQR(nombreMaquina) {
+    // Aquí puedes mostrar un contenedor especial en tu pantalla de bienvenida
+    // Indicando: "Escaneaste el QR de [Nombre de Máquina]. Selecciona tu rol para continuar:"
+    const pantallaInicio = document.getElementById('pantalla-seleccion-rol'); // O tu contenedor principal de roles
+    if(pantallaInicio) {
+        pantallaInicio.innerHTML = `
+            <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; max-width: 400px; margin: auto;">
+                <h3 style="color: #0284c7; margin-bottom: 5px;">📲 Acceso por Escaneo QR</h3>
+                <p style="font-size: 13px; color: #334155; margin-bottom: 15px;">Máquina detectada: <b>${nombreMaquina}</b></p>
+                <p style="font-size: 12px; color: #64748b; margin-bottom: 20px;">Selecciona el rol con el que deseas ingresar:</p>
+                
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button onclick="seleccionarRolQR('visitante')" style="background: #0ea5e9; color: white; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">👤 Visitante</button>
+                    <button onclick="seleccionarRolQR('mantenimiento')" style="background: #f59e0b; color: white; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">🔧 Mantenimiento</button>
+                    <button onclick="seleccionarRolQR('administrador')" style="background: #10b981; color: white; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold;">🛡️ Administrador</button>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function seleccionarRolQR(rol) {
+    window.currentUserRole = rol; // Guardas el rol seleccionado
+    
+    // Una vez elegido el rol, redirigimos de forma automática directamente a los detalles de esa máquina
+    if (maquinaQrPendiente) {
+        // Llamas a tu función existente que abre el menú de opciones de la máquina (Kardex, Buzón, etc.)
+        abrirMenuOpcionesMaquinaDirecto(maquinaQrPendiente);
+    }
+}
+
+// Ejecutar esta verificación al cargar la página
+window.addEventListener('DOMContentLoaded', () => {
+    verificarParametroQR();
+});
 // Exponer funciones globalmente
 window.addNewMachine = addNewMachine;
 window.subirManualPieza3D = subirManualPieza3D;
