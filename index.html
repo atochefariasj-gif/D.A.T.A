@@ -26,13 +26,16 @@
         // Configurar worker de PDF.js
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
     </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
     <div class="container" id="main-app-container">
         <!-- MENÚ PRINCIPAL -->
         <div id="main-menu" class="view-section active-view">
+          <button onclick="toggleModoOscuro()" id="btn-modo-oscuro" style="position: absolute; top: 15px; right: 15px; background: #334155; color: white; border: none; padding: 6px 12px; border-radius: 20px; font-size: 11px; cursor: pointer; z-index: 10;">🌙 Modo Oscuro</button>
             <span class="icon-gear">⚙️</span>
+            
             <h1>D.A.T.A</h1>
             <div class="subtitle">Dosier de Activos y Tarjetas de Andamiaje</div>
             
@@ -73,11 +76,14 @@
         <!-- SECCIÓN MÁQUINAS -->
         <div id="view-machines" class="view-section">
             <h2 id="line-title" style="color: #2b2d42; margin-top: 0; font-size: 16px;">Línea</h2>
-            <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Lista de máquinas:</p>
-            
+            <p style="font-size: 12px; color: #666; margin-bottom: 10px;">⚙️Lista de máquinas:</p>
+<!-- Botón del Buzón de Sugerencias para la línea activa -->
+<button onclick="abrirBuzonPorLinea(currentLine)" style="background: #0284c7; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 12px;">💡 Buzón de Sugerencias de la Línea</button>
+
             <div id="admin-toolbar" class="admin-toolbar" style="display:none; gap: 8px; margin-bottom: 10px;">
                 <button class="btn-action" onclick="addNewMachine()">➕ Agregar Máquina</button>
                 <button id="toggle-edit-btn" class="btn-action" onclick="toggleEditMode()">✏️ Editar Nombres</button>
+              
             </div>
             
             <div class="grid-container" id="machines-grid-container"></div>
@@ -89,7 +95,12 @@
         <div id="view-machine-detail" class="view-section">
             <h2 id="selected-machine-title" style="color: #00b4d8; margin-top: 0; font-size: 18px;">Máquina</h2>
             <p style="font-size: 12px; color: #666; margin-bottom: 15px;">Selecciona una opción:</p>
-            
+           <div class="btn-option admin-only" onclick="generarQRPrueba(currentMachineId, currentMachineName)" style="background: #475569; color: white;">
+    <span>🖨️ Generar Código QR</span>
+</div>
+            <div class="btn-option" onclick="abrirBuzonMaquina(currentMachineId, currentMachineName)" style="background: #0284c7; color: white;">
+               <span>💡 Buzón de Máquina</span>
+            </div>
             <div class="btn-option" onclick="openOption('Kardex')">
                 <span>📋</span> <div><strong>Datos de Kárdex</strong></div>
             </div>
@@ -130,7 +141,7 @@
 
         <!-- SECCIÓN INSTRUCCIONES DE USO -->
         <div id="view-instructions" class="view-section">
-            <h2 style="color: #2026A0; margin-top: 0; font-size: 16px; margin-bottom: 5px;">Instrucciones de Uso</h2>
+            <h2 style="color: #2026A0; margin-top: 0; font-size: 16px; margin-bottom: 5px;">📖Instrucciones de Uso</h2>
             <p id="inst-subtitle" style="font-size: 11px; color: #666; margin-bottom: 10px;"></p>
 
             <div id="admin-instructions-toolbar" style="display: none; gap: 8px; margin-bottom: 15px;">
@@ -326,8 +337,8 @@
             <input type="password" id="input-password-val" class="w-full p-2 bg-gray-900 text-white rounded border border-gray-600 focus:border-blue-500 outline-none text-xs mb-3" placeholder="Contraseña...">
             
             <div class="flex gap-2">
-                <button onclick="verificarPassword()" class="flex-1 py-2 bg-blue-600 hover:bg-blue-500 rounded text-white font-bold text-xs shadow transition">Ingresar</button>
-                <button onclick="cerrarModalPassword()" class="py-2 px-3 bg-gray-700 hover:bg-gray-600 rounded text-white text-xs font-semibold">Cancelar</button>
+                <button onclick="verificarPassword()" class="flex-1 py-2 bg-blue-600 hover:bg-blue-500 rounded text-white font-bold text-xs shadow transition">🔓Ingresar</button>
+                <button onclick="cerrarModalPassword()" class="py-2 px-3 bg-gray-700 hover:bg-gray-600 rounded text-white text-xs font-semibold">Cancelar❌</button>
             </div>
         </div>
     </div>
@@ -358,6 +369,40 @@
         </div>
     </div>
 
+<div id="modal-buzon" style="display:none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); z-index: 9999; justify-content: center; align-items: center;">
+    <div style="background: white; width: 90%; max-width: 550px; max-height: 85vh; border-radius: 8px; padding: 20px; display: flex; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="margin: 0; font-size: 16px; color: #1e293b;">💡 Buzón de Sugerencias</h3>
+            <button onclick="cerrarBuzonSugerencias()" style="background: #dc2626; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">✕</button>
+        </div>
+        <div id="lista-sugerencias-linea" style="flex-grow: 1; overflow-y: auto; border: 1px solid #e2e8f0; padding: 10px; margin-bottom: 10px; border-radius: 6px; background: #ffffff;"></div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <textarea id="input-nueva-sugerencia" placeholder="Escribe tu sugerencia de mejora para esta línea..." style="width: 100%; height: 60px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 12px; color: #1e293b;"></textarea>
+            <button onclick="enviarSugerenciaLinea()" style="background: #0284c7; color: white; border: none; padding: 8px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: bold;">Enviar Sugerencia</button>
+        </div>
+    </div>
+</div>
+<div id="modal-buzon-maquina" style="display:none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); z-index: 9999; justify-content: center; align-items: center;">
+    <div style="background: white; width: 90%; max-width: 550px; max-height: 85vh; border-radius: 8px; padding: 20px; display: flex; flex-direction: column;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 id="titulo-modal-maquina" style="margin: 0; font-size: 16px; color: #1e293b;">💡 Sugerencias de la Máquina</h3>
+            <button onclick="cerrarBuzonMaquina()" style="background: #dc2626; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">✕</button>
+        </div>
+        <div id="lista-sugerencias-maquina" style="flex-grow: 1; overflow-y: auto; border: 1px solid #e2e8f0; padding: 10px; margin-bottom: 10px; border-radius: 6px; background: #ffffff;"></div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+            <textarea id="input-nueva-sugerencia-maquina" placeholder="Escribe tu sugerencia de mejora para esta máquina..." style="width: 100%; height: 60px; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-size: 12px; color: #1e293b;"></textarea>
+            <button onclick="enviarSugerenciaMaquina()" style="background: #0284c7; color: white; border: none; padding: 8px; border-radius: 6px; font-size: 12px; cursor: pointer; font-weight: bold;">Enviar Sugerencia</button>
+        </div>
+    </div>
+</div>
+<div id="modal-qr" style="display:none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); z-index: 9999; justify-content: center; align-items: center;">
+    <div style="background: white; padding: 25px; border-radius: 12px; text-align: center; max-width: 320px; width: 90%;">
+        <h3 id="qr-titulo-maquina" style="margin-top: 0; color: #1e293b; font-size: 16px;">Código QR de Máquina</h3>
+        <div id="contenedor-codigo-qr" style="display: flex; justify-content: center; margin: 15px 0;"></div>
+        <p style="font-size: 11px; color: #64748b;">Imprime este código y pégalo en la máquina física en planta.</p>
+        <button onclick="cerrarModalQR()" style="background: #dc2626; color: white; border: none; padding: 6px 16px; border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: bold;">Cerrar</button>
+    </div>
+</div>
     <script src="script.js"></script>
 </body>
 </html>
