@@ -28,7 +28,7 @@ const PASSWORDS = {
 // ==========================================
 window.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
-    const maquinaEscaneada = urlParams.get('maquina');
+    const maquinaEscaneada = urlParams.get('qr');
 
     if (maquinaEscaneada) {
         // Guardamos la máquina en el sessionStorage para usarla después de autenticar el rol
@@ -96,8 +96,7 @@ async function verificarPassword() {
 
 async function selectRole(role) {
     currentRole = role;
-// ¡Llama a esta función aquí mismo para que el botón aparezca!
-     actualizarVisibilidadQR();
+    actualizarVisibilidadQR();
     document.getElementById('main-menu').classList.remove('active-view');
     document.getElementById('view-lines').classList.add('active-view');
 
@@ -109,18 +108,15 @@ async function selectRole(role) {
         // Consultamos a Supabase los datos de esa máquina específica
         const { data, error } = await dbSupabase
             .from('maquinas')
-            .select('*')
-            .eq('id', idPendiente)
+            .select('id, nombre')
+            .eq('qr_token', tokenPendiente) // <--- Buscamos por la columna qr_token
             .maybeSingle();
 
         if (data && !error) {
-            // Saltamos automáticamente a la línea de la máquina y luego a su detalle
-            currentLine = data.linea;
-            document.getElementById('lines-header-title').innerText = `⚙️ ${data.linea}`;
-            document.getElementById('view-lines').classList.remove('active-view');
-            document.getElementById('view-machine-detail').classList.add('active-view');
+            // ¡Abrimos los detalles de la máquina directamente!
             openMachineDetail(data.id, data.nombre);
-            return;
+        } else {
+            console.error("No se encontró la máquina con ese token en Supabase");
         }
     }
 }
