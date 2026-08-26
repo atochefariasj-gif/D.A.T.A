@@ -525,3 +525,65 @@ h1 {
 body.is-admin #admin-kardex-upload {
     display: block !important;
 }
+.card-item, .card-title {
+    text-align: center !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
+body.dark-mode .modal-content, 
+body.dark-mode div[id*="modal"] div {
+    color: #1e293b !important; /* Mantiene el texto oscuro legible dentro de las cajas blancas de modales */
+}
+body.dark-mode input, 
+body.dark-mode textarea, 
+body.dark-mode select {
+    background-color: #ffffff !important;
+    color: #1e293b !important;
+}
+.led-indicator {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    display: inline-block;
+    box-shadow: inset 0 1px 2px rgba(255,255,255,0.6), 0 0 8px currentColor;
+}
+
+.led-verde {
+    background-color: #22c55e;
+    color: #22c55e;
+    box-shadow: inset 0 1px 2px rgba(255,255,255,0.6), 0 0 10px #22c55e;
+}
+
+.led-amarillo {
+    background-color: #eab308;
+    color: #eab308;
+    box-shadow: inset 0 1px 2px rgba(255,255,255,0.6), 0 0 10px #eab308;
+}
+
+.led-rojo {
+    background-color: #ef4444;
+    color: #ef4444;
+    box-shadow: inset 0 1px 2px rgba(255,255,255,0.6), 0 0 12px #ef4444;
+    animation: parpadeo-led 1.5s infinite;
+}
+
+@keyframes parpadeo-led {
+    0% { opacity: 1; }
+    50% { opacity: 0.4; }
+    100% { opacity: 1; }
+}
+body.dark-mode h1, 
+body.dark-mode h2, 
+body.dark-mode h3, 
+body.dark-mode p, 
+body.dark-mode span, 
+body.dark-mode label,
+body.dark-mode .card-title,
+body.dark-mode div[id*="modal"] {
+    color: #0f172a !important; /* Texto oscuro y nítido dentro de las tarjetas blancas */
+}
+
+/* Forzar que el subtítulo o texto gris dentro del menú oscuro se vea bien */
+body.dark-mode .view-section:not(.active) {
+    color: #ffffff;
+}
