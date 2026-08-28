@@ -2767,29 +2767,36 @@ if (typeof firebase !== 'undefined' && !firebase.apps.length) {
 
 // Inicializar y obtener token FCM
 async function inicializarPushNotifications() {
-    try {
-        if (typeof firebase === 'undefined' || !('Notification' in window)) return;
+    if (typeof firebase === 'undefined' || !firebase.messaging.isSupported()) {
+        console.warn('Firebase Messaging no es soportado en este navegador.');
+        return;
+    }
 
-        // Registrar el Service Worker explícito
-        const registration = await navigator.serviceWorker.register('firebase-messaging-sw.js');
-        
+    try {
         const messaging = firebase.messaging();
         const permission = await Notification.requestPermission();
 
         if (permission === 'granted') {
-            // Solicitar token especificando vapidKey y la instancia del Service Worker
-            const token = await messaging.getToken({ 
-                vapidKey: 'BNwKAxWr9uZYTNvWHF9StP-EQJnUZxAd3buNyrJ89dFkKKFiy4N1bOFXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494',
-                serviceWorkerRegistration: registration
+            const registration = await navigator.serviceWorker.register('firebase-messaging-sw.js');
+            
+            // Obtener el token de Firebase
+            const currentToken = await messaging.getToken({
+                serviceWorkerRegistration: registration,
+                vapidKey: 'BNwKAxWr9uZYTNvWHF9StP-EQJnUZxAd3buNyrJ89dFkkKFiy4N1bOFXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494'
             });
 
-            if (token) {
-                console.log("FCM Token listo:", token);
-                await guardarTokenEnSupabase(token);
+            if (currentToken) {
+                console.log('Token FCM obtenido:', currentToken);
+                // GUARDA EL TOKEN OBLIGATORIAMENTE EN SUPABASE
+                await guardarTokenEnSupabase(currentToken);
+            } else {
+                console.warn('No se pudo generar el token FCM.');
             }
+        } else {
+            console.warn('Permiso de notificaciones denegado por el usuario.');
         }
     } catch (error) {
-        console.error("Error al obtener token FCM:", error);
+        console.error('Error al inicializar Firebase Push:', error);
     }
 }
 // Guardar Token en la base de datos
