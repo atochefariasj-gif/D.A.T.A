@@ -2837,7 +2837,7 @@ async function reregistrarDispositivo() {
         // Generar uno nuevo e insertarlo en Supabase
         const nuevoToken = await messaging.getToken({
             serviceWorkerRegistration: reg,
-            vapidKey: 'TU_VAPID_KEY_AQUI'
+            vapidKey: 'BNwKAxWr9uZYTNvWHF9StP-EQJnUZxAd3buNyrJ89dFkkKFiy4N1bOFXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494'
         });
 
         if (nuevoToken) {
