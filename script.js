@@ -26,21 +26,25 @@ const PASSWORDS = {
 // ==========================================
 // NUEVO: DETECCIÓN DE QR AL CARGAR LA PÁGINA
 // ==========================================
+// Variable global (colócala fuera de DOMContentLoaded o arriba del archivo)
+let pendienteRedireccion = null;
+
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Detectar si la app se abrió desde una notificación con parámetros en la URL
     const urlParams = new URLSearchParams(window.location.search);
-    const maquinaUrl = urlParams.get('maquina');
-    const piezaUrl = urlParams.get('pieza');
+    const action = urlParams.get('action');
+    const machineId = urlParams.get('machineId') || urlParams.get('maquina') || urlParams.get('piezas');
 
-    if (maquinaUrl) {
-        currentMachineId = isNaN(maquinaUrl) ? maquinaUrl : Number(maquinaUrl);
-        if (typeof cargarModeloMaquinaActual === 'function') {
-            cargarModeloMaquinaActual();
-        }
+    // Si viene de una Notificación Push para ir directo al Visor 3D
+    if (action === 'view3d' && machineId) {
+        sessionStorage.setItem('maquina_3d_pendiente', machineId);
+    } 
+    // Si viene de un código QR tradicional
+    else if (urlParams.get('pieza') || urlParams.get('piezas')) {
+        const tokenQr = urlParams.get('pieza') || urlParams.get('piezas');
+        sessionStorage.setItem('maquina_qr_pendiente', tokenQr);
     }
-
+    // ... Resto de tu código (inicializarNotificaciones(), activarEscuchaNotificacionesRealtime(), etc.)
     // ... (Tu código existente de QR y Modo Oscuro) ...
-
     inicializarPushNotifications();
     activarEscuchaNotificacionesRealtime();
 
@@ -111,15 +115,35 @@ async function verificarPassword() {
 
 async function selectRole(role) {
     currentRole = role;
-    actualizarVisibilidadQR();
+    actualizarVisibilidad();
 
     document.getElementById('main-menu').classList.remove('active-view');
-    document.getElementById('view-lines').classList.add('active-view');
 
-    const tokenPendiente = sessionStorage.getItem('maquina_qr_pendiente'); 
+    // 1. VERIFICAR SI VIENE DE UNA NOTIFICACIÓN PUSH (Visor 3D directo)
+    const token3DPendiente = sessionStorage.getItem('maquina_3d_pendiente');
+    if (token3DPendiente) {
+        sessionStorage.removeItem('maquina_3d_pendiente');
 
+        // Establecer la máquina actual
+        currentMachineId = isNaN(Number(token3DPendiente)) ? token3DPendiente : Number(token3DPendiente);
+
+        // Cargar datos/modelo 3D si aplica
+        if (typeof cargarModeloMaquinaActual === 'function') {
+            cargarModeloMaquinaActual();
+        }
+
+        // Abrir la vista del Visor 3D directamente (#view-visual3d)
+        document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active-view'));
+        const vista3D = document.getElementById('view-visual3d');
+        if (vista3D) vista3D.classList.add('active-view');
+
+        return; // Finaliza la función aquí para no ir a la lista de líneas
+    }
+
+    // 2. VERIFICAR SI VIENE DE UN CÓDIGO QR (Detalles de la máquina)
+    const tokenPendiente = sessionStorage.getItem('maquina_qr_pendiente');
     if (tokenPendiente) {
-        sessionStorage.removeItem('maquina_qr_pendiente'); 
+        sessionStorage.removeItem('maquina_qr_pendiente');
 
         const { data, error } = await dbSupabase
             .from('maquinas')
@@ -130,8 +154,13 @@ async function selectRole(role) {
         if (data && !error) {
             openMachineDetail(data.id, data.nombre);
         } else {
-            console.error("No se encontró la máquina con ese token en Supabase");
+            console.error('No se encontró la máquina con ese token en Supabase');
+            document.getElementById('view-lines').classList.add('active-view');
         }
+    } 
+    // 3. NAVEGACIÓN NORMAL (Mostrar vista de líneas)
+    else {
+        document.getElementById('view-lines').classList.add('active-view');
     }
 }
 
