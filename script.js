@@ -28,7 +28,7 @@ const PASSWORDS = {
 // ==========================================
 window.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
-    const qrTokenEscaneado = urlParams.get('qr'); // <--- Debe decir 'qr'
+    const qrTokenEscaneado = urlParams.get('qr');
 
     if (qrTokenEscaneado) {
         sessionStorage.setItem('maquina_qr_pendiente', qrTokenEscaneado);
@@ -51,10 +51,8 @@ function verificarPermisoQRAdmin() {
     return true;
 }
 
-// Ejemplo de función global protegida para tus botones de descarga/impresión de QR
 function descargarOImprimirQR(idMaquina) {
     if (!verificarPermisoQRAdmin()) return;
-    // Lógica actual de descarga o impresión de tu QR
     console.log("Generando descarga de QR para la máquina:", idMaquina);
 }
 
@@ -95,27 +93,23 @@ async function verificarPassword() {
 
 async function selectRole(role) {
     currentRole = role;
-    actualizarVisibilidadQR(); // Actualiza el botón de admin
+    actualizarVisibilidadQR();
 
     document.getElementById('main-menu').classList.remove('active-view');
     document.getElementById('view-lines').classList.add('active-view');
 
-    // 🟢 VERIFICAR SI HABÍA UN QR PENDIENTE TRAS SELECCIONAR ROL
     const tokenPendiente = sessionStorage.getItem('maquina_qr_pendiente'); 
 
     if (tokenPendiente) {
-        // Lo borramos para que no se repita al navegar después
         sessionStorage.removeItem('maquina_qr_pendiente'); 
 
-        // Consultamos a Supabase usando el token (qr_token) de la máquina
         const { data, error } = await dbSupabase
             .from('maquinas')
             .select('id, nombre')
-            .eq('qr_token', tokenPendiente) // <--- Buscamos por la columna qr_token
+            .eq('qr_token', tokenPendiente)
             .maybeSingle();
 
         if (data && !error) {
-            // ¡Abrimos los detalles de la máquina directamente!
             openMachineDetail(data.id, data.nombre);
         } else {
             console.error("No se encontró la máquina con ese token en Supabase");
@@ -226,7 +220,6 @@ async function updateMachineNameInline(id, nuevoNombre) {
 async function openMachineDetail(id, name, token) {
     currentMachineId = id;
     currentMachineName = name; 
-    // Consultamos el token de esta máquina específica en Supabase
     const { data, error } = await dbSupabase
         .from('maquinas')
         .select('qr_token')
@@ -234,7 +227,7 @@ async function openMachineDetail(id, name, token) {
         .maybeSingle();
 
     if (data) {
-        currentMachineToken = data.qr_token; // <--- Guardamos el token aquí
+        currentMachineToken = data.qr_token;
     }
     document.getElementById('selected-machine-title').innerText = name;
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
@@ -264,25 +257,20 @@ async function openOption(opt) {
 
         const contenedorImportar = document.getElementById('contenedor-importar-3d');
         const contenedorAdminBtn = document.getElementById('contenedor-admin-reportes-btn');
-        
         const btnDesensamblaje = document.getElementById('btn-iniciar-desensamblaje'); 
-        const btnMedicion = document.getElementById('btn-medir');
 
         if (currentRole === 'admin') {
             if (contenedorImportar) contenedorImportar.style.display = 'block';
             if (contenedorAdminBtn) contenedorAdminBtn.style.display = 'block';
             if (btnDesensamblaje) btnDesensamblaje.style.display = 'inline-block';
-            if (btnMedicion) btnMedicion.style.display = 'inline-block';
         } else if (currentRole === 'mantenimiento') {
             if (contenedorImportar) contenedorImportar.style.display = 'none';
             if (contenedorAdminBtn) contenedorAdminBtn.style.display = 'block';
             if (btnDesensamblaje) btnDesensamblaje.style.display = 'inline-block';
-            if (btnMedicion) btnMedicion.style.display = 'inline-block';
         } else {
             if (contenedorImportar) contenedorImportar.style.display = 'none';
             if (contenedorAdminBtn) contenedorAdminBtn.style.display = 'none';
             if (btnDesensamblaje) btnDesensamblaje.style.display = 'none';
-            if (btnMedicion) btnMedicion.style.display = 'none';
         }
 
         if (!window.is3DInitialized) {
@@ -1103,6 +1091,11 @@ async function procesarModeloCargado(gltf, nombreEquipo) {
 async function seleccionarComponente(nombrePieza) {
     const panel = document.getElementById('panel-info');
     const piezaEncontrada = piezasDetectadas.find(p => p.name === nombrePieza);
+    if (modoSeleccionMedidasActivo) {
+        modoSeleccionMedidasActivo = false;
+        abrirModalMedidasPorPieza(nombrePieza);
+        return;
+    }
 
     if (piezaSeleccionadaActual === nombrePieza) {
         panel.classList.add('hidden');
@@ -1412,8 +1405,7 @@ async function detectarToque(x, y) {
         if (child.isMesh) todosLosObjetos.push(child);
     });
 
-    let listaAExplorar = (modoMedicionActivo && piezaEnMedicion) ? [piezaEnMedicion] : todosLosObjetos;
-    const intersects = raycaster.intersectObjects(listaAExplorar, true);
+    const intersects = raycaster.intersectObjects(todosLosObjetos, true);
     
     if (intersects.length > 0) {
         let interseccion = intersects[0];
@@ -1433,15 +1425,6 @@ async function detectarToque(x, y) {
             if (mensajeNota) {
                 let autorNota = prompt("Tu nombre o turno:") || "Anónimo";
                 await guardarNota3D(objetoSeleccionado.name, puntoInterseccion, mensajeNota, autorNota);
-            }
-            return;
-        }
-
-        if (modoMedicionActivo) {
-            if (!piezaEnMedicion) {
-                aislarPiezaParaMedir(objetoSeleccionado);
-            } else {
-                manejarPuntoMedicionPreciso(puntoInterseccion, objetoSeleccionado);
             }
             return;
         }
@@ -1672,221 +1655,6 @@ function cerrarDesensamblaje() {
             }
         }
     });
-}
-
-let modoMedicionActivo = false;
-let piezaEnMedicion = null;
-let puntoMedicion1 = null;
-let puntoMedicion2 = null;
-let lineaMedicionMesh = null;
-let esferaPunto1 = null;
-let esferaPunto2 = null;
-
-function toggleModoMedicion() {
-    modoMedicionActivo = !modoMedicionActivo;
-    const panel = document.getElementById('panel-medicion');
-    const btn = document.getElementById('btn-medir');
-
-    if (modoMedicionActivo) {
-        panel.classList.remove('hidden');
-        btn.classList.add('bg-amber-700');
-        document.getElementById('resultado-medicion').innerText = "Haga clic en una pieza para aislarla y medir con precisión.";
-        document.getElementById('panel-info').classList.add('hidden');
-        limpiarMedicionManteniendoModo();
-    } else {
-        panel.classList.add('hidden');
-        btn.classList.remove('bg-amber-700');
-        limpiarMedicion();
-    }
-}
-
-function aislarPiezaParaMedir(piezaSeleccionada) {
-    piezaEnMedicion = piezaSeleccionada;
-    
-    piezasDetectadas.forEach(p => {
-        if (p.name === piezaSeleccionada.name) {
-            p.visible = true;
-            if (p.material) {
-                p.material.transparent = false;
-                p.material.opacity = 1.0;
-                p.material.color.setHex(p.userData.colorBase);
-            }
-        } else {
-            p.visible = false; 
-        }
-    });
-
-    const box = new THREE.Box3().setFromObject(piezaSeleccionada);
-    const centro = box.getCenter(new THREE.Vector3());
-    targetControlsTarget = centro.clone();
-    const offset = camera.position.clone().sub(controls.target).normalize().multiplyScalar(2.0); 
-    targetCameraPos = centro.clone().add(offset);
-
-    document.getElementById('resultado-medicion').innerText = "Pieza aislada. Haga clic en el primer punto.";
-}
-
-function restaurarVisibilidadPiezas() {
-    piezaEnMedicion = null;
-    piezasDetectadas.forEach(p => {
-        p.visible = true;
-        if (p.material) {
-            p.material.transparent = true;
-            p.material.opacity = 1.0;
-            let repInfo = reportesCargados[p.name];
-            let colorHex = p.userData.colorBase;
-            if (repInfo) {
-                if (repInfo.estado === 'mantenimiento') colorHex = 0xef4444;
-                else if (repInfo.estado === 'preventivo') colorHex = 0xf59e0b;
-            }
-            p.material.color.setHex(colorHex);
-        }
-    });
-}
-
-const TOLERANCIA_SNAP_AMPLIADA = 0.08; 
-
-function manejarPuntoMedicionPreciso(puntoInterseccionGlobal, meshObjetivo) {
-    const res = document.getElementById('resultado-medicion');
-
-    const resultadoSnap = calcularSnappingInteligente(puntoInterseccionGlobal, meshObjetivo, TOLERANCIA_SNAP_AMPLIADA);
-
-    if (!resultadoSnap) {
-        res.innerText = "⚠️ Acerque un poco más el cursor al vértice o arista de la pieza.";
-        return; 
-    }
-
-    const puntoAjustado = resultadoSnap.punto.clone();
-
-    if (!puntoMedicion1) {
-        puntoMedicion1 = puntoAjustado.clone();
-        res.innerText = "Punto 1 fijado correctamente. Seleccione el segundo punto.";
-        
-        const geometry = new THREE.SphereGeometry(0.003, 16, 16);
-        const material = new THREE.MeshBasicMaterial({ color: 0xef4444 });
-        esferaPunto1 = new THREE.Mesh(geometry, material);
-        esferaPunto1.position.copy(puntoMedicion1);
-        scene.add(esferaPunto1);
-
-    } else if (!puntoMedicion2) {
-        puntoMedicion2 = puntoAjustado.clone();
-        
-        const geometry = new THREE.SphereGeometry(0.003, 16, 16);
-        const material = new THREE.MeshBasicMaterial({ color: 0xef4444 });
-        esferaPunto2 = new THREE.Mesh(geometry, material);
-        esferaPunto2.position.copy(puntoMedicion2);
-        scene.add(esferaPunto2);
-
-        let distancia = puntoMedicion1.distanceTo(puntoMedicion2);
-        let distanciaMm = distancia * 1000; 
-        
-        let textoMedida = `<b>Distancia:</b> ${distancia.toFixed(4)} m (${distanciaMm.toFixed(2)} mm)`;
-        if (resultadoSnap.esCercanoACilindro || distanciaMm > 1) {
-            let diametroEstimadoMm = distanciaMm; 
-            let radioEstimadoMm = diametroEstimadoMm / 2;
-            textoMedida += `<br><b>Ø Diámetro Est.:</b> ${diametroEstimadoMm.toFixed(2)} mm | <b>Radio:</b> ${radioEstimadoMm.toFixed(2)} mm`;
-        }
-
-        res.innerHTML = textoMedida;
-
-        const materialLinea = new THREE.LineBasicMaterial({ color: 0x38bdf8, linewidth: 3 });
-        const puntosLinea = [puntoMedicion1, puntoMedicion2];
-        const geometriaLinea = new THREE.BufferGeometry().setFromPoints(puntosLinea);
-        lineaMedicionMesh = new THREE.Line(geometriaLinea, materialLinea);
-        scene.add(lineaMedicionMesh);
-
-    } else {
-        if (esferaPunto1) scene.remove(esferaPunto1);
-        if (esferaPunto2) scene.remove(esferaPunto2);
-        if (lineaMedicionMesh) scene.remove(lineaMedicionMesh);
-
-        puntoMedicion1 = puntoAjustado.clone();
-        puntoMedicion2 = null;
-        esferaPunto2 = null;
-        lineaMedicionMesh = null;
-
-        res.innerText = "Punto 1 fijado. Seleccione el segundo punto.";
-        const geometry = new THREE.SphereGeometry(0.003, 16, 16);
-        const material = new THREE.MeshBasicMaterial({ color: 0xef4444 });
-        esferaPunto1 = new THREE.Mesh(geometry, material);
-        esferaPunto1.position.copy(puntoMedicion1);
-        scene.add(esferaPunto1);
-    }
-}
-
-function calcularSnappingInteligente(puntoGlobal, mesh, tolerancia) {
-    const geometry = mesh.geometry;
-    const positionAttribute = geometry.attributes.position;
-    
-    let localPoint = puntoGlobal.clone();
-    mesh.worldToLocal(localPoint);
-
-    let minDist = Infinity;
-    let mejorPuntoLocal = localPoint.clone();
-
-    const vA = new THREE.Vector3();
-    const vB = new THREE.Vector3();
-    const tempPuntoArista = new THREE.Vector3();
-
-    const index = geometry.index;
-    
-    if (index) {
-        for (let i = 0; i < index.count; i += 3) {
-            const a = index.getX(i);
-            const b = index.getX(i + 1);
-            const c = index.getX(i + 2);
-
-            vA.fromBufferAttribute(positionAttribute, a);
-            vB.fromBufferAttribute(positionAttribute, b);
-
-            [vA, vB].forEach(v => {
-                let dist = localPoint.distanceTo(v);
-                if (dist < minDist) {
-                    minDist = dist;
-                    mejorPuntoLocal.copy(v);
-                }
-            });
-
-            let distArista = distanciaPuntoSegmento(localPoint, vA, vB, tempPuntoArista);
-            if (distArista < minDist) {
-                minDist = distArista;
-                mejorPuntoLocal.copy(tempPuntoArista);
-            }
-        }
-    }
-
-    if (minDist <= tolerancia) {
-        let mejorPuntoGlobal = mejorPuntoLocal.clone();
-        mesh.localToWorld(mejorPuntoGlobal);
-        return { punto: mejorPuntoGlobal, esCercanoACilindro: false };
-    }
-
-    return { punto: puntoGlobal, esCercanoACilindro: true };
-}
-
-function distanciaPuntoSegmento(p, a, b, target) {
-    const ab = new THREE.Vector3().subVectors(b, a);
-    const ap = new THREE.Vector3().subVectors(p, a);
-    let t = ap.dot(ab) / ab.dot(ab);
-    t = Math.max(0, Math.min(1, t));
-    target.copy(a).addScaledVector(ab, t);
-    return p.distanceTo(target);
-}
-
-function limpiarMedicionManteniendoModo() {
-    puntoMedicion1 = null;
-    puntoMedicion2 = null;
-    
-    if (lineaMedicionMesh) { scene.remove(lineaMedicionMesh); lineaMedicionMesh = null; }
-    if (esferaPunto1) { scene.remove(esferaPunto1); esferaPunto1 = null; }
-    if (esferaPunto2) { scene.remove(esferaPunto2); esferaPunto2 = null; }
-    
-    restaurarVisibilidadPiezas();
-}
-
-function limpiarMedicion() {
-    limpiarMedicionManteniendoModo();
-    const res = document.getElementById('resultado-medicion');
-    if (res && modoMedicionActivo) res.innerText = "Haga clic en una pieza para aislarla y medir con precisión.";
 }
 
 async function cargarDatosInventarioPieza(nombrePieza) {
@@ -2304,53 +2072,449 @@ async function enviarSugerenciaLinea() {
         await cargarSugerenciasPorLinea();
     }
 }
-// Variable global para guardar el token de la máquina actual (si no la tienes, agrégala arriba con tus let)
 
-
-// Función para generar y mostrar el código QR
 function generarQRMaquina() {
     const contenedorQR = document.getElementById('contenedor-codigo-qr');
     const modalQR = document.getElementById('modal-qr-dinamico');
     
-    // Limpiamos contenido previo
     contenedorQR.innerHTML = '';
     
-    // Validamos que tengamos el token cargado
     if (!currentMachineToken) {
         alert("No se encontró el token de esta máquina.");
         return;
     }
 
-    // Mostramos el modal
     modalQR.style.display = 'flex';
 
-    // Construimos la URL base de tu GitHub Pages o entorno actual
     const urlBase = window.location.origin + window.location.pathname;
     const urlApp = `${urlBase}?qr=${currentMachineToken}`;
 
-    // Generamos el código QR visualmente usando la librería QRCode
     new QRCode(contenedorQR, {
         text: urlApp,
         width: 180,
         height: 180
     });
 }
+
 function actualizarVisibilidadQR() {
     const seccionAdminQR = document.getElementById('seccion-admin-qr');
-    
-    // Si el rol actual es administrador, lo mostramos; si es visitante, lo ocultamos
     if (currentRole === 'admin') {
-        seccionAdminQR.style.display = 'block'; // Muestra el botón de QR
+        seccionAdminQR.style.display = 'block';
     } else {
-        seccionAdminQR.style.display = 'none';  // Lo oculta para visitantes
+        seccionAdminQR.style.display = 'none';
     }
 }
+
 function cerrarModalQR() {
     const modalQR = document.getElementById('modal-qr-dinamico');
     if (modalQR) {
         modalQR.style.display = 'none';
     }
 }
+// ==========================================
+// MÓDULO CATÁLOGO Y MEDIDAS DE PIEZAS (FIXED)
+// ==========================================
+
+let piezaSeleccionadaNombre = null;
+let modoSeleccionMedidasActivo = false;
+let piezasMedidasLista = [];
+let zoomActualPlano = 1;
+
+// 1. Activar el modo de selección al hacer clic en el botón inicial
+function activarSeleccionMedidas() {
+    modoSeleccionMedidasActivo = true;
+    alert("📌 Haz clic en una pieza del 3D o en la lista 'Desglose de Partes' para abrir sus medidas.");
+}
+
+// 2. Abrir Modal filtrando por el Nombre de la Pieza (TEXT)
+async function abrirModalMedidasPorPieza(nombrePieza) {
+    if (!nombrePieza) {
+        alert("Por favor selecciona una pieza válida.");
+        return;
+    }
+
+    piezaSeleccionadaNombre = nombrePieza;
+    modoSeleccionMedidasActivo = false;
+
+    const modal = document.getElementById('modal-medidas-piezas');
+    const adminToolbar = document.getElementById('admin-medidas-toolbar');
+    
+    if (!modal) return;
+
+    if (currentRole === 'admin') {
+        if (adminToolbar) adminToolbar.style.display = 'flex';
+        document.querySelectorAll('.col-admin-medidas').forEach(el => el.style.display = 'table-cell');
+    } else {
+        if (adminToolbar) adminToolbar.style.display = 'none';
+        document.querySelectorAll('.col-admin-medidas').forEach(el => el.style.display = 'none');
+    }
+
+    modal.style.display = 'flex';
+
+    // Buscar en la tabla 'piezas' por 'nombre' (soporta texto como "SEPARADORES2")
+    let { data: pieza, error } = await dbSupabase
+        .from('piezas')
+        .select('*')
+        .eq('maquina_id', currentMachineId)
+        .eq('nombre', nombrePieza)
+        .maybeSingle();
+
+    // Si la pieza aún no existe en el registro, la creamos automáticamente
+    if (!pieza && !error) {
+        const { data: nuevaPieza, error: errInsert } = await dbSupabase
+            .from('piezas')
+            .insert([{ maquina_id: currentMachineId, nombre: nombrePieza, tabla_medidas: [] }])
+            .select()
+            .single();
+        
+        if (!errInsert) pieza = nuevaPieza;
+    }
+
+    // Actualizar Encabezado del Modal
+    const tituloModal = document.querySelector('#modal-medidas-piezas h3');
+    if (tituloModal) {
+        tituloModal.textContent = `📐 Medidas de Pieza: ${nombrePieza}`;
+    }
+
+    // Cargar Plano
+    const imgElement = document.getElementById('img-plano-despiece');
+    if (imgElement) {
+        if (pieza && pieza.plano_despiece_url) {
+            imgElement.src = pieza.plano_despiece_url;
+        } else {
+            imgElement.src = 'https://via.placeholder.com/600x400?text=Sin+Plano/Medidas+Cargadas';
+        }
+    }
+
+    // Cargar Tabla de Piezas
+    piezasMedidasLista = (pieza && pieza.tabla_medidas) ? pieza.tabla_medidas : [];
+    renderizarTablaMedidas();
+}
+
+function cerrarModalMedidas() {
+    const modal = document.getElementById('modal-medidas-piezas');
+    if (modal) modal.style.display = 'none';
+    resetZoomPlano();
+}
+
+function renderizarTablaMedidas() {
+    const tbody = document.getElementById('tbody-medidas-piezas');
+    if (!tbody) return;
+    
+    tbody.innerHTML = '';
+
+    if (!piezasMedidasLista || piezasMedidasLista.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:15px; color:#64748b;">No hay registros de piezas/medidas agregados.</td></tr>`;
+        return;
+    }
+
+    let isAdmin = (currentRole === 'admin');
+
+    piezasMedidasLista.forEach((pieza, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'fila-pieza-item';
+        tr.id = `fila-pieza-${idx}`;
+        
+        // Al hacer clic en la fila completa se activa la selección y zoom
+        tr.onclick = (e) => {
+            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
+                seleccionarPiezaInteractiva(idx);
+            }
+        };
+
+        const tieneCoords = pieza.coords && pieza.coords.x;
+
+        if (isAdmin) {
+            tr.innerHTML = `
+                <td style="padding:6px;">
+                    <input type="text" value="${pieza.pos || (idx + 1)}" onchange="actualizarPiezaDato(${idx}, 'pos', this.value)" style="width:30px; border:1px solid #ccc; padding:2px; text-align:center;">
+                </td>
+                <td style="padding:6px;"><input type="text" value="${pieza.num_articulo || ''}" onchange="actualizarPiezaDato(${idx}, 'num_articulo', this.value)" style="width:100%; border:1px solid #ccc; padding:2px;"></td>
+                <td style="padding:6px;"><input type="text" value="${pieza.nombre || ''}" onchange="actualizarPiezaDato(${idx}, 'nombre', this.value)" style="width:100%; border:1px solid #ccc; padding:2px;"></td>
+                <td style="padding:6px;"><input type="text" value="${pieza.medida || ''}" onchange="actualizarPiezaDato(${idx}, 'medida', this.value)" style="width:100%; border:1px solid #ccc; padding:2px;"></td>
+                <td style="padding:6px; display:flex; gap:4px; align-items:center;">
+                    <button onclick="marcarPosicionEnImagen(${idx})" title="Vincular punto en imagen" style="background:${tieneCoords ? '#10b981' : '#0284c7'}; color:white; border:none; padding:4px 6px; border-radius:4px; cursor:pointer;">
+                        ${tieneCoords ? '📍 OK' : '📍 Ubicar'}
+                    </button>
+                    <button onclick="eliminarFilaPieza(${idx})" style="background:#ef4444; color:white; border:none; padding:4px 6px; border-radius:4px; cursor:pointer;">🗑️</button>
+                </td>
+            `;
+        } else {
+            tr.innerHTML = `
+                <td style="padding:10px; font-weight:bold; color:#0284c7; text-align:center;">${pieza.pos || (idx + 1)}</td>
+                <td style="padding:10px; font-weight:600;">${pieza.num_articulo || '-'}</td>
+                <td style="padding:10px;">${pieza.nombre || '-'}</td>
+                <td style="padding:10px; font-style:italic;">${pieza.medida || '-'}</td>
+            `;
+        }
+        tbody.appendChild(tr);
+    });
+
+    renderizarHotspotsPlano();
+}
+
+function seleccionarPiezaInteractiva(index) {
+    // 1. Quitar la clase 'activo' de todos los hotspots
+    document.querySelectorAll('.hotspot-item').forEach(hp => hp.classList.remove('activo'));
+
+    // 2. Activar parpadeo en el hotspot seleccionado
+    const hotspotActual = document.getElementById(`hotspot-pieza-${index}`);
+    if (hotspotActual) {
+        hotspotActual.classList.add('activo');
+    }
+
+    // 3. Aplicar Zoom enfocado a las coordenadas de la pieza
+    const pieza = piezasMedidasLista[index];
+    const wrapper = document.getElementById('wrapper-plano-img');
+
+    if (pieza && pieza.coords && wrapper) {
+        wrapper.style.transformOrigin = `${pieza.coords.x}% ${pieza.coords.y}%`;
+        wrapper.style.transform = 'scale(2.2)';
+    }
+
+    // 4. RESALTAR Y HACER SCROLL EN LA TABLA (Paso nuevo)
+    document.querySelectorAll('#tbody-medidas-piezas tr').forEach(tr => {
+        tr.style.backgroundColor = ''; // Limpia el color previo
+    });
+
+    const filaSeleccionada = document.getElementById(`fila-pieza-${index}`);
+    if (filaSeleccionada) {
+        // Colorea la fila (azul claro de selección)
+        filaSeleccionada.style.backgroundColor = '#e0f2fe';
+        
+        // Desplaza la tabla automáticamente para mostrar la fila activa
+        filaSeleccionada.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+function zoomPlano(factor) {
+    zoomActualPlano += factor;
+    if (zoomActualPlano < 0.5) zoomActualPlano = 0.5;
+    if (zoomActualPlano > 4) zoomActualPlano = 4;
+    const wrapper = document.getElementById('wrapper-plano-img');
+    if (wrapper) wrapper.style.transform = `scale(${zoomActualPlano})`;
+}
+
+function resetZoomPlano() {
+    const wrapper = document.getElementById('wrapper-plano-img');
+    if (wrapper) {
+        wrapper.style.transformOrigin = 'center center';
+        wrapper.style.transform = 'scale(1)';
+    }
+    // Opcional: quitar parpadeo activo
+    document.querySelectorAll('.hotspot-item').forEach(hp => hp.classList.remove('activo'));
+}
+
+async function subirPlanoDespiece(event) {
+    const file = event.target.files[0];
+    if (!file || !piezaSeleccionadaNombre) return;
+
+    // Nombre de archivo seguro sin caracteres especiales
+    const safeName = piezaSeleccionadaNombre.replace(/[^a-zA-Z0-9]/g, "_");
+    const fileName = `pieza_${safeName}_${Date.now()}`;
+    
+    const { data, error } = await dbSupabase.storage
+        .from('modelos-glb')
+        .upload(fileName, file);
+
+    if (error) {
+        alert("Error al subir archivo: " + error.message);
+        return;
+    }
+
+    const { data: publicData } = dbSupabase.storage
+        .from('modelos-glb')
+        .getPublicUrl(fileName);
+
+    const publicUrl = publicData.publicUrl;
+
+    // Actualizar en Supabase mediante 'nombre' y 'maquina_id'
+    await dbSupabase
+        .from('piezas')
+        .update({ plano_despiece_url: publicUrl })
+        .eq('maquina_id', currentMachineId)
+        .eq('nombre', piezaSeleccionadaNombre);
+
+    document.getElementById('img-plano-despiece').src = publicUrl;
+    alert("¡Plano cargado exitosamente!");
+}
+
+function agregarFilaPiezaMedida() {
+    if (!Array.isArray(piezasMedidasLista)) piezasMedidasLista = [];
+    piezasMedidasLista.push({
+        pos: piezasMedidasLista.length + 1,
+        num_articulo: '',
+        nombre: '',
+        medida: ''
+    });
+    renderizarTablaMedidas();
+}
+
+function actualizarPiezaDato(idx, campo, valor) {
+    if (piezasMedidasLista[idx]) {
+        piezasMedidasLista[idx][campo] = valor;
+    }
+}
+
+function eliminarFilaPieza(idx) {
+    piezasMedidasLista.splice(idx, 1);
+    renderizarTablaMedidas();
+}
+
+async function guardarCambiosTablaMedidas() {
+    if (!piezaSeleccionadaNombre) return;
+
+    const { error } = await dbSupabase
+        .from('piezas')
+        .update({ tabla_medidas: piezasMedidasLista })
+        .eq('maquina_id', currentMachineId)
+        .eq('nombre', piezaSeleccionadaNombre);
+
+    if (error) {
+        alert("Error al guardar tabla: " + error.message);
+    } else {
+        alert("¡Datos guardados correctamente!");
+    }
+}
+let marcandoCoordenadaIndex = null;
+
+// 1. Activar el modo de asignación de punto sobre la imagen
+function marcarPosicionEnImagen(idx) {
+    if (currentRole !== 'admin') return;
+    marcandoCoordenadaIndex = idx;
+    alert(`📍 Haz clic en el plano (sobre el número ${piezasMedidasLista[idx].pos || (idx + 1)}) para vincular su posición.`);
+}
+
+// 2. Capturar clic en la imagen y guardar las coordenadas (X%, Y%)
+function capturarCoordenadaPlano(event) {
+    if (marcandoCoordenadaIndex === null || currentRole !== 'admin') return;
+
+    const img = document.getElementById('img-plano-despiece');
+    const rect = img.getBoundingClientRect();
+    
+    if (rect.width === 0 || rect.height === 0) return;
+
+    // Obtener porcentaje exacto dentro del bounding box de la imagen
+    let xPercent = ((event.clientX - rect.left) / rect.width) * 100;
+    let yPercent = ((event.clientY - rect.top) / rect.height) * 100;
+
+    // Asegurar valores dentro del rango 0% - 100%
+    xPercent = Math.max(0, Math.min(100, xPercent));
+    yPercent = Math.max(0, Math.min(100, yPercent));
+
+    piezasMedidasLista[marcandoCoordenadaIndex].coords = {
+        x: xPercent.toFixed(2),
+        y: yPercent.toFixed(2)
+    };
+
+    marcandoCoordenadaIndex = null;
+    
+    renderizarHotspotsPlano();
+    renderizarTablaMedidas();
+}
+
+// 3. Renderizar los círculos numéricos (Hotspots) flotantes sobre la imagen
+function renderizarHotspotsPlano() {
+    const capa = document.getElementById('capa-hotspots-plano');
+    if (!capa) return;
+    capa.innerHTML = '';
+
+    piezasMedidasLista.forEach((pieza, idx) => {
+        if (pieza.coords && pieza.coords.x !== undefined && pieza.coords.y !== undefined) {
+            const hotspot = document.createElement('div');
+            hotspot.id = `hotspot-pieza-${idx}`;
+            hotspot.className = 'hotspot-item';
+            hotspot.textContent = pieza.pos || (idx + 1);
+            
+            hotspot.style.cssText = `
+                position: absolute;
+                top: ${pieza.coords.y}%;
+                left: ${pieza.coords.x}%;
+                transform: translate(-50%, -50%);
+                width: 24px;
+                height: 24px;
+                background-color: #0284c7;
+                color: #ffffff;
+                border: 2px solid #ffffff;
+                border-radius: 50%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 11px;
+                font-weight: bold;
+                cursor: pointer;
+                box-shadow: 0 2px 6px rgba(0,0,0,0.5);
+                pointer-events: auto;
+                z-index: 100;
+            `;
+
+            // Asignación directa del clic
+            hotspot.onclick = (e) => {
+                e.stopPropagation();
+                seleccionarPiezaInteractiva(idx);
+            };
+
+            capa.appendChild(hotspot);
+        }
+    });
+}
+
+// 4. Función de Selección + Zoom enfocado (Tabla -> Imagen & Imagen -> Tabla)
+function seleccionarPiezaInteractiva(index) {
+    // 1. Limpiar clase 'activo' de todos los hotspots
+    document.querySelectorAll('.hotspot-item').forEach(hp => hp.classList.remove('activo'));
+
+    // 2. Activar parpadeo en el hotspot seleccionado
+    const hotspotActual = document.getElementById(`hotspot-pieza-${index}`);
+    if (hotspotActual) {
+        hotspotActual.classList.add('activo');
+    }
+
+    // 3. Aplicar Zoom enfocado en la imagen
+    const pieza = piezasMedidasLista[index];
+    const wrapper = document.getElementById('wrapper-plano-img');
+
+    if (pieza && pieza.coords && wrapper) {
+        wrapper.style.transformOrigin = `${pieza.coords.x}% ${pieza.coords.y}%`;
+        wrapper.style.transform = 'scale(2.2)';
+    }
+
+    // 4. Limpiar resaltado previo de TODAS las filas e inputs de la tabla
+    document.querySelectorAll('.fila-pieza-item').forEach(tr => {
+        tr.style.backgroundColor = '';
+        tr.querySelectorAll('td, input').forEach(el => el.style.backgroundColor = '');
+    });
+
+    // 5. Resaltar la fila e inputs seleccionados
+    const filaSeleccionada = document.getElementById(`fila-pieza-${index}`);
+    if (filaSeleccionada) {
+        const colorHighlight = '#bae6fd'; // Azul celeste bien visible
+        
+        filaSeleccionada.style.backgroundColor = colorHighlight;
+        filaSeleccionada.querySelectorAll('td, input').forEach(el => {
+            el.style.backgroundColor = colorHighlight;
+        });
+
+        // Desplazar la tabla si la lista es grande
+        filaSeleccionada.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+// Integración con renderizarTablaMedidas() existente:
+// Asegúrate de que en renderizarTablaMedidas() agregues la opción para admin de fijar la coordenada
+// En el tr.innerHTML (para Admin) agrega este botón:
+// <button onclick="marcarPosicionEnImagen(${idx})" style="background:#0284c7; color:white; border:none; padding:4px 6px; border-radius:4px;">📍 Pos</button>
+// Exponer globalmente
+window.activarSeleccionMedidas = activarSeleccionMedidas;
+window.abrirModalMedidasPorPieza = abrirModalMedidasPorPieza;
+window.cerrarModalMedidas = cerrarModalMedidas;
+window.zoomPlano = zoomPlano;
+window.resetZoomPlano = resetZoomPlano;
+window.subirPlanoDespiece = subirPlanoDespiece;
+window.agregarFilaPiezaMedida = agregarFilaPiezaMedida;
+window.actualizarPiezaDato = actualizarPiezaDato;
+window.eliminarFilaPieza = eliminarFilaPieza;
+window.guardarCambiosTablaMedidas = guardarCambiosTablaMedidas;
 // Exponer funciones globalmente
 window.addNewMachine = addNewMachine;
 window.subirManualPieza3D = subirManualPieza3D;
@@ -2360,7 +2524,7 @@ window.procesarYSubirKardexPdf = procesarYSubirKardexPdf;
 window.deleteMachine = deleteMachine;
 window.agregarNuevaInstruccion = agregarNuevaInstruccion;
 window.abrirModalAgregarPaso = abrirModalAgregarPaso;
-window.cerrarModalPaso = cerrarModalPaso;
+window.cerrarModalPaso = cerrarnodalPaso = cerrarModalPaso;
 window.guardarNuevoPasoConImagen = guardarNuevoPasoConImagen;
 window.eliminarPasoDeInstruccion = eliminarPasoDeInstruccion;
 window.eliminarInstruccionCompleta = eliminarInstruccionCompleta;
