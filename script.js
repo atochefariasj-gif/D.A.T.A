@@ -2826,28 +2826,52 @@ async function guardarTokenEnSupabase(fcmToken) {
         console.error('Excepción al guardar token:', e);
     }
 }
-async function reregistrarDispositivo() {
-    try {
-        const reg = await navigator.serviceWorker.ready;
-        const messaging = firebase.messaging();
-        
-        // Forzar eliminación del token antiguo de la memoria local
-        await messaging.deleteToken(); 
-        
-        // Generar uno nuevo e insertarlo en Supabase
-        const nuevoToken = await messaging.getToken({
-            serviceWorkerRegistration: reg,
-            vapidKey: 'BNwKAxWr9uZYTNvWHF9StP-EQJnUZxAd3buNyrJ89dFkkKFiy4N1bOFXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494'
-        });
+async function autoRegistrarDispositivo() {
+    if (typeof firebase === 'undefined' || !firebase.messaging.isSupported()) return;
 
-        if (nuevoToken) {
-            await guardarTokenEnSupabase(nuevoToken);
-            alert("¡Dispositivo re-registrado con éxito en Supabase!");
+    try {
+        const messaging = firebase.messaging();
+        const permission = Notification.permission;
+
+        if (permission === 'granted') {
+            const reg = await navigator.serviceWorker.ready;
+            
+            // 1. Obtener token actual del navegador
+            let token = await messaging.getToken({
+                serviceWorkerRegistration: reg,
+                vapidKey: 'BNwKAxWr9uZYTNvWHF9StP-EQJnUZxAd3buNyrJ89dFkkKFiy4N1bOFXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494' // Tu VAPID Key real de Firebase
+            });
+
+            if (token) {
+                // 2. Verificar si este token existe en Supabase
+                const { data } = await dbSupabase
+                    .from('tokens_dispositivos')
+                    .select('token_push')
+                    .eq('token_push', token);
+
+                // 3. Si la tabla se limpió y el token ya no existe en Supabase, forzar regeneración
+                if (!data || data.length === 0) {
+                    console.log("Token no encontrado en Supabase. Regenerando...");
+                    await messaging.deleteToken(); // Borra la caché antigua
+                    token = await messaging.getToken({
+                        serviceWorkerRegistration: reg,
+                        vapidKey: 'BNwKAxWr9uZYTNvWHF9StP-EQJnUZxAd3buNyrJ89dFkkKFiy4N1bOFXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494'
+                    });
+                }
+
+                // 4. Guardar en Supabase
+                await guardarTokenEnSupabase(token);
+            }
         }
     } catch (e) {
-        console.error("Error al re-registrar:", e);
+        console.error("Error en auto-registro de notificaciones:", e);
     }
 }
+
+// Ejecutar automáticamente al cargar la página
+document.addEventListener('DOMContentLoaded', () => {
+    autoRegistrarDispositivo();
+});
 // Exponer globalmente
 window.activarSeleccionMedidas = activarSeleccionMedidas;
 window.abrirModalMedidasPorPieza = abrirModalMedidasPorPieza;
