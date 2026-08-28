@@ -27,34 +27,39 @@ const PASSWORDS = {
 // NUEVO: DETECCIÓN DE QR AL CARGAR LA PÁGINA
 // ==========================================
 // Variable global (colócala fuera de DOMContentLoaded o arriba del archivo)
+// NUEVO: DETECCIÓN DE URL AL CARGAR LA PÁGINA
 let pendienteRedireccion = null;
 
 document.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
     const action = urlParams.get('action');
-    const machineId = urlParams.get('machineId') || urlParams.get('maquina') || urlParams.get('piezas');
+    const machineId = urlParams.get('machineId') || urlParams.get('maquina');
+    const piezaQr = urlParams.get('pieza') || urlParams.get('piezas');
 
-    // Si viene de una Notificación Push para ir directo al Visor 3D
+    // 1. Si viene de una Notificación Push para ir directo al Visor 3D
     if (action === 'view3d' && machineId) {
         sessionStorage.setItem('maquina_3d_pendiente', machineId);
     } 
-    // Si viene de un código QR tradicional
-    else if (urlParams.get('pieza') || urlParams.get('piezas')) {
-        const tokenQr = urlParams.get('pieza') || urlParams.get('piezas');
-        sessionStorage.setItem('maquina_qr_pendiente', tokenQr);
+    // 2. Si viene de un código QR tradicional
+    else if (piezaQr) {
+        sessionStorage.setItem('maquina_qr_pendiente', piezaQr);
     }
-    // ... Resto de tu código (inicializarNotificaciones(), activarEscuchaNotificacionesRealtime(), etc.)
-    // ... (Tu código existente de QR y Modo Oscuro) ...
-    inicializarPushNotifications();
-    activarEscuchaNotificacionesRealtime();
 
-    // 2. Listener cuando la app ya está abierta en segundo plano
+    // Inicializar Notificaciones
+    if (typeof inicializarNotificaciones === 'function') {
+        inicializarNotificaciones();
+    }
+    if (typeof activarEscuchaNotificacionesRealtime === 'function') {
+        activarEscuchaNotificacionesRealtime();
+    }
+
+    // Listener cuando la app ya está abierta en segundo plano
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.addEventListener('message', (event) => {
             if (event.data && event.data.action === 'CARGAR_MAQUINA') {
                 const targetId = event.data.machineId;
                 if (targetId) {
-                    currentMachineId = isNaN(targetId) ? targetId : Number(targetId);
+                    currentMachineId = isNaN(Number(targetId)) ? targetId : Number(targetId);
                     if (typeof cargarModeloMaquinaActual === 'function') {
                         cargarModeloMaquinaActual();
                     }
@@ -115,52 +120,71 @@ async function verificarPassword() {
 
 async function selectRole(role) {
     currentRole = role;
-    actualizarVisibilidadQR();
 
-    document.getElementById('main-menu').classList.remove('active-view');
-
-    // 1. VERIFICAR SI VIENE DE UNA NOTIFICACIÓN PUSH (Visor 3D directo)
+    // 1. VERIFICAR SI VIENE DE NOTIFICACIÓN PUSH (Redirigir directo al Visor 3D)
     const token3DPendiente = sessionStorage.getItem('maquina_3d_pendiente');
     if (token3DPendiente) {
         sessionStorage.removeItem('maquina_3d_pendiente');
 
-        // Establecer la máquina actual
-        currentMachineId = isNaN(Number(token3DPendiente)) ? token3DPendiente : Number(token3DPendiente);
+        const mId = isNaN(Number(token3DPendiente)) ? token3DPendiente : Number(token3DPendiente);
 
-        // Cargar datos/modelo 3D si aplica
-        if (typeof cargarModeloMaquinaActual === 'function') {
-            cargarModeloMaquinaActual();
+        // Consultar el nombre de la máquina en Supabase para inicializarla correctamente
+        let nombreMaquina = "Máquina";
+        if (typeof dbSupabase !== 'undefined') {
+            const { data } = await dbSupabase
+                .from('maquinas')
+                .select('nombre')
+                .eq('id', mId)
+                .maybeSingle();
+            if (data && data.nombre) {
+                nombreMaquina = data.nombre;
+            }
         }
 
-        // Abrir la vista del Visor 3D directamente (#view-visual3d)
-        document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active-view'));
-        const vista3D = document.getElementById('view-visual3d');
-        if (vista3D) vista3D.classList.add('active-view');
+        // 1. Configurar contexto de la máquina en la app
+        if (typeof openMachineDetail === 'function') {
+            openMachineDetail(mId, nombreMaquina);
+        }
 
-        return; // Finaliza la función aquí para no ir a la lista de líneas
+        // 2. Saltar de inmediato al Visor 3D
+        if (typeof openOption === 'function') {
+            openOption('Visual3D');
+        } else {
+            document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active-view'));
+            const vista3D = document.getElementById('view-visual3d');
+            if (vista3D) vista3D.classList.add('active-view');
+        }
+
+        return; // Finalizar aquí
     }
 
-    // 2. VERIFICAR SI VIENE DE UN CÓDIGO QR (Detalles de la máquina)
+    // 2. VERIFICAR SI VIENE DE ESCÁNER QR (Redirigir a los Datos/Opciones de la Máquina)
     const tokenPendiente = sessionStorage.getItem('maquina_qr_pendiente');
     if (tokenPendiente) {
         sessionStorage.removeItem('maquina_qr_pendiente');
 
-        const { data, error } = await dbSupabase
-            .from('maquinas')
-            .select('id, nombre')
-            .eq('qr_token', tokenPendiente)
-            .maybeSingle();
+        if (typeof dbSupabase !== 'undefined') {
+            const { data, error } = await dbSupabase
+                .from('maquinas')
+                .select('id, nombre')
+                .eq('qr_token', tokenPendiente)
+                .maybeSingle();
 
-        if (data && !error) {
-            openMachineDetail(data.id, data.nombre);
-        } else {
-            console.error('No se encontró la máquina con ese token en Supabase');
-            document.getElementById('view-lines').classList.add('active-view');
+            if (data && !error) {
+                // Abre el panel de opciones de la máquina (Kárdex, Manuales, etc.)
+                openMachineDetail(data.id, data.nombre);
+                return;
+            } else {
+                console.error('No se encontró la máquina con ese token en Supabase');
+            }
         }
-    } 
+    }
+
     // 3. NAVEGACIÓN NORMAL (Mostrar vista de líneas)
-    else {
-        document.getElementById('view-lines').classList.add('active-view');
+    document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active-view'));
+    const viewLines = document.getElementById('view-lines');
+    if (viewLines) {
+        viewLines.classList.add('active-view');
     }
 }
 
