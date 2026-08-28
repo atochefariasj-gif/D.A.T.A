@@ -25,3 +25,31 @@ messaging.onBackgroundMessage((payload) => {
 
     self.registration.showNotification(title, options);
 });
+// Manejar clics en las notificaciones push
+self.addEventListener('notificationclick', function(event) {
+    event.notification.close();
+
+    // Obtener la URL o el ID de la máquina que vino en los datos de la notificación
+    const data = event.notification.data || {};
+    const maquinaId = data.maquinaId || ''; // O la URL completa a donde quieres dirigir
+
+    // URL a la que redirigirá (ajusta según cómo manejes las rutas en tu app)
+    const urlDestino = maquinaId ? `./index.html?maquina=${maquinaId}` : './index.html';
+
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windowClients) {
+            // Si la app ya está abierta en una pestaña, enfócala y cámbiala de URL
+            for (let i = 0; i < windowClients.length; i++) {
+                const client = windowClients[i];
+                if (client.url.includes('index.html') && 'focus' in client) {
+                    client.focus();
+                    return client.navigate(urlDestino);
+                }
+            }
+            // Si no está abierta, abre una nueva pestaña
+            if (clients.openWindow) {
+                return clients.openWindow(urlDestino);
+            }
+        })
+    );
+});
