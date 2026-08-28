@@ -2620,7 +2620,7 @@ async function enviarNotificacionEvento(titulo, cuerpo, machineId, pieza) {
         const reg = await navigator.serviceWorker.ready;
         reg.showNotification(titulo, {
             body: cuerpo,
-            icon: './icon.png',
+            icon: './logo.png',
             vibrate: [200, 100, 200],
             data: { 
                 machineId: machineId,
