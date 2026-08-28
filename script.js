@@ -1227,21 +1227,91 @@ async function cerrarModalMotivo() {
 
 async function guardarReporteMantenimiento() {
     let motivo = document.getElementById('txt-motivo-input').value.trim();
-    if (!motivo) return alert("Ingresa el motivo.");
+    if (!motivo) {
+        mostrarToast("Ingresa el motivo del reporte.", "error");
+        return;
+    }
 
-    let fechaHoraStr = new Date().toLocaleString();
-    const { data: maq } = await dbSupabase.from('maquinas').select('reportes_piezas').eq('id', currentMachineId).single();
-    let reportes = maq?.reportes_piezas || {};
+    // 1. Obtener el botón de envío para deshabilitarlo temporalmente
+    const btnEnviar = document.querySelector("#modal-motivo-reporte button[onclick*='guardarReporteMantenimiento']");
+    if (btnEnviar) {
+        btnEnviar.disabled = true;
+        btnEnviar.textContent = "Guardando...";
+    }
 
-    reportes[piezaSeleccionadaActual] = { estado: estadoReporteSeleccionado, motivo, fecha: fechaHoraStr };
-    await dbSupabase.from('maquinas').update({ reportes_piezas: reportes }).eq('id', currentMachineId);
-enviarNotificacionSistema(
-        `🛠️ Mantenimiento Reportado`,
-        `Se registró un mantenimiento para la máquina: ${nombreMaquina}`,
-        maquinaId
-    );
-    cerrarModalMotivo();
-    cargarModeloMaquinaActual();
+    try {
+        let fechaHoraStr = new Date().toLocaleString();
+        
+        // 2. Consulta a Supabase
+        const { data: maq, error: fetchError } = await dbSupabase
+            .from('maquinas')
+            .select('reportes_piezas')
+            .eq('id', currentMachineId)
+            .single();
+
+        if (fetchError) throw fetchError;
+
+        let reportes = maq?.reportes_piezas || {};
+
+        // 3. Actualizar objeto local de reportes
+        reportes[piezaSeleccionadaActual] = { 
+            estado: estadoReporteSeleccionado, 
+            motivo: motivo, 
+            fecha: fechaHoraStr 
+        };
+
+        // 4. Guardar cambios en Supabase
+        const { error: updateError } = await dbSupabase
+            .from('maquinas')
+            .update({ reportes_piezas: reportes })
+            .eq('id', currentMachineId);
+
+        if (updateError) throw updateError;
+
+        // 5. Limpiar campo y cerrar modal
+        document.getElementById('txt-motivo-input').value = '';
+        cerrarModalMotivo();
+        cargarModeloMaquinaActual();
+
+        // 6. Notificación de éxito
+        const tipoTexto = estadoReporteSeleccionado === 'preventivo' ? 'Alerta preventiva' : 'Reporte de mantenimiento';
+        mostrarToast(`¡${tipoTexto} guardado con éxito!`, 'exito');
+enviarNotificacionEvento(tituloNotif, msjNotif, currentMachineId);
+    } catch (error) {
+        console.error("Error al guardar reporte:", error);
+        mostrarToast("Ocurrió un error al guardar en la base de datos.", "error");
+    } finally {
+        // 7. Restaurar estado original del botón
+        if (btnEnviar) {
+            btnEnviar.disabled = false;
+            btnEnviar.textContent = "Enviar Reporte";
+        }
+    }
+}
+function mostrarToast(mensaje, tipo = 'exito') {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `toast-notificacion ${tipo === 'error' ? 'error' : ''}`;
+    
+    const icono = tipo === 'error' ? '❌' : '✅';
+    toast.innerHTML = `<span>${icono}</span> <span>${mensaje}</span>`;
+
+    container.appendChild(toast);
+
+    // Animación de entrada
+    setTimeout(() => toast.classList.add('show'), 10);
+
+    // Salida y remoción automática tras 3.5 segundos
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3500);
 }
 
 async function marcarPiezaOperativa(nombrePieza) {
@@ -1725,10 +1795,13 @@ async function guardarNota3D(nombrePieza, puntoCoord, mensaje, autor) {
         alert("Nota 3D guardada para el siguiente turno.");
         cargarNotas3DEnModelo();
     }
-    enviarNotificacionSistema(
-        `📝 Nueva Nota 3D en ${nombreMaquina}`,
-        `Se añadió una nota: "${contenidoNota}"`,
-        maquinaId
+    mostrarToast("📌 Nota 3D agregada con éxito", "exito");
+    
+    // Disparar notificación con vibración
+    enviarNotificacionEvento(
+        "📌 Nueva Nota 3D",
+        `Se agregó una nota en la pieza "${nombrePieza}": ${textoNota}`,
+        currentMachineId
     );
 }
 
@@ -2508,60 +2581,50 @@ function seleccionarPiezaInteractiva(index) {
         filaSeleccionada.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 }
-// Solicita permiso inicial para notificaciones
-async function solicitarPermisoNotificaciones() {
-    if (!("Notification" in window)) return false;
-    if (Notification.permission === "granted") return true;
-    if (Notification.permission !== "denied") {
-        const permiso = await Notification.requestPermission();
-        return permiso === "granted";
-    }
-    return false;
+// Registrar el Service Worker al cargar la aplicación
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('Service Worker registrado con éxito:', reg.scope))
+        .catch(err => console.error('Error al registrar Service Worker:', err));
+
+    // Listener para recibir mensajes desde el Service Worker cuando se hace clic en segundo plano
+    navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.accion === 'CARGAR_MAQUINA') {
+            const targetId = event.data.machineId;
+            if (targetId && typeof currentMachineId !== 'undefined' && currentMachineId !== targetId) {
+                currentMachineId = targetId;
+                if (typeof cargarModeloMaquinaActual === 'function') {
+                    cargarModeloMaquinaActual();
+                }
+            }
+        }
+    });
 }
 
-// Función universal para enviar alertas con redirección al 3D/Máquina
-async function enviarNotificacionSistema(titulo, mensaje, maquinaId = null) {
-    const tienePermiso = await solicitarPermisoNotificaciones();
-    
-    // Vibración hápitca táctil: [duración, pausa, duración]
-    if ("vibrate" in navigator) {
+// Función principal para notificaciones y vibración
+async function enviarNotificacionEvento(titulo, cuerpo, machineId) {
+    // 1. Activar vibración en dispositivos móviles (Patrón: 200ms vibra, 100ms pausa, 200ms vibra)
+    if ('vibrate' in navigator) {
         navigator.vibrate([200, 100, 200]);
     }
 
-    if (tienePermiso) {
-        const notif = new Notification(titulo, {
-            body: mensaje,
-            icon: 'https://cdn-icons-png.flaticon.com/512/1827/1827504.png',
-            tag: `maquina-${maquinaId}`, // Agrupa notificaciones de la misma máquina
-            data: { maquinaId: maquinaId }
+    // 2. Solicitar permiso si no ha sido otorgado
+    if ('Notification' in window && Notification.permission === 'default') {
+        await Notification.requestPermission();
+    }
+
+    // 3. Disparar notificación push mediante el Service Worker
+    if ('Notification' in window && Notification.permission === 'granted') {
+        const reg = await navigator.serviceWorker.ready;
+        reg.showNotification(titulo, {
+            body: cuerpo,
+            icon: '/assets/icon.png', // Ajusta la ruta de tu icono si aplica
+            vibrate: [200, 100, 200],
+            data: { machineId: machineId },
+            tag: `reporte-${machineId}`
         });
-
-        // Al hacer clic en la notificación
-        notif.onclick = function(event) {
-            window.focus(); // Enfoca la ventana de la App
-            notif.close();
-
-            const targetId = event.target.data?.maquinaId;
-            if (targetId) {
-                // Ejecuta la misma función que usas al escanear el QR para cargar la máquina/3D
-                cargarVisor3DporMaquina(targetId); 
-            }
-        };
     }
 }
-
-// Función auxiliar para redirigir/abrir la máquina en el visor (Ajusta con el nombre de tu función QR existente)
-function cargarVisor3DporMaquina(maquinaId) {
-    console.log(`Cargando visor 3D para la máquina: ${maquinaId}`);
-    
-    // Si usas una función propia para abrir el visor (ej: cargarModeloQR o abrirDetalleMaquina)
-    if (typeof cargarModelo3D === 'function') {
-        cargarModelo3D(maquinaId);
-    } else if (typeof procesarLecturaQR === 'function') {
-        procesarLecturaQR(maquinaId);
-    }
-}
-
 // Integración con renderizarTablaMedidas() existente:
 // Asegúrate de que en renderizarTablaMedidas() agregues la opción para admin de fijar la coordenada
 // En el tr.innerHTML (para Admin) agrega este botón:
