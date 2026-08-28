@@ -2794,14 +2794,30 @@ async function inicializarPushNotifications() {
 }
 // Guardar Token en la base de datos
 async function guardarTokenEnSupabase(fcmToken) {
-    if (!fcmToken || typeof dbSupabase === 'undefined') return;
+    if (!fcmToken || typeof dbSupabase === 'undefined') {
+        console.warn('Token FCM no válido o Supabase no inicializado');
+        return;
+    }
 
-    await dbSupabase
-        .from('tokens_dispositivos')
-        .upsert(
-            { token_push: fcmToken, ultimo_acceso: new Date().toISOString() }, 
-            { onConflict: 'token_push' }
-        );
+    try {
+        const { data, error } = await dbSupabase
+            .from('tokens_dispositivos')
+            .upsert(
+                { 
+                    token_push: fcmToken, 
+                    ultimo_acceso: new Date().toISOString() 
+                }, 
+                { onConflict: 'token_push' }
+            );
+
+        if (error) {
+            console.error('Error al insertar token en Supabase:', error.message);
+        } else {
+            console.log('Token registrado/actualizado con éxito en Supabase');
+        }
+    } catch (e) {
+        console.error('Excepción al guardar token:', e);
+    }
 }
 // Exponer globalmente
 window.activarSeleccionMedidas = activarSeleccionMedidas;
