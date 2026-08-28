@@ -42,7 +42,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // ... (Tu código existente de QR y Modo Oscuro) ...
 
     inicializarPushNotifications();
-    escucharNotificacionesRealtime();
+    activarEscuchaNotificacionesRealtime();
 
     // 2. Listener cuando la app ya está abierta en segundo plano
     if ('serviceWorker' in navigator) {
