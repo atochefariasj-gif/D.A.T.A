@@ -1,27 +1,32 @@
-// Manejador para el clic en la notificación desde segundo plano
 self.addEventListener('notificationclick', function(event) {
     event.notification.close();
 
-    const machineId = event.notification.data ? event.notification.data.machineId : null;
-    const urlToOpen = new URL(self.location.origin);
-
-    if (machineId) {
-        urlToOpen.searchParams.set('machineId', machineId);
-    }
+    const data = event.notification.data || {};
+    const machineId = data.machineId || '';
+    const pieza = data.pieza || '';
 
     event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
-            // Si ya hay una ventana abierta, la enfocamos y enviamos la orden
-            for (let i = 0; i < clientList.length; i++) {
-                let client = clientList[i];
-                if ('focus' in client) {
-                    client.postMessage({ accion: 'CARGAR_MAQUINA', machineId: machineId });
-                    return client.focus();
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windowClients) {
+            // 1. Si la ventana de la app ya está abierta
+            for (let i = 0; i < windowClients.length; i++) {
+                const client = windowClients[i];
+                if (client.url.includes('index.html') && 'focus' in client) {
+                    client.focus();
+                    
+                    // Enviar mensaje directo a script.js con la acción CARGAR_MAQUINA
+                    client.postMessage({
+                        action: 'CARGAR_MAQUINA',
+                        machineId: machineId,
+                        pieza: pieza
+                    });
+                    return;
                 }
             }
-            // Si está cerrada, abre la aplicación directamente
+
+            // 2. Si la app estaba cerrada, la abre pasando los parámetros en la URL
+            const urlDestino = `./index.html?maquina=${encodeURIComponent(machineId)}&pieza=${encodeURIComponent(pieza)}`;
             if (clients.openWindow) {
-                return clients.openWindow(urlToOpen.href);
+                return clients.openWindow(urlDestino);
             }
         })
     );
