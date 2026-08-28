@@ -1818,12 +1818,13 @@ async function guardarNota3D(nombrePieza, puntoCoord, mensaje, autor) {
     }
     mostrarToast("📌 Nota 3D agregada con éxito", "exito");
     
-    // Disparar notificación con vibración
-    enviarNotificacionEvento(
-        "📌 Nueva Nota 3D",
-        `Se agregó una nota en la pieza "${nombrePieza}": ${textoNota}`,
-        currentMachineId
-    );
+// Borra la línea 1822 (const textoNota = ...)
+
+enviarNotificacionEvento(
+    "📌 Nueva Nota 3D",
+    `Se agregó una nota en la pieza "${nombrePieza}": ${mensaje}`,
+    currentMachineId
+);
 }
 
 async function cargarNotas3DEnModelo() {
@@ -2619,7 +2620,7 @@ async function enviarNotificacionEvento(titulo, cuerpo, machineId, pieza) {
         const reg = await navigator.serviceWorker.ready;
         reg.showNotification(titulo, {
             body: cuerpo,
-            icon: '/assets/icon.png',
+            icon: './icon.png',
             vibrate: [200, 100, 200],
             data: { 
                 machineId: machineId,
