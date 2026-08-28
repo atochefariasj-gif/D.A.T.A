@@ -14,6 +14,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
+// Manejador para notificaciones en segundo plano / pantalla bloqueada
 messaging.onBackgroundMessage((payload) => {
     const title = payload.notification?.title || "📌 Notificación D.A.T.A.";
     const options = {
@@ -25,28 +26,32 @@ messaging.onBackgroundMessage((payload) => {
 
     self.registration.showNotification(title, options);
 });
-// Manejar clics en las notificaciones push
+
+// Manejar clics en las notificaciones push para ir directo al Visor 3D
 self.addEventListener('notificationclick', function(event) {
     event.notification.close();
 
-    // Obtener la URL o el ID de la máquina que vino en los datos de la notificación
     const data = event.notification.data || {};
-    const maquinaId = data.maquinaId || ''; // O la URL completa a donde quieres dirigir
+    // Extrae el ID de la máquina recibido en la carga útil (payload)
+    const maquinaId = data.machineId || data.maquinaId || '';
 
-    // URL a la que redirigirá (ajusta según cómo manejes las rutas en tu app)
-    const urlDestino = maquinaId ? `./index.html?maquina=${maquinaId}` : './index.html';
+    // Construye la URL agregando los parámetros exactos action=view3d
+    const baseUrl = self.location.origin + self.location.pathname.replace('firebase-messaging-sw.js', 'index.html');
+    const urlDestino = maquinaId 
+        ? `${baseUrl}?action=view3d&machineId=${encodeURIComponent(maquinaId)}` 
+        : baseUrl;
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windowClients) {
-            // Si la app ya está abierta en una pestaña, enfócala y cámbiala de URL
+            // Si la aplicación ya está abierta en una pestaña, la enfoca y navega al visor 3D
             for (let i = 0; i < windowClients.length; i++) {
                 const client = windowClients[i];
-                if (client.url.includes('index.html') && 'focus' in client) {
+                if ('focus' in client) {
                     client.focus();
                     return client.navigate(urlDestino);
                 }
             }
-            // Si no está abierta, abre una nueva pestaña
+            // Si la aplicación estaba cerrada, abre una nueva ventana con el parámetro directo al 3D
             if (clients.openWindow) {
                 return clients.openWindow(urlDestino);
             }
