@@ -521,7 +521,7 @@ h1 {
 .active-view { display: block; }
 .back-btn { background: #e9ecef; border: none; color: #495057; font-weight: bold; padding: 10px 20px; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 5px; }
 .back-btn:hover { background-color: #dee2e6; }
-/* Si el body o el contenedor tiene una clase de admin, forzar la visibilidad */
+
 body.is-admin #admin-kardex-upload {
     display: block !important;
 }
@@ -530,16 +530,7 @@ body.is-admin #admin-kardex-upload {
     justify-content: center !important;
     align-items: center !important;
 }
-body.dark-mode .modal-content, 
-body.dark-mode div[id*="modal"] div {
-    color: #1e293b !important; /* Mantiene el texto oscuro legible dentro de las cajas blancas de modales */
-}
-body.dark-mode input, 
-body.dark-mode textarea, 
-body.dark-mode select {
-    background-color: #ffffff !important;
-    color: #1e293b !important;
-}
+
 .led-indicator {
     width: 14px;
     height: 14px;
@@ -572,6 +563,10 @@ body.dark-mode select {
     50% { opacity: 0.4; }
     100% { opacity: 1; }
 }
+
+/* ========================================== */
+/* CORRECCIONES DEFINITIVAS DE MODO OSCURO     */
+/* ========================================== */
 body.dark-mode h1, 
 body.dark-mode h2, 
 body.dark-mode h3, 
@@ -580,10 +575,87 @@ body.dark-mode span,
 body.dark-mode label,
 body.dark-mode .card-title,
 body.dark-mode div[id*="modal"] {
-    color: #0f172a !important; /* Texto oscuro y nítido dentro de las tarjetas blancas */
+    color: #0f172a !important; 
 }
 
-/* Forzar que el subtítulo o texto gris dentro del menú oscuro se vea bien */
+/* Excepciones específicas para elementos dentro de modales y tarjetas oscuras que necesitan texto claro */
+body.dark-mode .modal-content h3,
+body.dark-mode .modal-content p,
+body.dark-mode .modal-content span,
+body.dark-mode div[id*="modal"] p,
+body.dark-mode div[id*="modal"] span {
+    color: #1e293b !important; 
+}
+
+/* Campos de formulario e inputs legibles en modo oscuro */
+body.dark-mode input, 
+body.dark-mode textarea, 
+body.dark-mode select {
+    background-color: #ffffff !important;
+    color: #1e293b !important;
+}
+
 body.dark-mode .view-section:not(.active) {
     color: #ffffff;
+}
+/* Ajustes opcionales para el panel de cotas y medición CAD */
+#panel-medicion {
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+/* Resaltado interactivo de piezas en la tabla */
+.fila-pieza-item {
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.fila-pieza-item:hover {
+    background-color: #f0f9ff !important;
+}
+
+.fila-pieza-activa {
+    background-color: #bae6fd !important;
+    font-weight: bold;
+    border-left: 4px solid #0284c7;
+}
+
+/* Responsividad para móviles */
+@media (max-width: 768px) {
+    #contenedor-flex-medidas {
+        flex-direction: column !important;
+    }
+}
+/* Animación para hacer parpadear el hotspot seleccionado */
+@keyframes hotspot-parpadeo {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        background-color: #ef4444; /* Rojo brillante */
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    }
+    50% {
+        transform: translate(-50%, -50%) scale(1.3);
+        background-color: #f59e0b; /* Amarillo / Naranja */
+        box-shadow: 0 0 15px 5px rgba(245, 158, 11, 0.9);
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(1);
+        background-color: #ef4444;
+        box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+    }
+}
+
+/* Clase activa que aplica el parpadeo */
+.hotspot-item.activo {
+    animation: hotspot-parpadeo 1s infinite !important;
+    z-index: 200 !important;
 }
