@@ -2687,14 +2687,14 @@ async function inicializarPushNotifications() {
     try {
         if (typeof firebase === 'undefined' || !('Notification' in window)) return;
 
-        // 1. Registrar el Service Worker indicando la ubicación relativa exacta
+        // Registrar el Service Worker explícito
         const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
         
         const messaging = firebase.messaging();
         const permission = await Notification.requestPermission();
 
         if (permission === 'granted') {
-            // 2. Pasar el registro explícito del SW a Firebase
+            // Solicitar token especificando vapidKey y la instancia del Service Worker
             const token = await messaging.getToken({ 
                 vapidKey: 'BNwKAxWr9uZYTNvwHF9StP-EQJnUZxAd3buNyrJ89dFkKKFiy4N1b0FXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494',
                 serviceWorkerRegistration: registration
