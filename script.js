@@ -2685,14 +2685,19 @@ if (typeof firebase !== 'undefined' && !firebase.apps.length) {
 // Inicializar y obtener token FCM
 async function inicializarPushNotifications() {
     try {
-        if (typeof firebase === 'undefined') return;
+        if (typeof firebase === 'undefined' || !('Notification' in window)) return;
+
+        // 1. Registrar el Service Worker indicando la ubicación relativa exacta
+        const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
         
         const messaging = firebase.messaging();
         const permission = await Notification.requestPermission();
-        
+
         if (permission === 'granted') {
+            // 2. Pasar el registro explícito del SW a Firebase
             const token = await messaging.getToken({ 
-                vapidKey: 'BNwKAxWr9uZYTNvwHF9StP-EQJnUZxAd3buNyrJ89dFkKKFiy4N1b0FXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494'
+                vapidKey: 'BNwKAxWr9uZYTNvwHF9StP-EQJnUZxAd3buNyrJ89dFkKKFiy4N1b0FXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494',
+                serviceWorkerRegistration: registration
             });
 
             if (token) {
@@ -2704,7 +2709,6 @@ async function inicializarPushNotifications() {
         console.error("Error al obtener token FCM:", error);
     }
 }
-
 // Guardar Token en la base de datos
 async function guardarTokenEnSupabase(token) {
     if (typeof dbSupabase === 'undefined') return;
