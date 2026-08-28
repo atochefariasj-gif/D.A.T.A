@@ -2826,6 +2826,28 @@ async function guardarTokenEnSupabase(fcmToken) {
         console.error('Excepción al guardar token:', e);
     }
 }
+async function reregistrarDispositivo() {
+    try {
+        const reg = await navigator.serviceWorker.ready;
+        const messaging = firebase.messaging();
+        
+        // Forzar eliminación del token antiguo de la memoria local
+        await messaging.deleteToken(); 
+        
+        // Generar uno nuevo e insertarlo en Supabase
+        const nuevoToken = await messaging.getToken({
+            serviceWorkerRegistration: reg,
+            vapidKey: 'TU_VAPID_KEY_AQUI'
+        });
+
+        if (nuevoToken) {
+            await guardarTokenEnSupabase(nuevoToken);
+            alert("¡Dispositivo re-registrado con éxito en Supabase!");
+        }
+    } catch (e) {
+        console.error("Error al re-registrar:", e);
+    }
+}
 // Exponer globalmente
 window.activarSeleccionMedidas = activarSeleccionMedidas;
 window.abrirModalMedidasPorPieza = abrirModalMedidasPorPieza;
