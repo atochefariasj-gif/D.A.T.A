@@ -1235,7 +1235,11 @@ async function guardarReporteMantenimiento() {
 
     reportes[piezaSeleccionadaActual] = { estado: estadoReporteSeleccionado, motivo, fecha: fechaHoraStr };
     await dbSupabase.from('maquinas').update({ reportes_piezas: reportes }).eq('id', currentMachineId);
-
+enviarNotificacionSistema(
+        `🛠️ Mantenimiento Reportado`,
+        `Se registró un mantenimiento para la máquina: ${nombreMaquina}`,
+        maquinaId
+    );
     cerrarModalMotivo();
     cargarModeloMaquinaActual();
 }
@@ -1721,6 +1725,11 @@ async function guardarNota3D(nombrePieza, puntoCoord, mensaje, autor) {
         alert("Nota 3D guardada para el siguiente turno.");
         cargarNotas3DEnModelo();
     }
+    enviarNotificacionSistema(
+        `📝 Nueva Nota 3D en ${nombreMaquina}`,
+        `Se añadió una nota: "${contenidoNota}"`,
+        maquinaId
+    );
 }
 
 async function cargarNotas3DEnModelo() {
@@ -2497,6 +2506,59 @@ function seleccionarPiezaInteractiva(index) {
 
         // Desplazar la tabla si la lista es grande
         filaSeleccionada.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+// Solicita permiso inicial para notificaciones
+async function solicitarPermisoNotificaciones() {
+    if (!("Notification" in window)) return false;
+    if (Notification.permission === "granted") return true;
+    if (Notification.permission !== "denied") {
+        const permiso = await Notification.requestPermission();
+        return permiso === "granted";
+    }
+    return false;
+}
+
+// Función universal para enviar alertas con redirección al 3D/Máquina
+async function enviarNotificacionSistema(titulo, mensaje, maquinaId = null) {
+    const tienePermiso = await solicitarPermisoNotificaciones();
+    
+    // Vibración hápitca táctil: [duración, pausa, duración]
+    if ("vibrate" in navigator) {
+        navigator.vibrate([200, 100, 200]);
+    }
+
+    if (tienePermiso) {
+        const notif = new Notification(titulo, {
+            body: mensaje,
+            icon: 'https://cdn-icons-png.flaticon.com/512/1827/1827504.png',
+            tag: `maquina-${maquinaId}`, // Agrupa notificaciones de la misma máquina
+            data: { maquinaId: maquinaId }
+        });
+
+        // Al hacer clic en la notificación
+        notif.onclick = function(event) {
+            window.focus(); // Enfoca la ventana de la App
+            notif.close();
+
+            const targetId = event.target.data?.maquinaId;
+            if (targetId) {
+                // Ejecuta la misma función que usas al escanear el QR para cargar la máquina/3D
+                cargarVisor3DporMaquina(targetId); 
+            }
+        };
+    }
+}
+
+// Función auxiliar para redirigir/abrir la máquina en el visor (Ajusta con el nombre de tu función QR existente)
+function cargarVisor3DporMaquina(maquinaId) {
+    console.log(`Cargando visor 3D para la máquina: ${maquinaId}`);
+    
+    // Si usas una función propia para abrir el visor (ej: cargarModeloQR o abrirDetalleMaquina)
+    if (typeof cargarModelo3D === 'function') {
+        cargarModelo3D(maquinaId);
+    } else if (typeof procesarLecturaQR === 'function') {
+        procesarLecturaQR(maquinaId);
     }
 }
 
