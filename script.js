@@ -115,7 +115,7 @@ async function verificarPassword() {
 
 async function selectRole(role) {
     currentRole = role;
-    actualizarVisibilidad();
+    actualizarVisibilidadQR();
 
     document.getElementById('main-menu').classList.remove('active-view');
 
