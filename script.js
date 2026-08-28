@@ -26,47 +26,39 @@ const PASSWORDS = {
 // ==========================================
 // NUEVO: DETECCIÓN DE QR AL CARGAR LA PÁGINA
 // ==========================================
-window.addEventListener('DOMContentLoaded', () => {
-    // 1. Detección de QR
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Detectar si la app se abrió desde una notificación con parámetros en la URL
     const urlParams = new URLSearchParams(window.location.search);
-    const qrTokenEscaneado = urlParams.get('qr');
+    const maquinaUrl = urlParams.get('maquina');
+    const piezaUrl = urlParams.get('pieza');
 
-    if (qrTokenEscaneado) {
-        sessionStorage.setItem('maquina_qr_pendiente', qrTokenEscaneado);
+    if (maquinaUrl) {
+        currentMachineId = isNaN(maquinaUrl) ? maquinaUrl : Number(maquinaUrl);
+        if (typeof cargarModeloMaquinaActual === 'function') {
+            cargarModeloMaquinaActual();
+        }
     }
 
-    // 2. Modo Oscuro
-    if (localStorage.getItem('modo_oscuro') === 'true') {
-        document.body.classList.add('dark-mode');
-        const btn = document.getElementById('btn-modo-oscuro');
-        if (btn) btn.innerText = '☀️ Modo Claro';
-        aplicarEstilosModoOscuro(true);
-    }
+    // ... (Tu código existente de QR y Modo Oscuro) ...
 
-    // 3. REGISTRAR SERVICE WORKER Y REALTIME (AQUÍ LO AGREGAS)
     inicializarPushNotifications();
-    activarEscuchaNotificacionesRealtime();
-});
-// Registrar el Service Worker al cargar la aplicación
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js')
-        .then(reg => console.log('Service Worker registrado con éxito:', reg.scope))
-        .catch(err => console.error('Error al registrar Service Worker:', err));
+    escucharNotificacionesRealtime();
 
-    // Listener para recibir mensajes desde el Service Worker cuando se hace clic en segundo plano
-    navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data && event.data.accion === 'CARGAR_MAQUINA') {
-            const targetId = event.data.machineId;
-            if (targetId && typeof currentMachineId !== 'undefined' && currentMachineId !== targetId) {
-                currentMachineId = targetId;
-                if (typeof cargarModeloMaquinaActual === 'function') {
-                    cargarModeloMaquinaActual();
+    // 2. Listener cuando la app ya está abierta en segundo plano
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data && event.data.action === 'CARGAR_MAQUINA') {
+                const targetId = event.data.machineId;
+                if (targetId) {
+                    currentMachineId = isNaN(targetId) ? targetId : Number(targetId);
+                    if (typeof cargarModeloMaquinaActual === 'function') {
+                        cargarModeloMaquinaActual();
+                    }
                 }
             }
-        }
-    });
-}
-
+        });
+    }
+});
 
 // Función para restringir descargas/impresiones de QR solo a administradores
 function verificarPermisoQRAdmin() {
@@ -2612,30 +2604,31 @@ function seleccionarPiezaInteractiva(index) {
 }
 
 // Función principal para notificaciones y vibración
-async function enviarNotificacionEvento(titulo, cuerpo, machineId) {
-    // 1. Activar vibración en dispositivos móviles (Patrón: 200ms vibra, 100ms pausa, 200ms vibra)
+// Añade el argumento 'pieza'
+async function enviarNotificacionEvento(titulo, cuerpo, machineId, pieza) {
+
     if ('vibrate' in navigator) {
         navigator.vibrate([200, 100, 200]);
     }
 
-    // 2. Solicitar permiso si no ha sido otorgado
     if ('Notification' in window && Notification.permission === 'default') {
         await Notification.requestPermission();
     }
 
-    // 3. Disparar notificación push mediante el Service Worker
     if ('Notification' in window && Notification.permission === 'granted') {
         const reg = await navigator.serviceWorker.ready;
         reg.showNotification(titulo, {
             body: cuerpo,
-            icon: '/assets/icon.png', // Ajusta la ruta de tu icono si aplica
+            icon: '/assets/icon.png',
             vibrate: [200, 100, 200],
-            data: { machineId: machineId },
+            data: { 
+                machineId: machineId,
+                pieza: pieza // <-- Agregamos la pieza aquí
+            },
             tag: `reporte-${machineId}`
         });
     }
 }
-
 // Escuchador en tiempo real mediante Supabase
 function activarEscuchaNotificacionesRealtime() {
     if (typeof dbSupabase === 'undefined') return;
@@ -2660,7 +2653,8 @@ function activarEscuchaNotificacionesRealtime() {
                     const titulo = esPreventivo ? '⚠️ Alerta Preventiva' : '🔴 Reporte de Mantenimiento';
                     const mensaje = `Pieza "${ultimaPieza}": ${infoReporte.motivo || 'Sin detalles'}`;
 
-                    enviarNotificacionEvento(titulo, mensaje, maquinaActualizada.id);
+                    // Cambia la línea 2662 por:
+enviarNotificacionEvento(titulo, mensaje, maquinaActualizada.id, ultimaPieza);
                 }
             }
         )
