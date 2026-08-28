@@ -44,9 +44,28 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // 3. REGISTRAR SERVICE WORKER Y REALTIME (AQUÍ LO AGREGAS)
-    registrarServiceWorker();
     activarEscuchaNotificacionesRealtime();
 });
+// Registrar el Service Worker al cargar la aplicación
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js')
+        .then(reg => console.log('Service Worker registrado con éxito:', reg.scope))
+        .catch(err => console.error('Error al registrar Service Worker:', err));
+
+    // Listener para recibir mensajes desde el Service Worker cuando se hace clic en segundo plano
+    navigator.serviceWorker.addEventListener('message', (event) => {
+        if (event.data && event.data.accion === 'CARGAR_MAQUINA') {
+            const targetId = event.data.machineId;
+            if (targetId && typeof currentMachineId !== 'undefined' && currentMachineId !== targetId) {
+                currentMachineId = targetId;
+                if (typeof cargarModeloMaquinaActual === 'function') {
+                    cargarModeloMaquinaActual();
+                }
+            }
+        }
+    });
+}
+
 
 // Función para restringir descargas/impresiones de QR solo a administradores
 function verificarPermisoQRAdmin() {
@@ -1279,9 +1298,12 @@ async function guardarReporteMantenimiento() {
         cerrarModalMotivo();
         cargarModeloMaquinaActual();
 
-        // 6. Notificación de éxito
-        const tipoTexto = estadoReporteSeleccionado === 'preventivo' ? 'Alerta preventiva' : 'Reporte de mantenimiento';
-        mostrarToast(`¡${tipoTexto} guardado con éxito!`, 'exito');
+// 6. Notificación de éxito
+const esPreventivo = estadoReporteSeleccionado === 'preventivo';
+const tituloNotif = esPreventivo ? '⚠️ Alerta Preventiva' : '🔴 Reporte de Mantenimiento';
+const msjNotif = `Pieza "${piezaSeleccionadaActual}": ${motivo}`;
+
+mostrarToast(`¡${esPreventivo ? 'Alerta' : 'Reporte'} guardado con éxito!`, 'exito');
 enviarNotificacionEvento(tituloNotif, msjNotif, currentMachineId);
     } catch (error) {
         console.error("Error al guardar reporte:", error);
@@ -2586,25 +2608,6 @@ function seleccionarPiezaInteractiva(index) {
         // Desplazar la tabla si la lista es grande
         filaSeleccionada.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
-}
-// Registrar el Service Worker al cargar la aplicación
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js')
-        .then(reg => console.log('Service Worker registrado con éxito:', reg.scope))
-        .catch(err => console.error('Error al registrar Service Worker:', err));
-
-    // Listener para recibir mensajes desde el Service Worker cuando se hace clic en segundo plano
-    navigator.serviceWorker.addEventListener('message', (event) => {
-        if (event.data && event.data.accion === 'CARGAR_MAQUINA') {
-            const targetId = event.data.machineId;
-            if (targetId && typeof currentMachineId !== 'undefined' && currentMachineId !== targetId) {
-                currentMachineId = targetId;
-                if (typeof cargarModeloMaquinaActual === 'function') {
-                    cargarModeloMaquinaActual();
-                }
-            }
-        }
-    });
 }
 
 // Función principal para notificaciones y vibración
