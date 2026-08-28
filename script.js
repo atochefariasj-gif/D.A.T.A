@@ -34,18 +34,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const urlParams = new URLSearchParams(window.location.search);
     const action = urlParams.get('action');
     const machineId = urlParams.get('machineId') || urlParams.get('maquina');
-    const piezaQr = urlParams.get('pieza') || urlParams.get('piezas');
+    const tokenQr = urlParams.get('pieza') || urlParams.get('piezas') || urlParams.get('qr');
 
-    // 1. Si viene de una Notificación Push para ir directo al Visor 3D
+    // 1. Notificación Push -> Guardar para Visor 3D
     if (action === 'view3d' && machineId) {
         sessionStorage.setItem('maquina_3d_pendiente', machineId);
     } 
-    // 2. Si viene de un código QR tradicional
-    else if (piezaQr) {
-        sessionStorage.setItem('maquina_qr_pendiente', piezaQr);
+    // 2. Escáner QR -> Guardar para Detalles de Máquina
+    else if (tokenQr) {
+        sessionStorage.setItem('maquina_qr_pendiente', tokenQr);
     }
 
-    // Inicializar Notificaciones
+    // Inicializaciones existentes
     if (typeof inicializarNotificaciones === 'function') {
         inicializarNotificaciones();
     }
@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
         activarEscuchaNotificacionesRealtime();
     }
 
-    // Listener cuando la app ya está abierta en segundo plano
+    // Listener en segundo plano
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.addEventListener('message', (event) => {
             if (event.data && event.data.action === 'CARGAR_MAQUINA') {
@@ -121,14 +121,12 @@ async function verificarPassword() {
 async function selectRole(role) {
     currentRole = role;
 
-    // 1. VERIFICAR SI VIENE DE NOTIFICACIÓN PUSH (Redirigir directo al Visor 3D)
+    // 1. NAVEGACIÓN DESDE NOTIFICACIÓN PUSH (Ir directo a Visor 3D)
     const token3DPendiente = sessionStorage.getItem('maquina_3d_pendiente');
     if (token3DPendiente) {
         sessionStorage.removeItem('maquina_3d_pendiente');
-
         const mId = isNaN(Number(token3DPendiente)) ? token3DPendiente : Number(token3DPendiente);
 
-        // Consultar el nombre de la máquina en Supabase para inicializarla correctamente
         let nombreMaquina = "Máquina";
         if (typeof dbSupabase !== 'undefined') {
             const { data } = await dbSupabase
@@ -136,17 +134,12 @@ async function selectRole(role) {
                 .select('nombre')
                 .eq('id', mId)
                 .maybeSingle();
-            if (data && data.nombre) {
-                nombreMaquina = data.nombre;
-            }
+            if (data && data.nombre) nombreMaquina = data.nombre;
         }
 
-        // 1. Configurar contexto de la máquina en la app
         if (typeof openMachineDetail === 'function') {
             openMachineDetail(mId, nombreMaquina);
         }
-
-        // 2. Saltar de inmediato al Visor 3D
         if (typeof openOption === 'function') {
             openOption('Visual3D');
         } else {
@@ -154,38 +147,37 @@ async function selectRole(role) {
             const vista3D = document.getElementById('view-visual3d');
             if (vista3D) vista3D.classList.add('active-view');
         }
-
-        return; // Finalizar aquí
+        return;
     }
 
-    // 2. VERIFICAR SI VIENE DE ESCÁNER QR (Redirigir a los Datos/Opciones de la Máquina)
-    const tokenPendiente = sessionStorage.getItem('maquina_qr_pendiente');
-    if (tokenPendiente) {
+    // 2. NAVEGACIÓN DESDE CÓDIGO QR (Ir a los datos/menú de la máquina)
+    const tokenQRPendiente = sessionStorage.getItem('maquina_qr_pendiente');
+    if (tokenQRPendiente) {
         sessionStorage.removeItem('maquina_qr_pendiente');
+        document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active-view'));
 
         if (typeof dbSupabase !== 'undefined') {
-            const { data, error } = await dbSupabase
-                .from('maquinas')
-                .select('id, nombre')
-                .eq('qr_token', tokenPendiente)
-                .maybeSingle();
+            let query = dbSupabase.from('maquinas').select('id, nombre');
+            if (!isNaN(Number(tokenQRPendiente))) {
+                query = query.eq('id', Number(tokenQRPendiente));
+            } else {
+                query = query.eq('qr_token', tokenQRPendiente);
+            }
 
+            const { data, error } = await query.maybeSingle();
             if (data && !error) {
-                // Abre el panel de opciones de la máquina (Kárdex, Manuales, etc.)
                 openMachineDetail(data.id, data.nombre);
                 return;
             } else {
-                console.error('No se encontró la máquina con ese token en Supabase');
+                console.error('No se encontró la máquina en Supabase:', error);
             }
         }
     }
 
-    // 3. NAVEGACIÓN NORMAL (Mostrar vista de líneas)
+    // 3. NAVEGACIÓN NORMAL (Vista de líneas)
     document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active-view'));
     const viewLines = document.getElementById('view-lines');
-    if (viewLines) {
-        viewLines.classList.add('active-view');
-    }
+    if (viewLines) viewLines.classList.add('active-view');
 }
 
 async function openLine(lineName, icon) {
@@ -2660,27 +2652,70 @@ function seleccionarPiezaInteractiva(index) {
 // Función principal para notificaciones y vibración
 // Añade el argumento 'pieza'
 async function enviarNotificacionEvento(titulo, cuerpo, machineId, pieza) {
-
+    // 1. Vibración local
     if ('vibrate' in navigator) {
         navigator.vibrate([200, 100, 200]);
     }
 
-    if ('Notification' in window && Notification.permission === 'default') {
-        await Notification.requestPermission();
+    // 2. Notificación local dentro de la app si está abierta
+    if ('Notification' in window && Notification.permission === 'granted') {
+        try {
+            const reg = await navigator.serviceWorker.ready;
+            reg.showNotification(titulo, {
+                body: cuerpo,
+                icon: 'logo.png',
+                vibrate: [200, 100, 200],
+                data: {
+                    machineId: machineId,
+                    pieza: pieza
+                },
+                tag: `reporte-${machineId}`
+            });
+        } catch (e) {
+            console.error('Error al mostrar notificación local:', e);
+        }
     }
 
-    if ('Notification' in window && Notification.permission === 'granted') {
-        const reg = await navigator.serviceWorker.ready;
-        reg.showNotification(titulo, {
-            body: cuerpo,
-            icon: 'logo.png',
-            vibrate: [200, 100, 200],
-            data: { 
-                machineId: machineId,
-                pieza: pieza // <-- Agregamos la pieza aquí
-            },
-            tag: `reporte-${machineId}`
-        });
+    // 3. ENVIAR NOTIFICACIÓN PUSH A TODOS LOS DISPOSITIVOS (VÍA FIREBASE FCM)
+    if (typeof dbSupabase !== 'undefined') {
+        try {
+            // Obtenemos todos los tokens guardados en Supabase
+            const { data: registrosTokens, error } = await dbSupabase
+                .from('tokens_dispositivos')
+                .select('token_push');
+
+            if (!error && registrosTokens && registrosTokens.length > 0) {
+                // Filtrar lista de tokens únicos
+                const tokens = [...new Set(registrosTokens.map(r => r.token_push).filter(Boolean))];
+
+                // Enviar la notificación Push masiva mediante la API REST de FCM/Servidor
+                // O emitir el envío individual a cada token de la tabla:
+                tokens.forEach(token => {
+                    fetch('https://fcm.googleapis.com/fcm/send', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            // Requiere tu Server Key de Firebase Cloud Messaging
+                           'Authorization': 'key=BNwKAxWr9uZYTNvWHF9StP-EQJnUZxAd3buNyrJ89dFkkKFiy4N1bOFXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494'
+                        },
+                        body: JSON.stringify({
+                            to: token,
+                            notification: {
+                                title: titulo,
+                                body: cuerpo,
+                                icon: 'logo.png'
+                            },
+                            data: {
+                                action: 'view3d',
+                                machineId: String(machineId)
+                            }
+                        })
+                    }).catch(err => console.error("Error enviando FCM individual:", err));
+                });
+            }
+        } catch (err) {
+            console.error('Error enviando notificaciones push a la lista:', err);
+        }
     }
 }
 // Escuchador en tiempo real mediante Supabase
@@ -2758,14 +2793,15 @@ async function inicializarPushNotifications() {
     }
 }
 // Guardar Token en la base de datos
-async function guardarTokenEnSupabase(token) {
-    if (typeof dbSupabase === 'undefined') return;
-    
-    const { error } = await dbSupabase
+async function guardarTokenEnSupabase(fcmToken) {
+    if (!fcmToken || typeof dbSupabase === 'undefined') return;
+
+    await dbSupabase
         .from('tokens_dispositivos')
-        .upsert({ token_push: token, ultimo_acceso: new Date() }, { onConflict: 'token_push' });
-    
-    if (error) console.error("Error guardando token:", error);
+        .upsert(
+            { token_push: fcmToken, ultimo_acceso: new Date().toISOString() }, 
+            { onConflict: 'token_push' }
+        );
 }
 // Exponer globalmente
 window.activarSeleccionMedidas = activarSeleccionMedidas;
