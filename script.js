@@ -2688,7 +2688,7 @@ async function inicializarPushNotifications() {
         if (typeof firebase === 'undefined' || !('Notification' in window)) return;
 
         // Registrar el Service Worker explícito
-        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+        const registration = await navigator.serviceWorker.register('firebase-messaging-sw.js');
         
         const messaging = firebase.messaging();
         const permission = await Notification.requestPermission();
