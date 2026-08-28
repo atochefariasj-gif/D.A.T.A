@@ -2800,14 +2800,17 @@ async function inicializarPushNotifications() {
     }
 }
 // Guardar Token en la base de datos
+// ==========================================
+// AUTO-REGISTRO AUTOMÁTICO DE NOTIFICACIONES PUSH
+// ==========================================
+
+const VAPID_KEY_PROYECTO = 'BNwKAxWr9uZYTNvWHF9StP-EQJnUZxAd3buNyrJ89dFkkKFiy4N1bOFXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494';
+
 async function guardarTokenEnSupabase(fcmToken) {
-    if (!fcmToken || typeof dbSupabase === 'undefined') {
-        console.warn('Token FCM no válido o Supabase no inicializado');
-        return;
-    }
+    if (!fcmToken || typeof dbSupabase === 'undefined') return;
 
     try {
-        const { data, error } = await dbSupabase
+        const { error } = await dbSupabase
             .from('tokens_dispositivos')
             .upsert(
                 { 
@@ -2818,16 +2821,17 @@ async function guardarTokenEnSupabase(fcmToken) {
             );
 
         if (error) {
-            console.error('Error al insertar token en Supabase:', error.message);
+            console.error('Error al guardar token en Supabase:', error.message);
         } else {
-            console.log('Token registrado/actualizado con éxito en Supabase');
+            console.log('✅ Token FCM registrado/actualizado en Supabase');
         }
     } catch (e) {
         console.error('Excepción al guardar token:', e);
     }
 }
+
 async function autoRegistrarDispositivo() {
-    if (typeof firebase === 'undefined' || !firebase.messaging.isSupported()) return;
+    if (typeof firebase === 'undefined' || !firebase.messaging || !firebase.messaging.isSupported()) return;
 
     try {
         const messaging = firebase.messaging();
@@ -2836,39 +2840,36 @@ async function autoRegistrarDispositivo() {
         if (permission === 'granted') {
             const reg = await navigator.serviceWorker.ready;
             
-            // 1. Obtener token actual del navegador
             let token = await messaging.getToken({
                 serviceWorkerRegistration: reg,
-                vapidKey: 'BNwKAxWr9uZYTNvWHF9StP-EQJnUZxAd3buNyrJ89dFkkKFiy4N1bOFXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494' // Tu VAPID Key real de Firebase
+                vapidKey: VAPID_KEY_PROYECTO
             });
 
             if (token) {
-                // 2. Verificar si este token existe en Supabase
+                // Verificar si existe en Supabase (por si borraste la tabla)
                 const { data } = await dbSupabase
                     .from('tokens_dispositivos')
                     .select('token_push')
                     .eq('token_push', token);
 
-                // 3. Si la tabla se limpió y el token ya no existe en Supabase, forzar regeneración
                 if (!data || data.length === 0) {
-                    console.log("Token no encontrado en Supabase. Regenerando...");
-                    await messaging.deleteToken(); // Borra la caché antigua
+                    console.log("Token no encontrado en Supabase. Re-generando suscripción...");
+                    await messaging.deleteToken();
                     token = await messaging.getToken({
                         serviceWorkerRegistration: reg,
-                        vapidKey: 'BNwKAxWr9uZYTNvWHF9StP-EQJnUZxAd3buNyrJ89dFkkKFiy4N1bOFXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494'
+                        vapidKey: VAPID_KEY_PROYECTO
                     });
                 }
 
-                // 4. Guardar en Supabase
                 await guardarTokenEnSupabase(token);
             }
         }
     } catch (e) {
-        console.error("Error en auto-registro de notificaciones:", e);
+        console.error("Error en autoRegistrarDispositivo:", e);
     }
 }
 
-// Ejecutar automáticamente al cargar la página
+// Iniciar automáticamente cuando cargue la página
 document.addEventListener('DOMContentLoaded', () => {
     autoRegistrarDispositivo();
 });
