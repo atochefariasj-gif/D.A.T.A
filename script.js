@@ -44,6 +44,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     // 3. REGISTRAR SERVICE WORKER Y REALTIME (AQUÍ LO AGREGAS)
+    inicializarPushNotifications();
     activarEscuchaNotificacionesRealtime();
 });
 // Registrar el Service Worker al cargar la aplicación
@@ -2664,6 +2665,55 @@ function activarEscuchaNotificacionesRealtime() {
             }
         )
         .subscribe();
+}
+// Configuración de Firebase para el frontend
+const firebaseConfig = {
+  apiKey: "AIzaSyBNfhgBdIe05n3L0YfbsmZbNVYVlDxDXZk",
+  authDomain: "data-control-activos.firebaseapp.com",
+  projectId: "data-control-activos",
+  storageBucket: "data-control-activos.firebasestorage.app",
+  messagingSenderId: "290148330315",
+  appId: "1:290148330315:web:0b53f07e03f72fefe9d6ce",
+  measurementId: "G-ZE1NC3LB15"
+};
+
+// Inicializar Firebase
+if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
+
+// Inicializar y obtener token FCM
+async function inicializarPushNotifications() {
+    try {
+        if (typeof firebase === 'undefined') return;
+        
+        const messaging = firebase.messaging();
+        const permission = await Notification.requestPermission();
+        
+        if (permission === 'granted') {
+            const token = await messaging.getToken({ 
+                vapidKey: 'BNwKAxWr9uZYTNvwHF9StP-EQJnUZxAd3buNyrJ89dFkKKFiy4N1b0FXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494'
+            });
+
+            if (token) {
+                console.log("FCM Token listo:", token);
+                await guardarTokenEnSupabase(token);
+            }
+        }
+    } catch (error) {
+        console.error("Error al obtener token FCM:", error);
+    }
+}
+
+// Guardar Token en la base de datos
+async function guardarTokenEnSupabase(token) {
+    if (typeof dbSupabase === 'undefined') return;
+    
+    const { error } = await dbSupabase
+        .from('tokens_dispositivos')
+        .upsert({ token_push: token, ultimo_acceso: new Date() }, { onConflict: 'token_push' });
+    
+    if (error) console.error("Error guardando token:", error);
 }
 // Exponer globalmente
 window.activarSeleccionMedidas = activarSeleccionMedidas;
