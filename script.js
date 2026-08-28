@@ -27,6 +27,7 @@ const PASSWORDS = {
 // NUEVO: DETECCIÓN DE QR AL CARGAR LA PÁGINA
 // ==========================================
 window.addEventListener('DOMContentLoaded', () => {
+    // 1. Detección de QR
     const urlParams = new URLSearchParams(window.location.search);
     const qrTokenEscaneado = urlParams.get('qr');
 
@@ -34,12 +35,17 @@ window.addEventListener('DOMContentLoaded', () => {
         sessionStorage.setItem('maquina_qr_pendiente', qrTokenEscaneado);
     }
 
+    // 2. Modo Oscuro
     if (localStorage.getItem('modo_oscuro') === 'true') {
         document.body.classList.add('dark-mode');
         const btn = document.getElementById('btn-modo-oscuro');
         if (btn) btn.innerText = '☀️ Modo Claro';
         aplicarEstilosModoOscuro(true);
     }
+
+    // 3. REGISTRAR SERVICE WORKER Y REALTIME (AQUÍ LO AGREGAS)
+    registrarServiceWorker();
+    activarEscuchaNotificacionesRealtime();
 });
 
 // Función para restringir descargas/impresiones de QR solo a administradores
@@ -2625,10 +2631,37 @@ async function enviarNotificacionEvento(titulo, cuerpo, machineId) {
         });
     }
 }
-// Integración con renderizarTablaMedidas() existente:
-// Asegúrate de que en renderizarTablaMedidas() agregues la opción para admin de fijar la coordenada
-// En el tr.innerHTML (para Admin) agrega este botón:
-// <button onclick="marcarPosicionEnImagen(${idx})" style="background:#0284c7; color:white; border:none; padding:4px 6px; border-radius:4px;">📍 Pos</button>
+
+// Escuchador en tiempo real mediante Supabase
+function activarEscuchaNotificacionesRealtime() {
+    if (typeof dbSupabase === 'undefined') return;
+
+    dbSupabase
+        .channel('cambios-reportes-maquinas')
+        .on(
+            'postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'maquinas' },
+            (payload) => {
+                const maquinaActualizada = payload.new;
+                const reportesNuevos = maquinaActualizada.reportes_piezas || {};
+                
+                const piezas = Object.keys(reportesNuevos);
+                if (piezas.length === 0) return;
+
+                const ultimaPieza = piezas[piezas.length - 1];
+                const infoReporte = reportesNuevos[ultimaPieza];
+
+                if (infoReporte) {
+                    const esPreventivo = infoReporte.estado === 'preventivo';
+                    const titulo = esPreventivo ? '⚠️ Alerta Preventiva' : '🔴 Reporte de Mantenimiento';
+                    const mensaje = `Pieza "${ultimaPieza}": ${infoReporte.motivo || 'Sin detalles'}`;
+
+                    enviarNotificacionEvento(titulo, mensaje, maquinaActualizada.id);
+                }
+            }
+        )
+        .subscribe();
+}
 // Exponer globalmente
 window.activarSeleccionMedidas = activarSeleccionMedidas;
 window.abrirModalMedidasPorPieza = abrirModalMedidasPorPieza;
