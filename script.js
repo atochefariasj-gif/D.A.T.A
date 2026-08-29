@@ -2842,7 +2842,7 @@ async function autoRegistrarDispositivo() {
             
             let token = await messaging.getToken({
                 serviceWorkerRegistration: reg,
-                vapidKey: VAPID_KEY_PROYECTO
+                vapidKey: 'BNwKAxWr9uZYTNvWHF9StP-EQJnUZxAd3buNyrJ89dFkkKFiy4N1bOFXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494'
             });
 
             if (token) {
@@ -2857,7 +2857,7 @@ async function autoRegistrarDispositivo() {
                     await messaging.deleteToken();
                     token = await messaging.getToken({
                         serviceWorkerRegistration: reg,
-                        vapidKey: VAPID_KEY_PROYECTO
+                        vapidKey: 'BNwKAxWr9uZYTNvWHF9StP-EQJnUZxAd3buNyrJ89dFkkKFiy4N1bOFXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494'
                     });
                 }
 
