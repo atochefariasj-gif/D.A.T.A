@@ -2,7 +2,7 @@
 const SUPABASE_URL = 'https://glgkfuiqwconjjffxgln.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_YxHDEuQiZ06ywaT5Yha68w_DX35lUVO';
 
-const { createClient } = supabase;
+const { createClient } = supabase; 
 const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentRole = 'visitante';
