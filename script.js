@@ -2749,15 +2749,18 @@ enviarNotificacionEvento(titulo, mensaje, maquinaActualizada.id, ultimaPieza);
         )
         .subscribe();
 }
-// Configuración de Firebase para el frontend
+// ==========================================
+// CONFIGURACIÓN E INICIALIZACIÓN DE FIREBASE
+// ==========================================
+
 const firebaseConfig = {
-  apiKey: "AIzaSyBNfhgBdIe05n3L0YfbsmZbNVYVlDxDXZk",
-  authDomain: "data-control-activos.firebaseapp.com",
-  projectId: "data-control-activos",
-  storageBucket: "data-control-activos.firebasestorage.app",
-  messagingSenderId: "290148330315",
-  appId: "1:290148330315:web:0b53f07e03f72fefe9d6ce",
-  measurementId: "G-ZE1NC3LB15"
+    apiKey: "AIzaSyBNfhgBdIe05n3L0YfbsmZbNVYVlDxDXZk",
+    authDomain: "data-control-activos.firebaseapp.com",
+    projectId: "data-control-activos",
+    storageBucket: "data-control-activos.firebasestorage.app",
+    messagingSenderId: "290148330315",
+    appId: "1:290148330315:web:0b53f07e03f72fefe9d6ce",
+    measurementId: "G-ZE1NC3LB15"
 };
 
 // Inicializar Firebase
@@ -2765,44 +2768,7 @@ if (typeof firebase !== 'undefined' && !firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
 }
 
-// Inicializar y obtener token FCM
-async function inicializarPushNotifications() {
-    if (typeof firebase === 'undefined' || !firebase.messaging.isSupported()) {
-        console.warn('Firebase Messaging no es soportado en este navegador.');
-        return;
-    }
-
-    try {
-        const messaging = firebase.messaging();
-        const permission = await Notification.requestPermission();
-
-        if (permission === 'granted') {
-            const registration = await navigator.serviceWorker.register('firebase-messaging-sw.js');
-            
-            // Obtener el token de Firebase
-            const currentToken = await messaging.getToken({
-                serviceWorkerRegistration: registration,
-                vapidKey: 'BNwKAxWr9uZYTNvWHF9StP-EQJnUZxAd3buNyrJ89dFkkKFiy4N1bOFXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494'
-            });
-
-            if (currentToken) {
-                console.log('Token FCM obtenido:', currentToken);
-                // GUARDA EL TOKEN OBLIGATORIAMENTE EN SUPABASE
-                await guardarTokenEnSupabase(currentToken);
-            } else {
-                console.warn('No se pudo generar el token FCM.');
-            }
-        } else {
-            console.warn('Permiso de notificaciones denegado por el usuario.');
-        }
-    } catch (error) {
-        console.error('Error al inicializar Firebase Push:', error);
-    }
-}
-// ==========================================
-// REGISTRO AUTOMÁTICO EN MÓVILES Y PC
-// ==========================================
-
+// Guardar o actualizar en Supabase
 async function guardarTokenEnSupabase(fcmToken) {
     if (!fcmToken || typeof dbSupabase === 'undefined') return;
 
@@ -2827,35 +2793,44 @@ async function guardarTokenEnSupabase(fcmToken) {
     }
 }
 
-async function autoRegistrarDispositivo() {
-    if (typeof firebase === 'undefined' || !firebase.messaging || !firebase.messaging.isSupported()) return;
+// Inicializar y obtener Token FCM
+async function inicializarPushNotifications() {
+    if (typeof firebase === 'undefined' || !firebase.messaging || !firebase.messaging.isSupported()) {
+        console.warn('Firebase Messaging no es soportado en este navegador.');
+        return;
+    }
 
     try {
-        const messaging = firebase.messaging();
-        
-        // 1. Verificar si hay permiso concedido
-        if (Notification.permission === 'granted') {
-            const reg = await navigator.serviceWorker.ready;
-            
-            // 2. Obtener el token de Firebase directamente
-            const token = await messaging.getToken({
-                serviceWorkerRegistration: reg,
-                vapidKey: 'BNwKAxWr9uZYTNvWHF9StP-EQJnUZxAd3buNyrJ89dFkkKFiy4N1bOFXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494'
-            });
+        const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
+        const messaging = firebase.messaging(app);
 
-            // 3. Guardarlo siempre en Supabase
-            if (token) {
-                await guardarTokenEnSupabase(token);
-            }
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') {
+            console.warn('Permiso de notificaciones denegado por el usuario.');
+            return;
+        }
+
+        const reg = await navigator.serviceWorker.ready;
+
+        const token = await messaging.getToken({
+            serviceWorkerRegistration: reg,
+            vapidKey: 'BNwKAxWr9uZYTNvWHF9StP-EQJnUZxAd3buNyrJ89dFkkKFiy4N1bOFXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494'
+        });
+
+        if (token) {
+            console.log('✅ Token FCM obtenido con éxito:', token);
+            await guardarTokenEnSupabase(token);
+        } else {
+            console.error('No se pudo generar el token de Firebase.');
         }
     } catch (e) {
-        console.error("Error en autoRegistrarDispositivo:", e);
+        console.error('Error al inicializar Push Notifications:', e);
     }
 }
 
-// Iniciar automáticamente al abrir en cualquier pantalla (PC, Celular, Tablet)
+// Ejecutar automáticamente al cargar
 document.addEventListener('DOMContentLoaded', () => {
-    autoRegistrarDispositivo();
+    inicializarPushNotifications();
 });
 // Exponer globalmente
 window.activarSeleccionMedidas = activarSeleccionMedidas;
