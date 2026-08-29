@@ -2845,6 +2845,49 @@ function hacerParpadearPieza3D(nombrePieza) {
         setTimeout(() => elementoPieza.classList.remove('parpadeo-alerta'), 4000);
     }
 }
+async function enviarNotificacionPushFCM(nombreMaquina, pieza, descripcion) {
+    try {
+        // 1. Obtener todos los tokens guardados en Supabase
+        const { data: tokensData, error } = await dbSupabase
+            .from('tokens_dispositivos')
+            .select('token_push');
+
+        if (error || !tokensData || tokensData.length === 0) return;
+
+        const serverKey = "BJCxH5OSBkS1JZxbJ1-cow5ZpME51RVASgJBxaSfgVKNj8X6-HuyMx-zLPShRj1rIwlrxiduBxO30boBIqz2O_Q"; // Tu Key VAPID / Web Push
+
+        // 2. Enviar la notificación a cada dispositivo tokenizado
+        for (const item of tokensData) {
+            if (!item.token_push) continue;
+
+            await fetch('https://fcm.googleapis.com/fcm/send', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'key=' + serverKey
+                },
+                body: JSON.stringify({
+                    to: item.token_push,
+                    priority: 'high',
+                    notification: {
+                        title: `🚨 Reporte: ${nombreMaquina || 'Máquina'}`,
+                        body: `Pieza: ${pieza || 'General'} - ${descripcion || 'Mantenimiento'}`,
+                        icon: './assets/icon.png',
+                        tag: `reporte-${Date.now()}`
+                    },
+                    data: {
+                        action: 'view3d',
+                        maquina_id: String(maquinaIdActual || ''),
+                        pieza: pieza || ''
+                    }
+                })
+            });
+        }
+        console.log("Notificaciones enviadas con éxito");
+    } catch (err) {
+        console.error("Error al enviar notificación:", err);
+    }
+}
 // Exponer globalmente
 window.activarSeleccionMedidas = activarSeleccionMedidas;
 window.abrirModalMedidasPorPieza = abrirModalMedidasPorPieza;
