@@ -2696,7 +2696,7 @@ async function enviarNotificacionEvento(titulo, cuerpo, machineId, pieza) {
                         headers: {
                             'Content-Type': 'application/json',
                             // Requiere tu Server Key de Firebase Cloud Messaging
-                           'Authorization': 'key=BNwKAxWr9uZYTNvWHF9StP-EQJnUZxAd3buNyrJ89dFkkKFiy4N1bOFXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494'
+                           'Authorization': 'key=BJCxh5OSBkS1JZxbJ1-cow5ZpME5lRVASgJBxaSfgVKNj8X6-HuyMx-zLPShRjlriwlrxiduBxO3OboBIqz20_Q'
                         },
                         body: JSON.stringify({
                             to: token,
@@ -2814,7 +2814,7 @@ async function inicializarPushNotifications() {
 
         const token = await messaging.getToken({
             serviceWorkerRegistration: reg,
-            vapidKey: 'BNwKAxWr9uZYTNvWHF9StP-EQJnUZxAd3buNyrJ89dFkkKFiy4N1bOFXXG7Wi6ocd40gt_1CT3qzVWQFHFP4494'
+            vapidKey: 'BJCxh5OSBkS1JZxbJ1-cow5ZpME5lRVASgJBxaSfgVKNj8X6-HuyMx-zLPShRjlriwlrxiduBxO3OboBIqz20_Q'
         });
 
         if (token) {
