@@ -2784,7 +2784,7 @@ async function inicializarPushNotifications() {
         // 2. Obtener el token de FCM pasando el Service Worker y la VAPID Key
         const token = await firebase.messaging().getToken({
             serviceWorkerRegistration: registration,
-            vapidKey: 'BJCaNSGGbS1jZXbU1-cowS2pVE51MnXG8xaSfpgNXjX6-HuyWX-yLPSHRj1rwixdixUdbO300eb0ip2Q_Q'
+            vapidKey: 'BJCxh5OSBkS1JZxbJ1-cow5ZpME5lRVASgJBxaSfgVKNj8X6-HuyMx-zLPShRjlriwlrxiduBxO3OboBIqz20_Q'
         });
 
         if (token) {
