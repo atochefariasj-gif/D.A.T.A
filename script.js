@@ -121,10 +121,13 @@ async function verificarPassword() {
 async function selectRole(role) {
     currentRole = role;
 
-    // 1. NAVEGACIÓN DESDE NOTIFICACIÓN PUSH (Ir directo a Visor 3D)
+    // Redirección directa si viene de una Notificación Push
     const token3DPendiente = sessionStorage.getItem('maquina_3d_pendiente');
     if (token3DPendiente) {
+        const piezaPendiente = sessionStorage.getItem('pieza_3d_pendiente');
+        
         sessionStorage.removeItem('maquina_3d_pendiente');
+        sessionStorage.removeItem('pieza_3d_pendiente');
 
         const mId = isNaN(Number(token3DPendiente)) ? token3DPendiente : Number(token3DPendiente);
         let nombreMaquina = 'Máquina';
@@ -139,20 +142,28 @@ async function selectRole(role) {
             if (data && data.nombre) nombreMaquina = data.nombre;
         }
 
+        // Abrir los datos internamente
         if (typeof openMachineDetail === 'function') {
             openMachineDetail(mId, nombreMaquina);
         }
 
-        if (typeof openOption === 'function') {
-            openOption('Visual3D');
-        } else {
-            document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active-view'));
-            const vista3D = document.getElementById('view-visual3d');
-            if (vista3D) vista3D.classList.add('active-view');
-        }
+        // Forzar vista inmediata de Visual 3D (evita regresar al Kárdex)
+        setTimeout(() => {
+            if (typeof openOption === 'function') {
+                openOption('Visual3D');
+            } else {
+                document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active-view'));
+                const vista3D = document.getElementById('view-visual3d');
+                if (vista3D) vista3D.classList.add('active-view');
+            }
 
-        // ⚠️ DETENER LA EJECUCIÓN AQUÍ PARA EVITAR QUE EL KARDEX/QR LA SOBREESCRIBA
-        return; 
+            // Ejecutar el parpadeo de la pieza
+            if (piezaPendiente) {
+                hacerParpadearPieza3D(piezaPendiente);
+            }
+        }, 350);
+
+        return; // Detiene el flujo normal para que no vuelva a los datos
     }
 
     // 2. NAVEGACIÓN DESDE CÓDIGO QR (Ir a los datos/kardex de la máquina)
@@ -2804,17 +2815,36 @@ document.addEventListener('DOMContentLoaded', () => {
 function cargarMaquinaDesdeURL() {
     const urlParams = new URLSearchParams(window.location.search);
     const maquinaReportada = urlParams.get('maquina');
+    const piezaReportada = urlParams.get('pieza');
 
     if (maquinaReportada) {
-        // Guardar en sessionStorage para que selectRole sepa que venimos de Push
         sessionStorage.setItem('maquina_3d_pendiente', maquinaReportada);
-        // Limpiar la URL sin recargar para evitar bucles al refrescar
+        if (piezaReportada) {
+            sessionStorage.setItem('pieza_3d_pendiente', piezaReportada);
+        }
+        // Limpiar la URL para que no vuelva a cargarse si refresca
         window.history.replaceState({}, document.title, window.location.pathname);
     }
 }
 document.addEventListener('DOMContentLoaded', () => {
     cargarMaquinaDesdeURL();
 });
+function hacerParpadearPieza3D(nombrePieza) {
+    if (!nombrePieza) return;
+    console.log("⚡ Resaltando pieza reportada:", nombrePieza);
+
+    // Si tu visor 3D (Three.js/babylon/custom) tiene una función para seleccionar/iluminar piezas:
+    if (typeof seleccionarPiezaEnVisor === 'function') {
+        seleccionarPiezaEnVisor(nombrePieza);
+    }
+
+    // Si la pieza se representa como un elemento del DOM o botón en la interfaz 3D:
+    const elementoPieza = document.querySelector(`[data-pieza="${nombrePieza}"]`) || document.getElementById(nombrePieza);
+    if (elementoPieza) {
+        elementoPieza.classList.add('parpadeo-alerta');
+        setTimeout(() => elementoPieza.classList.remove('parpadeo-alerta'), 4000);
+    }
+}
 // Exponer globalmente
 window.activarSeleccionMedidas = activarSeleccionMedidas;
 window.abrirModalMedidasPorPieza = abrirModalMedidasPorPieza;
