@@ -125,21 +125,24 @@ async function selectRole(role) {
     const token3DPendiente = sessionStorage.getItem('maquina_3d_pendiente');
     if (token3DPendiente) {
         sessionStorage.removeItem('maquina_3d_pendiente');
-        const mId = isNaN(Number(token3DPendiente)) ? token3DPendiente : Number(token3DPendiente);
 
-        let nombreMaquina = "Máquina";
+        const mId = isNaN(Number(token3DPendiente)) ? token3DPendiente : Number(token3DPendiente);
+        let nombreMaquina = 'Máquina';
+
         if (typeof dbSupabase !== 'undefined') {
             const { data } = await dbSupabase
                 .from('maquinas')
-                .select('nombre')
+                .select('id, nombre')
                 .eq('id', mId)
                 .maybeSingle();
+
             if (data && data.nombre) nombreMaquina = data.nombre;
         }
 
         if (typeof openMachineDetail === 'function') {
             openMachineDetail(mId, nombreMaquina);
         }
+
         if (typeof openOption === 'function') {
             openOption('Visual3D');
         } else {
@@ -147,13 +150,16 @@ async function selectRole(role) {
             const vista3D = document.getElementById('view-visual3d');
             if (vista3D) vista3D.classList.add('active-view');
         }
-        return;
+
+        // ⚠️ DETENER LA EJECUCIÓN AQUÍ PARA EVITAR QUE EL KARDEX/QR LA SOBREESCRIBA
+        return; 
     }
 
-    // 2. NAVEGACIÓN DESDE CÓDIGO QR (Ir a los datos/menú de la máquina)
+    // 2. NAVEGACIÓN DESDE CÓDIGO QR (Ir a los datos/kardex de la máquina)
     const tokenQRPendiente = sessionStorage.getItem('maquina_qr_pendiente');
     if (tokenQRPendiente) {
         sessionStorage.removeItem('maquina_qr_pendiente');
+        
         document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active-view'));
 
         if (typeof dbSupabase !== 'undefined') {
@@ -165,14 +171,23 @@ async function selectRole(role) {
             }
 
             const { data, error } = await query.maybeSingle();
-            if (data && !error) {
-                openMachineDetail(data.id, data.nombre);
-                return;
-            } else {
+            if (error) {
                 console.error('No se encontró la máquina en Supabase:', error);
+                return;
+            }
+
+            if (data) {
+                openMachineDetail(data.id, data.nombre);
+                return; // ⚠️ Detener ejecución al abrir Kardex por QR
             }
         }
     }
+
+    // 3. NAVEGACIÓN NORMAL (Vista de líneas)
+    document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active-view'));
+    const viewLines = document.getElementById('view-lines');
+    if (viewLines) viewLines.classList.add('active-view');
+}
 
     // 3. NAVEGACIÓN NORMAL (Vista de líneas)
     document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active-view'));
@@ -2835,24 +2850,12 @@ function cargarMaquinaDesdeURL() {
     const maquinaReportada = urlParams.get('maquina');
 
     if (maquinaReportada) {
-        // Esperar a que el selector o la lista de máquinas esté renderizada
-        const intervalo = setInterval(() => {
-            const selectorMaquina = document.getElementById('select-maquina') || document.querySelector('.selector-maquinas');
-            
-            if (selectorMaquina) {
-                clearInterval(intervalo);
-                
-                // Asignar el valor y disparar el evento de cambio para cargar el visor 3D
-                selectorMaquina.value = maquinaReportada;
-                selectorMaquina.dispatchEvent(new Event('change'));
-
-                console.log(`✅ Redirigido automáticamente a la máquina: ${maquinaReportada}`);
-            }
-        }, 300);
+        // Guardar en sessionStorage para que selectRole sepa que venimos de Push
+        sessionStorage.setItem('maquina_3d_pendiente', maquinaReportada);
+        // Limpiar la URL sin recargar para evitar bucles al refrescar
+        window.history.replaceState({}, document.title, window.location.pathname);
     }
 }
-
-// Ejecutar al cargar la página
 document.addEventListener('DOMContentLoaded', () => {
     cargarMaquinaDesdeURL();
 });
