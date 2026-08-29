@@ -34,23 +34,29 @@ messaging.onBackgroundMessage((payload) => {
 });
 
 // Manejo del clic en la notificación
-self.addEventListener('notificationclick', (event) => {
+// En firebase-messaging-sw.js
+self.addEventListener('notificationclick', function(event) {
     event.notification.close();
 
-    const targetUrl = event.notification.data?.url || './index.html';
+    // Obtener el ID/Nombre de la máquina enviado en el payload
+    const maquinaId = event.notification.data?.maquina_id || '';
+    
+    // Construir la URL hacia tu aplicación
+    const urlToOpen = new URL(`./index.html?maquina=${encodeURIComponent(maquinaId)}`, self.location.origin).href;
 
     event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-            // Si la app ya está abierta, redirigir
-            for (let client of windowClients) {
-                if (client.url.includes('index.html') && 'focus' in client) {
-                    client.navigate(targetUrl);
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+            // Si la ventana/pestaña ya está abierta, redirigirla y enfocarla
+            for (let i = 0; i < clientList.length; i++) {
+                let client = clientList[i];
+                if ('navigate' in client) {
+                    client.navigate(urlToOpen);
                     return client.focus();
                 }
             }
-            // Si la app está cerrada, abrir la URL con el parámetro
+            // Si la app está cerrada, abrir una pestaña nueva
             if (clients.openWindow) {
-                return clients.openWindow(targetUrl);
+                return clients.openWindow(urlToOpen);
             }
         })
     );
