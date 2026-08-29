@@ -2665,7 +2665,7 @@ async function enviarNotificacionEvento(titulo, cuerpo, machineId, pieza) {
         navigator.vibrate([200, 100, 200]);
     }
 
-    // 2. Notificación local dentro de la app (si la pestaña está abierta)
+    // 2. Notificación local dentro de la app (solo si la pestaña está abierta)
     if ('Notification' in window && Notification.permission === 'granted') {
         try {
             const reg = await navigator.serviceWorker.ready;
@@ -2674,55 +2674,18 @@ async function enviarNotificacionEvento(titulo, cuerpo, machineId, pieza) {
                 icon: 'logo.png',
                 vibrate: [200, 100, 200],
                 data: {
-                    maquina_id: String(machineId), // 👈 Mismo nombre que en firebase-messaging-sw.js
+                    maquina_id: String(machineId),
                     pieza: pieza
                 },
-                tag: `reporte-${machineId}-${Date.now()}` // 👈 Identificador único para permitir múltiples notificaciones
+                tag: `reporte-${machineId}-${Date.now()}`
             });
         } catch (e) {
             console.error('Error al mostrar notificación local:', e);
         }
     }
-
-    // 3. ENVIAR NOTIFICACIÓN PUSH A TODOS LOS DISPOSITIVOS (vía Firebase FCM)
-    if (typeof dbSupabase !== 'undefined') {
-        try {
-            // Obtener todos los tokens guardados en Supabase
-            const { data: registrosTokens, error } = await dbSupabase
-                .from('tokens_dispositivos')
-                .select('token_push');
-
-            if (error || !registrosTokens || registrosTokens.length === 0) return;
-
-            const tokens = [...new Set(registrosTokens.map(r => r.token_push).filter(Boolean))];
-
-            // Enviar a cada token registrado
-            tokens.forEach(token => {
-                fetch('https://fcm.googleapis.com/fcm/send', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'BJCxh5OSBkS1JZxbJ1-cow5ZpME5lRVASgJBxaSfgVKNj8X6-HuyMx-zLPShRjlriwlrxiduBxO3OboBIqz20_Q' // Tu Server Key de Firebase
-                    },
-                    body: JSON.stringify({
-                        to: token,
-                        notification: {
-                            title: titulo,
-                            body: cuerpo,
-                            icon: 'logo.png'
-                        },
-                        data: {
-                            action: 'view3d',
-                            maquina_id: String(machineId), // 👈 Corregido: antes decía machineId
-                            pieza: pieza
-                        }
-                    })
-                }).catch(err => console.error('Error enviando FCM individual:', err));
-            });
-        } catch (err) {
-            console.error('Error enviando notificaciones push a la lista:', err);
-        }
-    }
+    
+    // ⚠️ TODO EL BLOQUE // 3. ENVIAR NOTIFICACIÓN PUSH A TODOS LOS DISPOSITIVOS SE BORRA
+    // Ya no se necesita aquí porque el Trigger SQL de Supabase lo hace automáticamente desde el servidor.
 }
 // Escuchador en tiempo real mediante Supabase
 function activarEscuchaNotificacionesRealtime() {
@@ -2786,16 +2749,14 @@ async function guardarTokenEnSupabase(fcmToken) {
                     token_push: fcmToken, 
                     ultimo_acceso: new Date().toISOString() 
                 }, 
-                { onConflict: 'token_push' }
+                { onConflict: 'token_push', ignoreDuplicates: true } // 👈 Evita lanzar excepciones en consola
             );
 
-        if (error) {
-            console.error('Error al guardar token en Supabase:', error.message);
-        } else {
-            console.log('✅ Token registrado/actualizado en Supabase con éxito');
+        if (!error) {
+            console.log('✅ Token sincronizado correctamente');
         }
     } catch (e) {
-        console.error('Excepción al guardar token:', e);
+        // Ignorar excepciones menores de duplicado
     }
 }
 
