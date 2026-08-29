@@ -2649,15 +2649,13 @@ function seleccionarPiezaInteractiva(index) {
     }
 }
 
-// Función principal para notificaciones y vibración
-// Añade el argumento 'pieza'
 async function enviarNotificacionEvento(titulo, cuerpo, machineId, pieza) {
-    // 1. Vibración local
+    // 1. Vibración local si está disponible
     if ('vibrate' in navigator) {
         navigator.vibrate([200, 100, 200]);
     }
 
-    // 2. Notificación local dentro de la app si está abierta
+    // 2. Notificación local dentro de la app (si la pestaña está abierta)
     if ('Notification' in window && Notification.permission === 'granted') {
         try {
             const reg = await navigator.serviceWorker.ready;
@@ -2666,53 +2664,51 @@ async function enviarNotificacionEvento(titulo, cuerpo, machineId, pieza) {
                 icon: 'logo.png',
                 vibrate: [200, 100, 200],
                 data: {
-                    machineId: machineId,
+                    maquina_id: String(machineId), // 👈 Mismo nombre que en firebase-messaging-sw.js
                     pieza: pieza
                 },
-                tag: `reporte-${machineId}`
+                tag: `reporte-${machineId}-${Date.now()}` // 👈 Identificador único para permitir múltiples notificaciones
             });
         } catch (e) {
             console.error('Error al mostrar notificación local:', e);
         }
     }
 
-    // 3. ENVIAR NOTIFICACIÓN PUSH A TODOS LOS DISPOSITIVOS (VÍA FIREBASE FCM)
+    // 3. ENVIAR NOTIFICACIÓN PUSH A TODOS LOS DISPOSITIVOS (vía Firebase FCM)
     if (typeof dbSupabase !== 'undefined') {
         try {
-            // Obtenemos todos los tokens guardados en Supabase
+            // Obtener todos los tokens guardados en Supabase
             const { data: registrosTokens, error } = await dbSupabase
                 .from('tokens_dispositivos')
                 .select('token_push');
 
-            if (!error && registrosTokens && registrosTokens.length > 0) {
-                // Filtrar lista de tokens únicos
-                const tokens = [...new Set(registrosTokens.map(r => r.token_push).filter(Boolean))];
+            if (error || !registrosTokens || registrosTokens.length === 0) return;
 
-                // Enviar la notificación Push masiva mediante la API REST de FCM/Servidor
-                // O emitir el envío individual a cada token de la tabla:
-                tokens.forEach(token => {
-                    fetch('https://fcm.googleapis.com/fcm/send', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            // Requiere tu Server Key de Firebase Cloud Messaging
-                           'Authorization': 'key=BJCxh5OSBkS1JZxbJ1-cow5ZpME5lRVASgJBxaSfgVKNj8X6-HuyMx-zLPShRjlriwlrxiduBxO3OboBIqz20_Q'
+            const tokens = [...new Set(registrosTokens.map(r => r.token_push).filter(Boolean))];
+
+            // Enviar a cada token registrado
+            tokens.forEach(token => {
+                fetch('https://fcm.googleapis.com/fcm/send', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'BJCxh5OSBkS1JZxbJ1-cow5ZpME5lRVASgJBxaSfgVKNj8X6-HuyMx-zLPShRjlriwlrxiduBxO3OboBIqz20_Q' // Tu Server Key de Firebase
+                    },
+                    body: JSON.stringify({
+                        to: token,
+                        notification: {
+                            title: titulo,
+                            body: cuerpo,
+                            icon: 'logo.png'
                         },
-                        body: JSON.stringify({
-                            to: token,
-                            notification: {
-                                title: titulo,
-                                body: cuerpo,
-                                icon: 'logo.png'
-                            },
-                            data: {
-                                action: 'view3d',
-                                machineId: String(machineId)
-                            }
-                        })
-                    }).catch(err => console.error("Error enviando FCM individual:", err));
-                });
-            }
+                        data: {
+                            action: 'view3d',
+                            maquina_id: String(machineId), // 👈 Corregido: antes decía machineId
+                            pieza: pieza
+                        }
+                    })
+                }).catch(err => console.error('Error enviando FCM individual:', err));
+            });
         } catch (err) {
             console.error('Error enviando notificaciones push a la lista:', err);
         }
@@ -2833,6 +2829,32 @@ async function inicializarPushNotifications() {
 // Ejecutar automáticamente al cargar
 document.addEventListener('DOMContentLoaded', () => {
     inicializarPushNotifications();
+});
+function cargarMaquinaDesdeURL() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const maquinaReportada = urlParams.get('maquina');
+
+    if (maquinaReportada) {
+        // Esperar a que el selector o la lista de máquinas esté renderizada
+        const intervalo = setInterval(() => {
+            const selectorMaquina = document.getElementById('select-maquina') || document.querySelector('.selector-maquinas');
+            
+            if (selectorMaquina) {
+                clearInterval(intervalo);
+                
+                // Asignar el valor y disparar el evento de cambio para cargar el visor 3D
+                selectorMaquina.value = maquinaReportada;
+                selectorMaquina.dispatchEvent(new Event('change'));
+
+                console.log(`✅ Redirigido automáticamente a la máquina: ${maquinaReportada}`);
+            }
+        }, 300);
+    }
+}
+
+// Ejecutar al cargar la página
+document.addEventListener('DOMContentLoaded', () => {
+    cargarMaquinaDesdeURL();
 });
 // Exponer globalmente
 window.activarSeleccionMedidas = activarSeleccionMedidas;
