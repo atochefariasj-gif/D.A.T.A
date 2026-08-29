@@ -2670,33 +2670,51 @@ function seleccionarPiezaInteractiva(index) {
     }
 }
 
-async function enviarNotificacionEvento(titulo, cuerpo, machineId, pieza) {
-    // 1. Vibración local si está disponible
-    if ('vibrate' in navigator) {
-        navigator.vibrate([200, 100, 200]);
-    }
+async function enviarNotificacionEvento(titulo, mensaje, maquinaId) {
+    try {
+        // 1. Consultar todos los tokens activos en Supabase
+        const { data: tokensData, error } = await dbSupabase
+            .from('tokens_dispositivos')
+            .select('token_push');
 
-    // 2. Notificación local dentro de la app (solo si la pestaña está abierta)
-    if ('Notification' in window && Notification.permission === 'granted') {
-        try {
-            const reg = await navigator.serviceWorker.ready;
-            reg.showNotification(titulo, {
-                body: cuerpo,
-                icon: 'logo.png',
-                vibrate: [200, 100, 200],
-                data: {
-                    maquina_id: String(machineId),
-                    pieza: pieza
-                },
-                tag: `reporte-${machineId}-${Date.now()}`
-            });
-        } catch (e) {
-            console.error('Error al mostrar notificación local:', e);
+        if (error || !tokensData || tokensData.length === 0) {
+            console.log("No hay tokens registrados para enviar notificación.");
+            return;
         }
+
+        const serverKey = "BJCxH5OSBkS1JZxbJ1-cow5ZpME51RVASgJBxaSfgVKNj8X6-HuyMx-zLPShRj1rIwlrxiduBxO30boBIqz2O_Q";
+
+        // 2. Enviar a cada dispositivo
+        for (const item of tokensData) {
+            if (!item.token_push) continue;
+
+            await fetch('https://fcm.googleapis.com/fcm/send', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'key=' + serverKey
+                },
+                body: JSON.stringify({
+                    to: item.token_push,
+                    priority: 'high',
+                    notification: {
+                        title: titulo,
+                        body: mensaje,
+                        icon: './assets/icon.png',
+                        tag: `reporte-${Date.now()}`
+                    },
+                    data: {
+                        action: 'view3d',
+                        maquina_id: String(maquinaId || ''),
+                        pieza: String(piezaSeleccionadaActual || '')
+                    }
+                })
+            });
+        }
+        console.log("📱 Notificaciones enviadas correctamente a todos los dispositivos.");
+    } catch (err) {
+        console.error("Error al enviar notificación FCM:", err);
     }
-    
-    // ⚠️ TODO EL BLOQUE // 3. ENVIAR NOTIFICACIÓN PUSH A TODOS LOS DISPOSITIVOS SE BORRA
-    // Ya no se necesita aquí porque el Trigger SQL de Supabase lo hace automáticamente desde el servidor.
 }
 // Escuchador en tiempo real mediante Supabase
 function activarEscuchaNotificacionesRealtime() {
@@ -2845,49 +2863,7 @@ function hacerParpadearPieza3D(nombrePieza) {
         setTimeout(() => elementoPieza.classList.remove('parpadeo-alerta'), 4000);
     }
 }
-async function enviarNotificacionPushFCM(nombreMaquina, pieza, descripcion) {
-    try {
-        // 1. Obtener todos los tokens guardados en Supabase
-        const { data: tokensData, error } = await dbSupabase
-            .from('tokens_dispositivos')
-            .select('token_push');
 
-        if (error || !tokensData || tokensData.length === 0) return;
-
-        const serverKey = "BJCxH5OSBkS1JZxbJ1-cow5ZpME51RVASgJBxaSfgVKNj8X6-HuyMx-zLPShRj1rIwlrxiduBxO30boBIqz2O_Q"; // Tu Key VAPID / Web Push
-
-        // 2. Enviar la notificación a cada dispositivo tokenizado
-        for (const item of tokensData) {
-            if (!item.token_push) continue;
-
-            await fetch('https://fcm.googleapis.com/fcm/send', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'key=' + serverKey
-                },
-                body: JSON.stringify({
-                    to: item.token_push,
-                    priority: 'high',
-                    notification: {
-                        title: `🚨 Reporte: ${nombreMaquina || 'Máquina'}`,
-                        body: `Pieza: ${pieza || 'General'} - ${descripcion || 'Mantenimiento'}`,
-                        icon: './assets/icon.png',
-                        tag: `reporte-${Date.now()}`
-                    },
-                    data: {
-                        action: 'view3d',
-                        maquina_id: String(maquinaIdActual || ''),
-                        pieza: pieza || ''
-                    }
-                })
-            });
-        }
-        console.log("Notificaciones enviadas con éxito");
-    } catch (err) {
-        console.error("Error al enviar notificación:", err);
-    }
-}
 // Exponer globalmente
 window.activarSeleccionMedidas = activarSeleccionMedidas;
 window.abrirModalMedidasPorPieza = abrirModalMedidasPorPieza;
