@@ -2753,7 +2753,7 @@ async function guardarTokenEnSupabase(fcmToken) {
     try {
         const { error } = await dbSupabase
             .from('tokens_dispositivos')
-            .upsert(
+            .insert(
                 { 
                     token_push: fcmToken, 
                     ultimo_acceso: new Date().toISOString() 
@@ -2792,7 +2792,7 @@ async function inicializarPushNotifications() {
             
             // Guardar el token en Supabase
             if (dbSupabase) {
-                await dbSupabase.from('tokens_dispositivos').upsert(
+                await dbSupabase.from('tokens_dispositivos').insert(
                     { token: token }, 
                     { onConflict: 'token' }
                 );
