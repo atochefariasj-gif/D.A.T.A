@@ -2734,17 +2734,15 @@ enviarNotificacionEvento(titulo, mensaje, maquinaActualizada.id, ultimaPieza);
 // ==========================================
 
 const firebaseConfig = {
-    apiKey: "AIzaSyBNfhgBdIe05n3L0YfbsmZbNVYVlDxDXZk",
-    authDomain: "data-control-activos.firebaseapp.com",
-    projectId: "data-control-activos",
-    storageBucket: "data-control-activos.firebasestorage.app",
-    messagingSenderId: "290148330315",
-    appId: "1:290148330315:web:0b53f07e03f72fefe9d6ce",
-    measurementId: "G-ZE1NC3LB15"
+  apiKey: "AIzaSyMBnFmG3ebNlo3y8fam2m0aYYVd3LOxD2k",
+  authDomain: "data-control-activos.firebaseapp.com",
+  projectId: "data-control-activos",
+  storageBucket: "data-control-activos.firebasestorage.app",
+  messagingSenderId: "290148330315",
+  appId: "1:290148330315:web:0653f07ed372fef8e9ddce"
 };
 
-// Inicializar Firebase
-if (typeof firebase !== 'undefined' && !firebase.apps.length) {
+if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
 }
 
