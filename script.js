@@ -2,7 +2,7 @@
 const SUPABASE_URL = 'https://glgkfuiqwconjjffxgln.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_YxHDEuQiZ06ywaT5Yha68w_DX35lUVO';
 
-const { createClient } = supabase; 
+const { createClient } = supabase;
 const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentRole = 'visitante';
@@ -2773,42 +2773,39 @@ async function guardarTokenEnSupabase(fcmToken) {
 
 // Inicializar y obtener Token FCM
 async function inicializarPushNotifications() {
-    if (typeof firebase === 'undefined' || !firebase.messaging || !firebase.messaging.isSupported()) {
-        console.warn('Firebase Messaging no es soportado en este navegador.');
-        return;
-    }
-
     try {
-        const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
-        const messaging = firebase.messaging(app);
-
-        // 1. Pedir permiso
-        const perm = await Notification.requestPermission();
-        if (perm === 'granted') {
-
-            // 2. Registrar el Service Worker con la ruta exacta
-            const swPath = window.location.pathname.includes('/D.A.T.A/')
-                ? '/D.A.T.A/firebase-messaging-sw.js'
-                : './firebase-messaging-sw.js';
-
-            const reg = await navigator.serviceWorker.register(swPath);
-            await navigator.serviceWorker.ready;
-
-            // 3. Obtener Token
-            const token = await messaging.getToken({
-                serviceWorkerRegistration: reg,
-                vapidKey: 'BJCaNSGGbS1jZXbU1-cowS2pVE51MnXG8xaSfpgNXjX6-HuyWX-yLPSHRj1rwixdixUdbO300eb0ip2Q_Q'
-            });
-
-            if (token) {
-                await guardarTokenEnSupabase(token);
-            }
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') {
+            console.log("Permiso de notificaciones denegado.");
+            return;
         }
-    } catch (e) {
-        console.error("Error en Push Notifications:", e);
+
+        // 1. Obtener el registro del Service Worker
+        const registration = await navigator.serviceWorker.register('./sw.js');
+
+        // 2. Obtener el token de FCM pasando el Service Worker y la VAPID Key
+        const token = await firebase.messaging().getToken({
+            serviceWorkerRegistration: registration,
+            vapidKey: 'BJCaNSGGbS1jZXbU1-cowS2pVE51MnXG8xaSfpgNXjX6-HuyWX-yLPSHRj1rwixdixUdbO300eb0ip2Q_Q'
+        });
+
+        if (token) {
+            console.log("Token FCM obtenido correctamente:", token);
+            
+            // Guardar el token en Supabase
+            if (dbSupabase) {
+                await dbSupabase.from('tokens_dispositivos').upsert(
+                    { token: token }, 
+                    { onConflict: 'token' }
+                );
+            }
+        } else {
+            console.warn("No se pudo obtener el token FCM.");
+        }
+    } catch (err) {
+        console.error("Error en Push Notifications:", err);
     }
 }
-
 // Ejecutar automáticamente al cargar
 document.addEventListener('DOMContentLoaded', () => {
     inicializarPushNotifications();
