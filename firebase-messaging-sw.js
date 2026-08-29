@@ -14,22 +14,18 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-// Manejador para notificaciones en segundo plano / pantalla bloqueada
+// Manejador para notificaciones en segundo plano / app cerrada
 messaging.onBackgroundMessage((payload) => {
     const title = payload.notification?.title || "🚨 Notificación D.A.T.A.";
-    const maquinaId = payload.data?.maquina_id || '';
-    const pieza = payload.data?.pieza || '';
+    const body = payload.notification?.body || "Nuevo reporte registrado.";
 
     const options = {
-        body: payload.notification?.body || "Nuevo reporte registrado.",
+        body: body,
         icon: './assets/icon.png',
         badge: './assets/icon.png',
         vibrate: [200, 100, 200, 100, 200],
-        tag: payload.notification?.tag || `reporte-${Date.now()}`,
-        data: {
-            maquina_id: maquinaId,
-            pieza: pieza
-        }
+        tag: `reporte-${Date.now()}`,
+        data: payload.data || {} // Guardamos machineId, pieza y action enviados desde la Edge Function
     };
 
     self.registration.showNotification(title, options);
@@ -39,23 +35,25 @@ messaging.onBackgroundMessage((payload) => {
 self.addEventListener('notificationclick', function(event) {
     event.notification.close();
 
-    // Capturar máquina y pieza enviadas en la data
-    const maquinaId = event.notification.data?.maquina_id || '';
-    const pieza = event.notification.data?.pieza || '';
-    
-    // Construir la URL completa con parámetros ?maquina=...&pieza=...
+    const data = event.notification.data || {};
+    const machineId = data.machineId || data.maquina_id || '';
+    const pieza = data.pieza || '';
+
+    // Construir la URL con los parámetros para abrir el visor 3D directamente
     const baseUrl = self.location.origin + self.location.pathname.replace('firebase-messaging-sw.js', '');
-    const urlToOpen = `${baseUrl}index.html?maquina=${encodeURIComponent(maquinaId)}&pieza=${encodeURIComponent(pieza)}`;
+    const urlToOpen = `${baseUrl}index.html?action=view3d&machineId=${encodeURIComponent(machineId)}&pieza=${encodeURIComponent(pieza)}`;
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+            // Si ya hay una pestaña abierta del sitio, la reorientamos y la enfocamos
             for (let i = 0; i < clientList.length; i++) {
                 let client = clientList[i];
-                if ('navigate' in client) {
+                if (client.url.includes(self.location.origin) && 'navigate' in client) {
                     client.navigate(urlToOpen);
                     return client.focus();
                 }
             }
+            // Si la aplicación estaba totalmente cerrada, abrimos una nueva ventana
             if (clients.openWindow) {
                 return clients.openWindow(urlToOpen);
             }
