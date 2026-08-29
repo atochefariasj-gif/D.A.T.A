@@ -38,15 +38,14 @@ messaging.onBackgroundMessage((payload) => {
 self.addEventListener('notificationclick', function(event) {
     event.notification.close();
 
-    // Obtener el ID/Nombre de la máquina enviado en el payload
     const maquinaId = event.notification.data?.maquina_id || '';
     
-    // Construir la URL hacia tu aplicación
-    const urlToOpen = new URL(`./index.html?maquina=${encodeURIComponent(maquinaId)}`, self.location.origin).href;
+    // Usar la raíz actual del sitio para evitar rutas rotas
+    const baseUrl = self.location.origin + self.location.pathname.replace('firebase-messaging-sw.js', '');
+    const urlToOpen = `${baseUrl}index.html?maquina=${encodeURIComponent(maquinaId)}`;
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
-            // Si la ventana/pestaña ya está abierta, redirigirla y enfocarla
             for (let i = 0; i < clientList.length; i++) {
                 let client = clientList[i];
                 if ('navigate' in client) {
@@ -54,7 +53,6 @@ self.addEventListener('notificationclick', function(event) {
                     return client.focus();
                 }
             }
-            // Si la app está cerrada, abrir una pestaña nueva
             if (clients.openWindow) {
                 return clients.openWindow(urlToOpen);
             }
