@@ -2,7 +2,7 @@ importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js')
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
 
 firebase.initializeApp({
-  apiKey: "AIzaSyMBnFmG3ebNlo3y8fam2m0aYYVd3LOxD2k",
+  apiKey: "AIzaSyARO3Y2z_FZmC-_sL1LNGL7NKXPIIbCjPo",
   authDomain: "data-control-activos.firebaseapp.com",
   projectId: "data-control-activos",
   storageBucket: "data-control-activos.firebasestorage.app",
