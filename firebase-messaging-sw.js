@@ -18,15 +18,17 @@ const messaging = firebase.messaging();
 messaging.onBackgroundMessage((payload) => {
     const title = payload.notification?.title || "🚨 Notificación D.A.T.A.";
     const maquinaId = payload.data?.maquina_id || '';
+    const pieza = payload.data?.pieza || '';
 
     const options = {
         body: payload.notification?.body || "Nuevo reporte registrado.",
         icon: './assets/icon.png',
         badge: './assets/icon.png',
         vibrate: [200, 100, 200, 100, 200],
-        tag: `reporte-${Date.now()}`, // ⚠️ IMPORTANTE: Permite recibir múltiples notificaciones
+        tag: payload.notification?.tag || `reporte-${Date.now()}`,
         data: {
-            url: `./index.html?maquina=${encodeURIComponent(maquinaId)}`
+            maquina_id: maquinaId,
+            pieza: pieza
         }
     };
 
@@ -34,15 +36,16 @@ messaging.onBackgroundMessage((payload) => {
 });
 
 // Manejo del clic en la notificación
-// En firebase-messaging-sw.js
 self.addEventListener('notificationclick', function(event) {
     event.notification.close();
 
+    // Capturar máquina y pieza enviadas en la data
     const maquinaId = event.notification.data?.maquina_id || '';
+    const pieza = event.notification.data?.pieza || '';
     
-    // Usar la raíz actual del sitio para evitar rutas rotas
+    // Construir la URL completa con parámetros ?maquina=...&pieza=...
     const baseUrl = self.location.origin + self.location.pathname.replace('firebase-messaging-sw.js', '');
-    const urlToOpen = `${baseUrl}index.html?maquina=${encodeURIComponent(maquinaId)}`;
+    const urlToOpen = `${baseUrl}index.html?maquina=${encodeURIComponent(maquinaId)}&pieza=${encodeURIComponent(pieza)}`;
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
