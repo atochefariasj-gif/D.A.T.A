@@ -1,17 +1,15 @@
-importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
 
-const firebaseConfig = {
-  apiKey: "AIzaSyBNfhgBdIe05n3L0YfbsmZbNVYVlDxDXZk",
+firebase.initializeApp({
+  apiKey: "AIzaSyMBnFmG3ebNlo3y8fam2m0aYYVd3LOxD2k",
   authDomain: "data-control-activos.firebaseapp.com",
   projectId: "data-control-activos",
   storageBucket: "data-control-activos.firebasestorage.app",
   messagingSenderId: "290148330315",
-  appId: "1:290148330315:web:0b53f07e03f72fefe9d6ce",
-  measurementId: "G-ZE1NC3LB15"
-};
+  appId: "1:290148330315:web:0653f07ed372fef8e9ddce"
+});
 
-firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
 // Manejador para notificaciones en segundo plano / app cerrada
