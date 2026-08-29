@@ -16,44 +16,41 @@ const messaging = firebase.messaging();
 
 // Manejador para notificaciones en segundo plano / pantalla bloqueada
 messaging.onBackgroundMessage((payload) => {
-    const title = payload.notification?.title || "📌 Notificación D.A.T.A.";
+    const title = payload.notification?.title || "🚨 Notificación D.A.T.A.";
+    const maquinaId = payload.data?.maquina_id || '';
+
     const options = {
-        body: payload.notification?.body || "Nuevo reporte de mantenimiento",
+        body: payload.notification?.body || "Nuevo reporte registrado.",
         icon: './assets/icon.png',
+        badge: './assets/icon.png',
         vibrate: [200, 100, 200, 100, 200],
-        data: payload.data || {}
+        tag: `reporte-${Date.now()}`, // ⚠️ IMPORTANTE: Permite recibir múltiples notificaciones
+        data: {
+            url: `./index.html?maquina=${encodeURIComponent(maquinaId)}`
+        }
     };
 
     self.registration.showNotification(title, options);
 });
 
-// Manejar clics en las notificaciones push para ir directo al Visor 3D
-self.addEventListener('notificationclick', function(event) {
+// Manejo del clic en la notificación
+self.addEventListener('notificationclick', (event) => {
     event.notification.close();
 
-    const data = event.notification.data || {};
-    // Extrae el ID de la máquina recibido en la carga útil (payload)
-    const maquinaId = data.machineId || data.maquinaId || '';
-
-    // Construye la URL agregando los parámetros exactos action=view3d
-    const baseUrl = self.location.origin + self.location.pathname.replace('firebase-messaging-sw.js', 'index.html');
-    const urlDestino = maquinaId 
-        ? `${baseUrl}?action=view3d&machineId=${encodeURIComponent(maquinaId)}` 
-        : baseUrl;
+    const targetUrl = event.notification.data?.url || './index.html';
 
     event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windowClients) {
-            // Si la aplicación ya está abierta en una pestaña, la enfoca y navega al visor 3D
-            for (let i = 0; i < windowClients.length; i++) {
-                const client = windowClients[i];
-                if ('focus' in client) {
-                    client.focus();
-                    return client.navigate(urlDestino);
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+            // Si la app ya está abierta, redirigir
+            for (let client of windowClients) {
+                if (client.url.includes('index.html') && 'focus' in client) {
+                    client.navigate(targetUrl);
+                    return client.focus();
                 }
             }
-            // Si la aplicación estaba cerrada, abre una nueva ventana con el parámetro directo al 3D
+            // Si la app está cerrada, abrir la URL con el parámetro
             if (clients.openWindow) {
-                return clients.openWindow(urlDestino);
+                return clients.openWindow(targetUrl);
             }
         })
     );
