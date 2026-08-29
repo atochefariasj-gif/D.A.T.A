@@ -189,11 +189,6 @@ async function selectRole(role) {
     if (viewLines) viewLines.classList.add('active-view');
 }
 
-    // 3. NAVEGACIÓN NORMAL (Vista de líneas)
-    document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active-view'));
-    const viewLines = document.getElementById('view-lines');
-    if (viewLines) viewLines.classList.add('active-view');
-}
 
 async function openLine(lineName, icon) {
     currentLine = lineName;
