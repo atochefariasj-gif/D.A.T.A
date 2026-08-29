@@ -2804,27 +2804,29 @@ async function inicializarPushNotifications() {
         const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(firebaseConfig);
         const messaging = firebase.messaging(app);
 
+        // 1. Pedir permiso
         const perm = await Notification.requestPermission();
-        if (perm !== 'granted') {
-            console.warn('Permiso de notificaciones denegado por el usuario.');
-            return;
-        }
+        if (perm !== 'granted') return;
 
-        const reg = await navigator.serviceWorker.ready;
+        // 2. Registrar el Service Worker con la ruta exacta de GitHub Pages
+        const swPath = window.location.pathname.includes('/D.A.T.A/') 
+            ? '/D.A.T.A/firebase-messaging-sw.js' 
+            : './firebase-messaging-sw.js';
 
+        const reg = await navigator.serviceWorker.register(swPath);
+        await navigator.serviceWorker.ready;
+
+        // 3. Obtener Token
         const token = await messaging.getToken({
             serviceWorkerRegistration: reg,
-            vapidKey: 'BJCxh5OSBkS1JZxbJ1-cow5ZpME5lRVASgJBxaSfgVKNj8X6-HuyMx-zLPShRjlriwlrxiduBxO3OboBIqz20_Q'
+            vapidKey: 'BJCxh5OSBkS1JZxbJ1-cow5ZpME5lRVASgJBxaSfgVKNj8X6-HuyMx-zLPShRjlriwlrxiduBxO3OboBIqz20_Q' // <-- Pon la clave que dio éxito en PC
         });
 
         if (token) {
-            console.log('✅ Token FCM obtenido con éxito:', token);
             await guardarTokenEnSupabase(token);
-        } else {
-            console.error('No se pudo generar el token de Firebase.');
         }
     } catch (e) {
-        console.error('Error al inicializar Push Notifications:', e);
+        console.error('Error en Push Notifications:', e);
     }
 }
 
