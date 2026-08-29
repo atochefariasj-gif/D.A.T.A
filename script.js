@@ -52,7 +52,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof activarEscuchaNotificacionesRealtime === 'function') {
         activarEscuchaNotificacionesRealtime();
     }
-
+// ⚡ AGREGAR ESTO: Ejecutar el parpadeo de la pieza si vino desde una notificación Push
+    const piezaPendiente = sessionStorage.getItem('pieza_3d_pendiente');
+    if (piezaPendiente && typeof hacerParpadearPieza3D === 'function') {
+        hacerParpadearPieza3D(piezaPendiente);
+        sessionStorage.removeItem('pieza_3d_pendiente'); // Limpia para no repetir al recargar
+    }
     // Listener en segundo plano
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.addEventListener('message', (event) => {
@@ -2672,46 +2677,23 @@ function seleccionarPiezaInteractiva(index) {
 
 async function enviarNotificacionEvento(titulo, mensaje, maquinaId) {
     try {
-        // 1. Consultar todos los tokens activos en Supabase
-        const { data: tokensData, error } = await dbSupabase
-            .from('tokens_dispositivos')
-            .select('token_push');
+        if (!dbSupabase) return;
 
-        if (error || !tokensData || tokensData.length === 0) {
-            console.log("No hay tokens registrados para enviar notificación.");
-            return;
+        // Invocar la Edge Function 'enviar-push' de forma segura desde Supabase
+        const { data, error } = await dbSupabase.functions.invoke('enviar-push', {
+            body: {
+                id_maquina: maquinaId,
+                pieza: typeof piezaSeleccionadaActual !== 'undefined' ? piezaSeleccionadaActual : '',
+                descripcion: mensaje,
+                titulo: titulo
+            }
+        });
+
+        if (error) {
+            console.error("Error al invocar Edge Function enviar-push:", error);
+        } else {
+            console.log("Notificaciones push enviadas correctamente vía Edge Function:", data);
         }
-
-        const serverKey = "BJCxH5OSBkS1JZxbJ1-cow5ZpME51RVASgJBxaSfgVKNj8X6-HuyMx-zLPShRj1rIwlrxiduBxO30boBIqz2O_Q";
-
-        // 2. Enviar a cada dispositivo
-        for (const item of tokensData) {
-            if (!item.token_push) continue;
-
-            await fetch('https://fcm.googleapis.com/fcm/send', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'key=' + serverKey
-                },
-                body: JSON.stringify({
-                    to: item.token_push,
-                    priority: 'high',
-                    notification: {
-                        title: titulo,
-                        body: mensaje,
-                        icon: './assets/icon.png',
-                        tag: `reporte-${Date.now()}`
-                    },
-                    data: {
-                        action: 'view3d',
-                        maquina_id: String(maquinaId || ''),
-                        pieza: String(piezaSeleccionadaActual || '')
-                    }
-                })
-            });
-        }
-        console.log("📱 Notificaciones enviadas correctamente a todos los dispositivos.");
     } catch (err) {
         console.error("Error al enviar notificación FCM:", err);
     }
@@ -2802,27 +2784,28 @@ async function inicializarPushNotifications() {
 
         // 1. Pedir permiso
         const perm = await Notification.requestPermission();
-        if (perm !== 'granted') return;
+        if (perm === 'granted') {
 
-        // 2. Registrar el Service Worker con la ruta exacta de GitHub Pages
-        const swPath = window.location.pathname.includes('/D.A.T.A/') 
-            ? '/D.A.T.A/firebase-messaging-sw.js' 
-            : './firebase-messaging-sw.js';
+            // 2. Registrar el Service Worker con la ruta exacta
+            const swPath = window.location.pathname.includes('/D.A.T.A/')
+                ? '/D.A.T.A/firebase-messaging-sw.js'
+                : './firebase-messaging-sw.js';
 
-        const reg = await navigator.serviceWorker.register(swPath);
-        await navigator.serviceWorker.ready;
+            const reg = await navigator.serviceWorker.register(swPath);
+            await navigator.serviceWorker.ready;
 
-        // 3. Obtener Token
-        const token = await messaging.getToken({
-            serviceWorkerRegistration: reg,
-            vapidKey: 'BJCxh5OSBkS1JZxbJ1-cow5ZpME5lRVASgJBxaSfgVKNj8X6-HuyMx-zLPShRjlriwlrxiduBxO3OboBIqz20_Q' // <-- Pon la clave que dio éxito en PC
-        });
+            // 3. Obtener Token
+            const token = await messaging.getToken({
+                serviceWorkerRegistration: reg,
+                vapidKey: 'BJCaNSGGbS1jZXbU1-cowS2pVE51MnXG8xaSfpgNXjX6-HuyWX-yLPSHRj1rwixdixUdbO300eb0ip2Q_Q'
+            });
 
-        if (token) {
-            await guardarTokenEnSupabase(token);
+            if (token) {
+                await guardarTokenEnSupabase(token);
+            }
         }
     } catch (e) {
-        console.error('Error en Push Notifications:', e);
+        console.error("Error en Push Notifications:", e);
     }
 }
 
