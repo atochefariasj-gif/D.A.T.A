@@ -2779,7 +2779,8 @@ async function inicializarPushNotifications() {
         }
 
         // 1. Obtener el registro del Service Worker
-        const registration = await navigator.serviceWorker.register('./sw.js');
+        // Línea 2782: Cambia './sw.js' por './firebase-messaging-sw.js'
+const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
 
         // 2. Obtener el token de FCM pasando el Service Worker y la VAPID Key
         const token = await firebase.messaging().getToken({
