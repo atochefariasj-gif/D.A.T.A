@@ -84,6 +84,8 @@ messaging.onBackgroundMessage((payload) => {
 });
 
 // Manejo del clic en la notificación
+// DENTRO DE firebase-messaging-sw.js
+
 self.addEventListener('notificationclick', function(event) {
     event.notification.close();
 
@@ -91,18 +93,17 @@ self.addEventListener('notificationclick', function(event) {
     const machineId = data.machineId || '';
     const pieza = data.pieza || '';
 
-    // Construir la URL completa para evitar fallos de ruta en PC o móviles
-    const targetPath = self.location.pathname.replace('firebase-messaging-sw.js', 'index.html');
-    const urlDestino = `${self.location.origin}${targetPath}?maquina=${encodeURIComponent(machineId)}&pieza=${encodeURIComponent(pieza)}`;
+    // URL ABSOLUTA Y EXACTA DE TU PROYECTO
+    const baseUrl = 'https://atochefariasj-gif.github.io/D.A.T.A/index.html';
+    const urlDestino = `${baseUrl}?maquina=${encodeURIComponent(machineId)}&pieza=${encodeURIComponent(pieza)}`;
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windowClients) {
-            // 1. Si la ventana ya está abierta (PC, Tablet o Celular)
+            // 1. Si la pestaña ya está abierta en la PC, la enfoca y le envía el mensaje
             for (let i = 0; i < windowClients.length; i++) {
                 const client = windowClients[i];
-                if ('focus' in client) {
+                if (client.url.includes('atochefariasj-gif.github.io') && 'focus' in client) {
                     client.focus();
-                    // Enviar datos al script principal sin recargar
                     client.postMessage({
                         action: 'CARGAR_MAQUINA',
                         machineId: machineId,
@@ -112,7 +113,7 @@ self.addEventListener('notificationclick', function(event) {
                 }
             }
 
-            // 2. Si la app estaba cerrada, abre la ventana con los parámetros en la URL
+            // 2. Si la ventana estaba cerrada, abre la URL exacta
             if (clients.openWindow) {
                 return clients.openWindow(urlDestino);
             }
