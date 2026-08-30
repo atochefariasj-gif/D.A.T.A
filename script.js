@@ -2845,14 +2845,22 @@ function hacerParpadearPieza3D(nombrePieza) {
         setTimeout(() => elementoPieza.classList.remove('parpadeo-alerta'), 4000);
     }
 }
+// Agrega este bloque dentro de tu inicialización de Firebase en script.js
 firebase.messaging().onMessage((payload) => {
-  console.log("Notificación recibida en primer plano:", payload);
-  const title = payload.data.title || "Notificación";
-  const options = {
-    body: payload.data.body,
-    icon: payload.data.icon
-  };
-  new Notification(title, options);
+  console.log("Notificación en primer plano recibida:", payload);
+  
+  const title = payload.notification?.title || payload.data?.title || "🚨 Reporte de Mantenimiento";
+  const body = payload.notification?.body || payload.data?.body || "Nuevo reporte";
+  const icon = payload.data?.icon || 'https://atochefariasj-gif.github.io/D.A.T.A/favicon.ico';
+
+  // Forzar cartel nativo del sistema operativo
+  if (Notification.permission === 'granted') {
+    new Notification(title, {
+      body: body,
+      icon: icon,
+      data: payload.data
+    });
+  }
 });
 
 // Exponer globalmente
