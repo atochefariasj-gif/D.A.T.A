@@ -17,18 +17,20 @@ const messaging = firebase.messaging();
 // Manejador para recibir notificaciones en segundo plano
 messaging.onBackgroundMessage((payload) => {
     const data = payload.data || {};
-    const title = data.title || payload.notification?.title || "🚨 Notificación D.A.T.A.";
-    const body = data.body || payload.notification?.body || "Nuevo reporte registrado.";
+    const title = payload.notification?.title || data.title || "🚨 Notificación D.A.T.A.";
+    const body = payload.notification?.body || data.body || "Nuevo reporte registrado.";
     
     const machineId = data.machineId || data.maquina_id || '';
     const pieza = data.pieza || '';
 
     const options = {
         body: body,
-        icon: data.icon || 'logo.png',
-        badge: 'logo.png',
+        icon: data.icon || 'https://atochefariasj-gif.github.io/D.A.T.A/favicon.ico',
+        badge: 'https://atochefariasj-gif.github.io/D.A.T.A/favicon.ico',
         vibrate: [200, 100, 200, 100, 200],
-        tag: `reporte-${Date.now()}`,
+        // USAR UN TAG FIJO: evita que la pantalla se llene de múltiples notificaciones repetidas
+        tag: 'mantenimiento-reporte',
+        renotify: true,
         data: {
             machineId: machineId,
             pieza: pieza
@@ -38,7 +40,7 @@ messaging.onBackgroundMessage((payload) => {
     return self.registration.showNotification(title, options);
 });
 
-// Manejo unificado del clic en la notificación
+// Manejo del clic en la notificación
 self.addEventListener('notificationclick', function(event) {
     event.notification.close();
 
@@ -46,13 +48,18 @@ self.addEventListener('notificationclick', function(event) {
     const machineId = data.machineId || '';
     const pieza = data.pieza || '';
 
+    // Construir la URL completa para evitar fallos de ruta en PC o móviles
+    const targetPath = self.location.pathname.replace('firebase-messaging-sw.js', 'index.html');
+    const urlDestino = `${self.location.origin}${targetPath}?maquina=${encodeURIComponent(machineId)}&pieza=${encodeURIComponent(pieza)}`;
+
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windowClients) {
-            // 1. Si la ventana ya está abierta, la enfoca y le envía el mensaje sin recargar
+            // 1. Si la ventana ya está abierta (PC, Tablet o Celular)
             for (let i = 0; i < windowClients.length; i++) {
                 const client = windowClients[i];
                 if ('focus' in client) {
                     client.focus();
+                    // Enviar datos al script principal sin recargar
                     client.postMessage({
                         action: 'CARGAR_MAQUINA',
                         machineId: machineId,
@@ -62,8 +69,7 @@ self.addEventListener('notificationclick', function(event) {
                 }
             }
 
-            // 2. Si la app estaba totalmente cerrada, la abre con los parámetros en la URL
-            const urlDestino = `./index.html?maquina=${encodeURIComponent(machineId)}&pieza=${encodeURIComponent(pieza)}`;
+            // 2. Si la app estaba cerrada, abre la ventana con los parámetros en la URL
             if (clients.openWindow) {
                 return clients.openWindow(urlDestino);
             }
