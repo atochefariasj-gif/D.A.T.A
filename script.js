@@ -2808,60 +2808,93 @@ if (dbSupabase) {
         console.error("Error en Push Notifications:", err);
     }
 }
-// Ejecutar automáticamente al cargar
-document.addEventListener('DOMContentLoaded', () => {
-    inicializarPushNotifications();
-});
-function cargarMaquinaDesdeURL() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const maquinaReportada = urlParams.get('maquina');
-    const piezaReportada = urlParams.get('pieza');
+// ==========================================
+// DETECCIÓN Y MANEJO DE URL AL CARGAR LA PÁGINA
+// ==========================================
 
-    if (maquinaReportada) {
-        sessionStorage.setItem('maquina_3d_pendiente', maquinaReportada);
-        if (piezaReportada) {
-            sessionStorage.setItem('pieza_3d_pendiente', piezaReportada);
-        }
-        // Limpiar la URL para que no vuelva a cargarse si refresca
-        window.history.replaceState({}, document.title, window.location.pathname);
+function procesarParametrosURL() {
+  const urlParams = new URLSearchParams(window.location.search);
+  
+  const machineId = urlParams.get('maquina') || urlParams.get('machineId');
+  const pieza = urlParams.get('pieza');
+
+  if (machineId) {
+    sessionStorage.setItem('maquina_3d_pendiente', machineId);
+    if (pieza) {
+      sessionStorage.setItem('pieza_3d_pendiente', pieza);
     }
+    // Limpia la URL inmediatamente para evitar ejecuciones duplicadas
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
 }
-document.addEventListener('DOMContentLoaded', () => {
-    cargarMaquinaDesdeURL();
-});
-function hacerParpadearPieza3D(nombrePieza) {
-    if (!nombrePieza) return;
-    console.log("⚡ Resaltando pieza reportada:", nombrePieza);
 
-    // Si tu visor 3D (Three.js/babylon/custom) tiene una función para seleccionar/iluminar piezas:
+// Un solo escuchador para cuando la página carga
+document.addEventListener('DOMContentLoaded', () => {
+  procesarParametrosURL();
+
+  if (typeof inicializarPushNotifications === 'function') {
+    inicializarPushNotifications();
+  }
+  
+  if (typeof cargarMaquinaDesdeURL === 'function') {
+    cargarMaquinaDesdeURL();
+  }
+});
+
+// Escuchar mensajes cuando la app YA ESTÁ ABIERTA en primer plano
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data && event.data.action === 'CARGAR_MAQUINA') {
+      const { machineId, pieza } = event.data;
+      if (machineId) {
+        sessionStorage.setItem('maquina_3d_pendiente', machineId);
+        if (pieza) sessionStorage.setItem('pieza_3d_pendiente', pieza);
+        
+        if (typeof cargarMaquinaDesdeURL === 'function') {
+          cargarMaquinaDesdeURL();
+        } else {
+          window.location.reload();
+        }
+      }
+    }
+  });
+}
+
+// Escuchar notificaciones Push de Firebase en primer plano
+if (typeof firebase !== 'undefined' && firebase.messaging) {
+  firebase.messaging().onMessage((payload) => {
+    console.log("Notificación recibida en primer plano:", payload);
+    const title = payload.notification?.title || payload.data?.title || "🚨 Reporte D.A.T.A.";
+    const body = payload.notification?.body || payload.data?.body || "Nuevo reporte recibido";
+    
+    if (Notification.permission === 'granted') {
+      new Notification(title, {
+        body: body,
+        icon: 'https://atochefariasj-gif.github.io/D.A.T.A/favicon.ico',
+        data: payload.data
+      });
+    }
+  });
+}
+
+// ==========================================
+// FUNCIONES DE RESALTADO Y VISOR 3D (MANTENER)
+// ==========================================
+
+function hacerParpadearPieza(nombrePieza) {
+    if (!nombrePieza) return;
+    console.log("📍 Resaltando pieza reportada:", nombrePieza);
+
     if (typeof seleccionarPiezaEnVisor === 'function') {
         seleccionarPiezaEnVisor(nombrePieza);
     }
 
-    // Si la pieza se representa como un elemento del DOM o botón en la interfaz 3D:
     const elementoPieza = document.querySelector(`[data-pieza="${nombrePieza}"]`) || document.getElementById(nombrePieza);
     if (elementoPieza) {
         elementoPieza.classList.add('parpadeo-alerta');
         setTimeout(() => elementoPieza.classList.remove('parpadeo-alerta'), 4000);
     }
 }
-// Agrega este bloque dentro de tu inicialización de Firebase en script.js
-firebase.messaging().onMessage((payload) => {
-  console.log("Notificación en primer plano recibida:", payload);
-  
-  const title = payload.notification?.title || payload.data?.title || "🚨 Reporte de Mantenimiento";
-  const body = payload.notification?.body || payload.data?.body || "Nuevo reporte";
-  const icon = payload.data?.icon || 'https://atochefariasj-gif.github.io/D.A.T.A/favicon.ico';
-
-  // Forzar cartel nativo del sistema operativo
-  if (Notification.permission === 'granted') {
-    new Notification(title, {
-      body: body,
-      icon: icon,
-      data: payload.data
-    });
-  }
-});
 
 // Exponer globalmente
 window.activarSeleccionMedidas = activarSeleccionMedidas;
