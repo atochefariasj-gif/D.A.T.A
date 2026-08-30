@@ -14,9 +14,8 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-// Manejador para notificaciones en segundo plano / pantalla bloqueada
+// Manejador para recibir notificaciones en segundo plano
 messaging.onBackgroundMessage((payload) => {
-    // Extraer variables desde data o notification
     const data = payload.data || {};
     const title = data.title || payload.notification?.title || "🚨 Notificación D.A.T.A.";
     const body = data.body || payload.notification?.body || "Nuevo reporte registrado.";
@@ -39,7 +38,7 @@ messaging.onBackgroundMessage((payload) => {
     return self.registration.showNotification(title, options);
 });
 
-// Manejo del clic en la notificación
+// Manejo unificado del clic en la notificación
 self.addEventListener('notificationclick', function(event) {
     event.notification.close();
 
@@ -47,23 +46,26 @@ self.addEventListener('notificationclick', function(event) {
     const machineId = data.machineId || '';
     const pieza = data.pieza || '';
 
-    // Construir la URL con los parámetros para abrir el modelo 3D directamente
-    const baseUrl = self.location.origin + self.location.pathname.replace('firebase-messaging-sw.js', '');
-    const urlToOpen = `${baseUrl}index.html?maquina=${encodeURIComponent(machineId)}&pieza=${encodeURIComponent(pieza)}`;
-
     event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
-            // Si hay una pestaña abierta del sitio, la enfocamos y navegamos
-            for (let i = 0; i < clientList.length; i++) {
-                let client = clientList[i];
-                if ('navigate' in client) {
-                    client.navigate(urlToOpen);
-                    return client.focus();
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windowClients) {
+            // 1. Si la ventana ya está abierta, la enfoca y le envía el mensaje sin recargar
+            for (let i = 0; i < windowClients.length; i++) {
+                const client = windowClients[i];
+                if ('focus' in client) {
+                    client.focus();
+                    client.postMessage({
+                        action: 'CARGAR_MAQUINA',
+                        machineId: machineId,
+                        pieza: pieza
+                    });
+                    return;
                 }
             }
-            // Si la app estaba cerrada, la abrimos
+
+            // 2. Si la app estaba totalmente cerrada, la abre con los parámetros en la URL
+            const urlDestino = `./index.html?maquina=${encodeURIComponent(machineId)}&pieza=${encodeURIComponent(pieza)}`;
             if (clients.openWindow) {
-                return clients.openWindow(urlToOpen);
+                return clients.openWindow(urlDestino);
             }
         })
     );
