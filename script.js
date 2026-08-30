@@ -2790,13 +2790,17 @@ async function inicializarPushNotifications() {
         if (token) {
             console.log("Token FCM obtenido correctamente:", token);
             
-            // Guardar el token en Supabase
-            if (dbSupabase) {
-                await dbSupabase.from('tokens_dispositivos').insert(
-                    { token: token }, 
-                    { onConflict: 'token' }
-                );
+if (dbSupabase) {
+    await dbSupabase.from('tokens_dispositivos').upsert(
+        [
+            { 
+                token_push: token, 
+                ultimo_acceso: new Date().toISOString() 
             }
+        ],
+        { onConflict: 'token_push' }
+    );
+}
         } else {
             console.warn("No se pudo obtener el token FCM.");
         }
