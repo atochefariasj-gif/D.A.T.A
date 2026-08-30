@@ -25,8 +25,8 @@ messaging.onBackgroundMessage((payload) => {
 
     const options = {
         body: body,
-        icon: data.icon || './assets/icon.png',
-        badge: './assets/icon.png',
+        icon: data.icon || './assets/logo.png',
+        badge: './assets/logo.png',
         vibrate: [200, 100, 200, 100, 200],
         tag: `reporte-${Date.now()}`,
         data: {
