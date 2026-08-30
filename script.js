@@ -2845,6 +2845,15 @@ function hacerParpadearPieza3D(nombrePieza) {
         setTimeout(() => elementoPieza.classList.remove('parpadeo-alerta'), 4000);
     }
 }
+firebase.messaging().onMessage((payload) => {
+  console.log("Notificación recibida en primer plano:", payload);
+  const title = payload.data.title || "Notificación";
+  const options = {
+    body: payload.data.body,
+    icon: payload.data.icon
+  };
+  new Notification(title, options);
+});
 
 // Exponer globalmente
 window.activarSeleccionMedidas = activarSeleccionMedidas;
