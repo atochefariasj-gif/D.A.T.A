@@ -2793,7 +2793,7 @@ async function inicializarPushNotifications() {
             console.log("Token FCM obtenido correctamente:", token);
             
 if (dbSupabase) {
-    await dbSupabase.from('tokens_dispositivos').insert(
+    await dbSupabase.from('tokens_dispositivos').upsert(
         [
             { 
                 token_push: token, 
