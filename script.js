@@ -2753,7 +2753,7 @@ async function guardarTokenEnSupabase(fcmToken) {
     try {
         const { error } = await dbSupabase
             .from('tokens_dispositivos')
-            .insert(
+            .upsert(
                 { 
                     token_push: fcmToken, 
                     ultimo_acceso: new Date().toISOString() 
