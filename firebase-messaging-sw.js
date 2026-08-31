@@ -14,25 +14,33 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
+// Manejador para recibir notificaciones en segundo plano
 messaging.onBackgroundMessage((payload) => {
     const data = payload.data || {};
     const title = payload.notification?.title || data.title || "🚨 Notificación D.A.T.A.";
     const body = payload.notification?.body || data.body || "Nuevo reporte registrado.";
+    
+    const machineId = data.machineId || data.maquina_id || '';
+    const pieza = data.pieza || '';
 
     const options = {
         body: body,
-        icon: data.icon || 'https://atochefariasj-gif.github.io/D.A.T.A/logo.png',
-        tag: 'reporte-mantenimiento-unico',
+        icon: data.icon || 'https://atochefariasj-gif.github.io/D.A.T.A/favicon.ico',
+        badge: 'https://atochefariasj-gif.github.io/D.A.T.A/favicon.ico',
+        vibrate: [200, 100, 200, 100, 200],
+        // USAR UN TAG FIJO: evita que la pantalla se llene de múltiples notificaciones repetidas
+        tag: 'mantenimiento-reporte',
         renotify: true,
         data: {
-            machineId: data.machineId || data.maquina_id || '',
-            pieza: data.pieza || ''
+            machineId: machineId,
+            pieza: pieza
         }
     };
 
     return self.registration.showNotification(title, options);
 });
 
+// Manejo del clic en la notificación
 self.addEventListener('notificationclick', function(event) {
     event.notification.close();
 
@@ -40,15 +48,18 @@ self.addEventListener('notificationclick', function(event) {
     const machineId = data.machineId || '';
     const pieza = data.pieza || '';
 
-    const baseUrl = 'https://atochefariasj-gif.github.io/D.A.T.A/index.html';
-    const urlDestino = `${baseUrl}?maquina=${encodeURIComponent(machineId)}&pieza=${encodeURIComponent(pieza)}`;
+    // Construir la URL completa para evitar fallos de ruta en PC o móviles
+    const targetPath = self.location.pathname.replace('firebase-messaging-sw.js', 'index.html');
+    const urlDestino = `${self.location.origin}${targetPath}?maquina=${encodeURIComponent(machineId)}&pieza=${encodeURIComponent(pieza)}`;
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(windowClients) {
+            // 1. Si la ventana ya está abierta (PC, Tablet o Celular)
             for (let i = 0; i < windowClients.length; i++) {
                 const client = windowClients[i];
-                if (client.url.includes('atochefariasj-gif.github.io') && 'focus' in client) {
+                if ('focus' in client) {
                     client.focus();
+                    // Enviar datos al script principal sin recargar
                     client.postMessage({
                         action: 'CARGAR_MAQUINA',
                         machineId: machineId,
@@ -57,6 +68,8 @@ self.addEventListener('notificationclick', function(event) {
                     return;
                 }
             }
+
+            // 2. Si la app estaba cerrada, abre la ventana con los parámetros en la URL
             if (clients.openWindow) {
                 return clients.openWindow(urlDestino);
             }
