@@ -152,7 +152,7 @@ async function selectRole(role) {
             openMachineDetail(mId, nombreMaquina);
         }
 
-        // Forzar vista inmediata de Visual 3D (evita regresar al Kárdex)
+// Forzar vista inmediata de Visual 3D (evita regresar al Kárdex)
         setTimeout(() => {
             if (typeof openOption === 'function') {
                 openOption('Visual3D');
@@ -162,9 +162,11 @@ async function selectRole(role) {
                 if (vista3D) vista3D.classList.add('active-view');
             }
 
-            // Ejecutar el parpadeo de la pieza
-            if (piezapendiente) {
-                hacerParpadearPieza(nombrePieza);
+            // OBTENER LA PIEZA DE SESSIONSTORAGE Y EJECUTAR EL PARPADEO
+            const piezaPendiente = sessionStorage.getItem('pieza_3d_pendiente');
+            if (piezaPendiente) {
+                hacerParpadearPieza(piezaPendiente);
+                sessionStorage.removeItem('pieza_3d_pendiente'); // Limpiar después de usar
             }
         }, 350);
 
@@ -2875,7 +2877,7 @@ if (typeof firebase !== 'undefined' && firebase.messaging) {
         const machineId = data.machineId || data.maquina_id || '';
         const pieza = data.pieza || '';
 
-        // 1. Si la app está abierta, cargamos o resaltamos la pieza inmediatamente en pantalla
+        // 1. Cargar la máquina y pieza automáticamente en pantalla si la app está abierta
         if (machineId) {
             sessionStorage.setItem('maquina_3d_pendiente', machineId);
             if (pieza) sessionStorage.setItem('pieza_3d_pendiente', pieza);
@@ -2885,20 +2887,18 @@ if (typeof firebase !== 'undefined' && firebase.messaging) {
             }
         }
 
-        // 2. Disparar la notificación flotante nativa del sistema
+        // 2. Mostrar la notificación flotante del sistema operativo
         if (Notification.permission === 'granted') {
-            const notification = new Notification(title, {
-                body: body,
-                icon: icon,
-                tag: 'reporte-mantenimiento-unico',
-                data: data
-            });
-
-            notification.onclick = function(event) {
-                event.preventDefault();
-                window.focus();
-                notification.close();
-            };
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.ready.then((registration) => {
+                    registration.showNotification(title, {
+                        body: body,
+                        icon: icon,
+                        tag: 'reporte-mantenimiento-unico',
+                        data: data
+                    });
+                });
+            }
         }
     });
 }
