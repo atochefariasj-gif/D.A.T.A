@@ -2755,7 +2755,7 @@ async function guardarTokenEnSupabase(fcmToken) {
     try {
         const { error } = await dbSupabase
             .from('tokens_dispositivos')
-            .insert(
+            .upsert(
                 { 
                     token_push: fcmToken, 
                     ultimo_acceso: new Date().toISOString() 
@@ -2771,40 +2771,40 @@ async function guardarTokenEnSupabase(fcmToken) {
     }
 }
 
-// Inicializar y obtener Token FCM
+// Inicializar y obtener Token FCM (Compatible con Móviles y PC)
 async function inicializarPushNotifications() {
     try {
+        if (!('serviceWorker' in navigator) || !('Notification' in window)) {
+            console.warn("Este navegador no soporta notificaciones Push.");
+            return;
+        }
+
+        // 1. Solicitar permisos de notificación
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') {
             console.log("Permiso de notificaciones denegado.");
             return;
         }
 
-        // 1. Obtener el registro del Service Worker
-        const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+        // 2. Esperar a que el Service Worker esté completamente listo y activo
+        await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+        const registration = await navigator.serviceWorker.ready;
 
-        // 2. Obtener el token de FCM pasando el Service Worker y la VAPID Key
-        const token = await firebase.messaging().getToken({
-            serviceWorkerRegistration: registration,
-            vapidKey: 'BJCxh5OSBkS1JZxbJ1-cow5ZpME5lRVASgJBxaSfgVKNj8X6-HuyMx-zLPShRjlriwlrxiduBxO3OboBIqz20_Q'
-        });
-
-        if (token) {
-            console.log("Token FCM obtenido correctamente:", token);
+        // 3. Obtener el token de FCM pasando la VAPID Key y el Service Worker registrado
+        if (typeof firebase !== 'undefined' && firebase.messaging) {
+            const messaging = firebase.messaging();
             
-if (dbSupabase) {
-    await dbSupabase.from('tokens_dispositivos').upsert(
-        [
-            { 
-                token_push: token, 
-                ultimo_acceso: new Date().toISOString() 
+            const token = await messaging.getToken({
+                serviceWorkerRegistration: registration,
+                vapidKey: 'BJCaN5O8SG51JzbJ1-cowCyeM51mVkig8Xua5fPgNXJ6k-HuYW-cLPSNHjIrIrw1xdxdb00O0b1g2O_0'
+            });
+
+            if (token) {
+                console.log("Token FCM obtenido correctamente:", token);
+                await guardarTokenEnSupabase(token);
+            } else {
+                console.warn("No se pudo obtener el token FCM.");
             }
-        ],
-        { onConflict: 'token_push' }
-    );
-}
-        } else {
-            console.warn("No se pudo obtener el token FCM.");
         }
     } catch (err) {
         console.error("Error en Push Notifications:", err);
