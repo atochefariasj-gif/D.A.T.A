@@ -163,7 +163,7 @@ async function selectRole(role) {
             }
 
             // Ejecutar el parpadeo de la pieza
-            if (nombrePieza) {
+            if (piezapendiente) {
                 hacerParpadearPieza(nombrePieza);
             }
         }, 350);
