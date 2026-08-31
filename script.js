@@ -2860,46 +2860,21 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Escuchar notificaciones Push en primer plano (App abierta)
+// Escuchar notificaciones Push de Firebase en primer plano
 if (typeof firebase !== 'undefined' && firebase.messaging) {
-    const messaging = firebase.messaging();
+  firebase.messaging().onMessage((payload) => {
+    console.log("Notificación recibida en primer plano:", payload);
+    const title = payload.notification?.title || payload.data?.title || "🚨 Reporte D.A.T.A.";
+    const body = payload.notification?.body || payload.data?.body || "Nuevo reporte recibido";
     
-    messaging.onMessage((payload) => {
-        console.log("Notificación recibida en primer plano:", payload);
-        
-        const data = payload.data || {};
-        const title = payload.notification?.title || data.title || "🚨 Reporte D.A.T.A.";
-        const body = payload.notification?.body || data.body || "Nuevo reporte recibido";
-        const icon = data.icon || 'https://atochefariasj-gif.github.io/D.A.T.A/favicon.ico';
-
-        if (Notification.permission === 'granted') {
-            const notification = new Notification(title, {
-                body: body,
-                icon: icon,
-                tag: 'reporte-mantenimiento-unico',
-                data: data
-            });
-
-            // Al hacer clic en la notificación flotante estando en la app
-            notification.onclick = function(event) {
-                event.preventDefault();
-                window.focus();
-
-                const machineId = data.machineId || data.maquina_id || '';
-                const pieza = data.pieza || '';
-
-                if (machineId) {
-                    sessionStorage.setItem('maquina_3d_pendiente', machineId);
-                    if (pieza) sessionStorage.setItem('pieza_3d_pendiente', pieza);
-
-                    if (typeof cargarMaquinaDesdeURL === 'function') {
-                        cargarMaquinaDesdeURL();
-                    }
-                }
-                notification.close();
-            };
-        }
-    });
+    if (Notification.permission === 'granted') {
+      new Notification(title, {
+        body: body,
+        icon: 'https://atochefariasj-gif.github.io/D.A.T.A/favicon.ico',
+        data: payload.data
+      });
+    }
+  });
 }
 
 // ==========================================
