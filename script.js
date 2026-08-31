@@ -2755,7 +2755,7 @@ async function guardarTokenEnSupabase(fcmToken) {
     try {
         const { error } = await dbSupabase
             .from('tokens_dispositivos')
-            .upsert(
+            .insert(
                 { 
                     token_push: fcmToken, 
                     ultimo_acceso: new Date().toISOString() 
@@ -2793,7 +2793,7 @@ async function inicializarPushNotifications() {
             console.log("Token FCM obtenido correctamente:", token);
             
 if (dbSupabase) {
-    await dbSupabase.from('tokens_dispositivos').upsert(
+    await dbSupabase.from('tokens_dispositivos').insert(
         [
             { 
                 token_push: token, 
