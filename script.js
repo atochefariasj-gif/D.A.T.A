@@ -163,8 +163,8 @@ async function selectRole(role) {
             }
 
             // Ejecutar el parpadeo de la pieza
-            if (piezaPendiente) {
-                hacerParpadearPieza3D(piezaPendiente);
+            if (nombrePieza) {
+                hacerParpadearPieza(nombrePieza);
             }
         }, 350);
 
@@ -2863,15 +2863,29 @@ if ('serviceWorker' in navigator) {
 // Escuchar notificaciones Push en primer plano (App abierta)
 if (typeof firebase !== 'undefined' && firebase.messaging) {
     const messaging = firebase.messaging();
-    
+
     messaging.onMessage((payload) => {
         console.log("Notificación recibida en primer plano:", payload);
-        
+
         const data = payload.data || {};
         const title = payload.notification?.title || data.title || "🚨 Reporte D.A.T.A.";
         const body = payload.notification?.body || data.body || "Nuevo reporte recibido";
         const icon = data.icon || 'https://atochefariasj-gif.github.io/D.A.T.A/logo.png';
 
+        const machineId = data.machineId || data.maquina_id || '';
+        const pieza = data.pieza || '';
+
+        // 1. Si la app está abierta, cargamos o resaltamos la pieza inmediatamente en pantalla
+        if (machineId) {
+            sessionStorage.setItem('maquina_3d_pendiente', machineId);
+            if (pieza) sessionStorage.setItem('pieza_3d_pendiente', pieza);
+
+            if (typeof cargarMaquinaDesdeURL === 'function') {
+                cargarMaquinaDesdeURL();
+            }
+        }
+
+        // 2. Disparar la notificación flotante nativa del sistema
         if (Notification.permission === 'granted') {
             const notification = new Notification(title, {
                 body: body,
@@ -2880,28 +2894,14 @@ if (typeof firebase !== 'undefined' && firebase.messaging) {
                 data: data
             });
 
-            // Al hacer clic en la notificación flotante estando en la app
             notification.onclick = function(event) {
                 event.preventDefault();
                 window.focus();
-
-                const machineId = data.machineId || data.maquina_id || '';
-                const pieza = data.pieza || '';
-
-                if (machineId) {
-                    sessionStorage.setItem('maquina_3d_pendiente', machineId);
-                    if (pieza) sessionStorage.setItem('pieza_3d_pendiente', pieza);
-
-                    if (typeof cargarMaquinaDesdeURL === 'function') {
-                        cargarMaquinaDesdeURL();
-                    }
-                }
                 notification.close();
             };
         }
     });
 }
-
 // ==========================================
 // FUNCIONES DE RESALTADO Y VISOR 3D (MANTENER)
 // ==========================================
