@@ -2870,7 +2870,7 @@ if (typeof firebase !== 'undefined' && firebase.messaging) {
         const data = payload.data || {};
         const title = payload.notification?.title || data.title || "🚨 Reporte D.A.T.A.";
         const body = payload.notification?.body || data.body || "Nuevo reporte recibido";
-        const icon = data.icon || 'https://atochefariasj-gif.github.io/D.A.T.A/favicon.ico';
+        const icon = data.icon || 'https://atochefariasj-gif.github.io/D.A.T.A/logo.png';
 
         if (Notification.permission === 'granted') {
             const notification = new Notification(title, {
