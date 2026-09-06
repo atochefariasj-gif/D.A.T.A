@@ -18,7 +18,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/gsap.min.js"></script>
     <!-- Librería SheetJS para exportar a Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script> <!--esta libreria conecta con la base de datos de supabase, conecta con tu script en la fila 4-->
     <link rel="stylesheet" href="style.css">
     <!-- Librería PDF.js para renderizar páginas PDF en canvas / imágenes -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
@@ -88,7 +88,7 @@
               
             </div>
             
-            <div class="grid-container" id="machines-grid-container"></div>
+            <div class="grid-container" id="machines-grid-container"></div> se vincula con la linea 177 del script
 
             <button class="back-btn" onclick="goBack('lines')">⬅ Volver a Líneas</button>
         </div>
@@ -123,7 +123,7 @@
             <button class="back-btn" onclick="goBack('machines')">⬅ Volver a Máquinas</button>
         </div>
 
-        <!-- SECCIÓN KÁRDEX -->
+        <!-- SECCIÓN KÁRDEX conecta con el script linea 258 -->
         <div id="view-kardex" class="view-section">
             <h2 style="color: #2b2d42; margin-top: 0; font-size: 14px; margin-bottom: 5px;">📋 Kárdex de Mantenimiento</h2>
             <p id="kardex-subtitle" style="font-size: 11px; color: #666; margin-bottom: 8px;"></p>
@@ -145,7 +145,7 @@
             <button class="back-btn" onclick="salirKardex()">⬅ Volver a Opciones</button>
         </div>
 
-        <!-- SECCIÓN INSTRUCCIONES DE USO -->
+        <!-- SECCIÓN INSTRUCCIONES DE USO conecta con el script linea 261-->
         <div id="view-instructions" class="view-section">
             <h2 style="color: #2026A0; margin-top: 0; font-size: 16px; margin-bottom: 5px;">📖Instrucciones de Uso</h2>
             <p id="inst-subtitle" style="font-size: 11px; color: #666; margin-bottom: 10px;"></p>
@@ -161,7 +161,7 @@
             <button class="back-btn" onclick="salirInstrucciones()">⬅ Volver a Opciones</button>
         </div>
 
-        <!-- SECCIÓN MANUALES -->
+        <!-- SECCIÓN MANUALES conecta con el script linea 264 -->
         <div id="view-manuals" class="view-section">
             <h2 style="color: #2b2d42; margin-top: 0; font-size: 16px; margin-bottom: 5px;">📚 Manuales Técnicos</h2>
             <p id="man-subtitle" style="font-size: 11px; color: #666; margin-bottom: 10px;"></p>
@@ -178,7 +178,7 @@
             <button class="back-btn" onclick="salirManuales()">⬅ Volver a Opciones</button>
         </div>
 
-        <!-- SECCIÓN VISUAL 3D -->
+        <!-- SECCIÓN VISUAL 3D, conecta con tu escript en la linea 267-->
         <div id="view-visual3d" class="view-section" style="width: 100%;">
             <div style="display: flex; flex-direction: column; height: 480px; width: 100%; background: #111827; border-radius: 12px; overflow: hidden; text-align: left; position: relative;" id="visual3d-wrapper-box">
                 
@@ -328,18 +328,18 @@
         </div>
     </div>
 
-    <!-- MODAL PARA CONTRASEÑA -->
+    <!-- MODAL PARA CONTRASEÑA , CONECTA CON TU BLOQUE 7 FILA 75 DE TU SCRIPT-->
     <div class="image-modal" id="modal-password">
         <div class="image-modal-content" style="background: #1f2937; padding: 20px; border-radius: 12px; width: 300px; text-align: left;" onclick="event.stopPropagation()">
             <button class="modal-close-btn" onclick="cerrarModalPassword()">✕</button>
             <h3 class="text-white text-sm font-bold mb-2" id="modal-password-title">Ingrese Contraseña</h3>
-            <p class="text-gray-300 text-[11px] mb-3">Acceso restringido para este rol.</p>
+            <p class="text-gray-300 text-[11px] mb-3">Ingrese contraseña porfavor</p>
             
             <input type="password" id="input-password-val" class="w-full p-2 bg-gray-900 text-white rounded border border-gray-600 focus:border-blue-500 outline-none text-xs mb-3" placeholder="Contraseña...">
             
             <div class="flex gap-2">
-                <button onclick="verificarPassword()" class="flex-1 py-2 bg-blue-600 hover:bg-blue-500 rounded text-white font-bold text-xs shadow transition">🔓Ingresar</button>
-                <button onclick="cerrarModalPassword()" class="py-2 px-3 bg-gray-700 hover:bg-gray-600 rounded text-white text-xs font-semibold">Cancelar❌</button>
+                <button onclick="verificarPassword()" class="flex-1 py-2 bg-blue-600 hover:bg-blue-500 rounded text-white font-bold text-xs shadow transition">🔓ACCEDER</button>
+                <button onclick="cerrarModalPassword()" class="py-2 px-3 bg-gray-700 hover:bg-gray-600 rounded text-white text-xs font-semibold">CANCELAR❌</button>
             </div>
         </div>
     </div>
