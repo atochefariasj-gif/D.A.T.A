@@ -1,355 +1,279 @@
-// Credenciales de Supabase
-const SUPABASE_URL = 'https://glgkfuiqwconjjffxgln.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_YxHDEuQiZ06ywaT5Yha68w_DX35lUVO';
-
-const { createClient } = supabase;
-const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-let currentRole = 'visitante';
-let currentLine = '';
-let currentMachineId = null;
-let currentMachineName = null; 
-let currentMachineToken = null;
-let isEditMode = false;
-let rolPendiente = '';
-let mapaNombres = {}; // Aquí se guardarán los nombres del JSON[cite: 1]
-let reportesCargados = {}; // Variable para guardar el estado de las piezas[cite: 1]
+// 1.CONEXION A SUPABASE linea 1-5
+    const SUPABASE_URL = 'https://glgkfuiqwconjjffxgln.supabase.co';//guarda la direccion web unica de mi app en supabase para saber a que servidor enviar petiviones
+    const SUPABASE_ANON_KEY = 'sb_publishable_YxHDEuQiZ06ywaT5Yha68w_DX35lUVO';//guarda la clave publica que le da permiso a la base de datos de manera segura
+    const { createClient } = supabase;//Extrae la función createClient de la librería global de Supabase que cargaste previamente en el archivo index.html.
+    const dbSupabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);//Con esta variable realizarás todas las consultas (select, insert, upsert) hacia tus tablas.
+let currentRole = 'visitante';// define los roles con el usuario ingresa en la app
+let currentLine = '';//almacena los datos de las las lineas en el sistema 
+let currentMachineId = null;// guarda el Id de la maquina seleccionada en el momento
+let currentMachineName = null; //guarda el nombre de la maquina seleccionada 
+let currentMachineToken = null;//Guarda un token o identificador temporal asignado a la sesión de la máquina.
+let isEditMode = false;// un interruptor para saber si la interfaz esta en modo edicion o modo lectura, esto protege a la interfaz para que no puedan editar por defecto
+let rolPendiente = '';//Guarda temporalmente el rol elegido, si la aplicación debe procesar una redirección (como leer un código QR) antes de darle acceso total.
+let mapaNombres = {}; // Aquí se guardarán los nombres de tu archivo nombres.json
+let reportesCargados = {}; // Variable para guardar el estado de las piezas o reportes para no volver a pedir a la base de datos a cada segundo
 let documentacionPiezasCargada = {}; // Variable para guardar los links/planos de las piezas
-
-let centroModeloGlobal = new THREE.Vector3(); // Centro global para las vistas rápidas y centrado
-
-const PASSWORDS = {
-    'mantenimiento': '123',
-    'admin': 'admin123'
-};
-
-// ==========================================
-// NUEVO: DETECCIÓN DE QR AL CARGAR LA PÁGINA
-// ==========================================
-// Variable global (colócala fuera de DOMContentLoaded o arriba del archivo)
-// NUEVO: DETECCIÓN DE URL AL CARGAR LA PÁGINA
-let pendienteRedireccion = null;
-
-document.addEventListener('DOMContentLoaded', () => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const action = urlParams.get('action');
-    const machineId = urlParams.get('machineId') || urlParams.get('maquina');
-    const tokenQr = urlParams.get('pieza') || urlParams.get('piezas') || urlParams.get('qr');
-
-    // 1. Notificación Push -> Guardar para Visor 3D
-    if (action === 'view3d' && machineId) {
-        sessionStorage.setItem('maquina_3d_pendiente', machineId);
-    } 
-    // 2. Escáner QR -> Guardar para Detalles de Máquina
-    else if (tokenQr) {
-        sessionStorage.setItem('maquina_qr_pendiente', tokenQr);
-    }
-
-    // Inicializaciones existentes
-    if (typeof inicializarNotificaciones === 'function') {
-        inicializarNotificaciones();
-    }
-    if (typeof activarEscuchaNotificacionesRealtime === 'function') {
-        activarEscuchaNotificacionesRealtime();
-    }
-// ⚡ AGREGAR ESTO: Ejecutar el parpadeo de la pieza si vino desde una notificación Push
-    const piezaPendiente = sessionStorage.getItem('pieza_3d_pendiente');
-    if (piezaPendiente && typeof hacerParpadearPieza3D === 'function') {
-        hacerParpadearPieza3D(piezaPendiente);
-        sessionStorage.removeItem('pieza_3d_pendiente'); // Limpia para no repetir al recargar
-    }
-    // Listener en segundo plano
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.addEventListener('message', (event) => {
-            if (event.data && event.data.action === 'CARGAR_MAQUINA') {
-                const targetId = event.data.machineId;
-                if (targetId) {
-                    currentMachineId = isNaN(Number(targetId)) ? targetId : Number(targetId);
-                    if (typeof cargarModeloMaquinaActual === 'function') {
-                        cargarModeloMaquinaActual();
-                    }
-                }
+let centroModeloGlobal = new THREE.Vector3(); // Centro global para las vistas rápidas y centrado, clacula el centro del modelo 
+let pendienteRedireccion = null;//crea una variable temporal para recordar si el usuario debe ser redirigido a alguna vista específica tras cargar la interfaz
+//2.CONTRASELÑAS DE USUARIOS MIENTRAS ESTE EN BETA 
+    const PASSWORDS = {'mantenimiento': '123','admin': 'admin123'};
+//3.TODO DENTRO DE ESTE BLOQUE SE EJECUTA AL ABRIR LA APLICACION 
+document.addEventListener('DOMContentLoaded', () => {//llama al evento DOMContentLoaded
+    const urlParams = new URLSearchParams(window.location.search);// esto busca en toda la barra de direcciones url lo que esta despues del signo "?"
+    const action = urlParams.get('action');// extrae el valor del parametro action de la url si esque existe 
+    const machineId = urlParams.get('machineId') || urlParams.get('maquina');// busca el numero de la maquina 
+    const tokenQr = urlParams.get('pieza') || urlParams.get('piezas') || urlParams.get('qr');//busca el codigo de la pieza o el qr
+    
+    //3.1.CALSIFICACION DE ENTRADAS : SIN ENTRA POR NOTIFICACION O POR ESCANEAR EL QR 
+      // 3.1.1. Si el usuario presiona la notificacion busca el id de la maquina para redirigirlo al visor 3d
+   if (action === 'view3d' && machineId) {sessionStorage.setItem('maquina_3d_pendiente', machineId);} 
+      // 3.1.2. si el usuario escanea el QR guarda el QR en la memoria pra redirigirlo a los datos de la maquina 
+   else if (tokenQr) {sessionStorage.setItem('maquina_qr_pendiente', tokenQr);}
+   
+   //3.2.ACTIVACION DE FUNCIONES 
+   if (typeof inicializarPushNotifications === 'function') {inicializarPushNotifications();}// Busca y activa la funcion inicializarPushNotifications si es que existe 
+   if (typeof activarEscuchaNotificacionesRealtime === 'function') {activarEscuchaNotificacionesRealtime();}//Verifica si existe el escuchador de cambios en tiempo real con Supabase y lo ejecuta. activa tu funcion activarEscuchaNotificacionesRealtime
+   //3.3.RESALTAR LA PIEZA AL ENTRAR POR NOTIFICACION 
+    const piezaPendiente = sessionStorage.getItem('pieza_3d_pendiente');//Lee si había quedado guardada alguna pieza pendiente por resaltar.
+    if (piezaPendiente && typeof hacerParpadearPieza === 'function') {hacerParpadearPieza(piezaPendiente);sessionStorage.removeItem('pieza_3d_pendiente');}//Llama a la función para hacer parpadear la pieza reportada y luego elimina ese registro temporal de sessionStorage para que no vuelva a parpadear si refrescas la pantalla.
+    //3.4.COMUNICACION EN SEGUNDO PLANO EL SERVICEWORKER
+    if ('serviceWorker' in navigator) {//Comprueba si el navegador soporta Service Workers.
+    navigator.serviceWorker.addEventListener('message', (event) => {//Escucha mensajes enviados por el Service Worker en segundo plano hacia la app activa
+    if (event.data && event.data.action === 'CARGAR_MAQUINA') {//Si el Service Worker le ordena cargar una máquina en particular
+    const targetId = event.data.machineId;
+    if (targetId) {currentMachineId = isNaN(Number(targetId)) ? targetId : Number(targetId);//Extrae el ID enviado, se asegura de convertirlo a número si corresponde y lo asigna a la variable global currentMachineId (linea 9)
+    if (typeof cargarModeloMaquinaActual === 'function') {cargarModeloMaquinaActual();}//dispara de inmediato la crga del modelo 3D linea ....
             }
-        });
+         }
+      });
     }
 });
-
-// Función para restringir descargas/impresiones de QR solo a administradores
-function verificarPermisoQRAdmin() {
-    if (currentRole !== 'admin') {
-        alert("Acceso denegado: Solo el Administrador puede descargar o imprimir códigos QR.");
-        return false;
-    }
-    return true;
-}
-
-function descargarOImprimirQR(idMaquina) {
-    if (!verificarPermisoQRAdmin()) return;
-    console.log("Generando descarga de QR para la máquina:", idMaquina);
-}
-
-// Función para cargar los nombres desde el archivo JSON[cite: 1]
-async function cargarTraducciones() {
-    try {
-        const response = await fetch('nombres.json');
-        if (!response.ok) throw new Error("No se pudo cargar el archivo nombres.json");
-        mapaNombres = await response.json();
-        console.log("Traducciones cargadas correctamente.");
-    } catch (error) {
-        console.warn("No se pudo cargar nombres.json, usando nombres originales.", error);
-        mapaNombres = {}; // Si falla, queda vacío y no se rompe nada[cite: 1]
+//4.Función para restringir descargas/impresiones de QR solo a administradores (seguno candado por si se ejecute manualmente )
+function verificarPermisoQRAdmin() {//comprueba si el ususario actual es administrador antes de dar acceso al QR
+    if (currentRole !== 'admin') {//condicion que compara la variable global currentRole (linea 7), Si el rol actual NO es igual a 'admin', entra al bloque de bloqueo.
+        alert("Acceso denegado: Solo el Administrador puede descargar o imprimir códigos QR.");// mensaje de alerta si esque el ususario no tiene permiso
+        return false;}//corta la ejecucion de la funcion y devuelve permiso denegado
+        return true;}// si la condicion no se cumple , es decir si es admin, ingnora la alerta y te da permiso concedido
+//5.FUNCION PARA DESACRGAR E IMPRIMIR EL QR
+function descargarOImprimirQR(idMaquina) {//recibe el id de la maquina y declara la funcion de descargar o imprimir
+    if (!verificarPermisoQRAdmin()) return;//llama a la funcion (linea55) cancelando la descarga 
+        console.log("Generando descarga de QR para la máquina:", idMaquina);}//muestra un mensaje en la consola de inicio de descarga 
+//6.Función para cargar los nombres desde el archivo nombres.json
+async function cargarTraducciones() {//funcion asincrona (async) para leer el archivo nombres.json sin congelar la pantalla
+    try {//Inicia un bloque de pruebas de seguridad para intentar descargar el archivo nombres.json
+    const response = await fetch('nombres.json');//Solicita al servidor/carpeta local el archivo nombres.json y espera (await) su respuesta.
+    if (!response.ok) throw new Error("No se pudo cargar el archivo nombres.json");//verifica si la respuoesta fuesta exitosa y si no lanza error
+         mapaNombres = await response.json();//convierte el contenido en un objeto json y lo almacena en la variable mapaNombres (linea 14)
+        console.log("Traducciones cargadas correctamente.");} //aviso de exito en la consola
+         catch (error) {console.warn("No se pudo cargar nombres.json, usando nombres originales.", error);mapaNombres = {}; // Si falla, queda vacío y no se rompe nada
     }
 }
-
-async function solicitarPassword(rol) {
-    rolPendiente = rol;
-    document.getElementById('modal-password-title').innerText = `🔐Contraseña para ${rol.toUpperCase()}`;
-    document.getElementById('input-password-val').value = '';
-    document.getElementById('modal-password').style.display = 'flex';
+//7.GESTION DE VENTANA MODAL PARA CONTRASEÑAS 
+async function solicitarPassword(rol) {//Declara la función encargada de desplegar la ventana emergente de contraseña al intentar cambiar de rol.
+    rolPendiente = rol;//Guarda el rol solicitado (ej: 'admin' o 'mantenimiento') en la variable global rolPendiente(linea13) para saber qué clave validar más adelante.
+    document.getElementById('modal-password-title').innerText = `🔐Contraseña de ${rol.toUpperCase()}`;//busca el titulo del modal en el index.html
+    document.getElementById('input-password-val').value = '';//limpia la cacilla done se ingresa la contraseña
+    document.getElementById('modal-password').style.display = 'flex';//Cambia la propiedad CSS del elemento modal a 'flex' para volverlo visible en la pantalla.
 }
-
-async function cerrarModalPassword() {
-    document.getElementById('modal-password').style.display = 'none';
+async function cerrarModalPassword() {//cierra la ventana que solicita la contraseña 
+    document.getElementById('modal-password').style.display = 'none';//Oculta el modal de contraseñas de la vista asignándole el estilo 'none'.
 }
-
-async function verificarPassword() {
-    let passInput = document.getElementById('input-password-val').value;
-    if (passInput === PASSWORDS[rolPendiente]) {
-        cerrarModalPassword();
-        selectRole(rolPendiente);
-    } else {
-        alert("Contraseña incorrecta");
-    }
-    actualizarVisibilidadQR();
+async function verificarPassword() {//validacion de contraseña 
+    let passInput = document.getElementById('input-password-val').value;//obtiene la contraseña ingrasada
+    //Compara la contraseña ingresada con el diccionario PASSWORDS (linea 20) Si coincide, oculta la ventana emergente y llama a selectRole(linea 91) para autorizar la sesión.
+    if (passInput === PASSWORDS[rolPendiente])
+    {cerrarModalPassword();
+    selectRole(rolPendiente);}
+    else {alert("Contraseña incorrecta");}//muestra una ventana de error si la contraseña no es correcta 
+    actualizarVisibilidadQR();//llama a la funcion (linea 2242)
 }
-
+//8.ASIGNACION DE ROL 
 async function selectRole(role) {
-    currentRole = role;
-
-    // Redirección directa si viene de una Notificación Push
+    currentRole = role;//Actualiza la variable global (FILA 7) con el nuevo rol asignado.
+    //8.1.Bloque de edirección directa si viene de una Notificación Push, limpia las variables de sessionStorage para no repetir el proceso al actualizar
     const token3DPendiente = sessionStorage.getItem('maquina_3d_pendiente');
     if (token3DPendiente) {
-        const piezaPendiente = sessionStorage.getItem('pieza_3d_pendiente');
-        
-        sessionStorage.removeItem('maquina_3d_pendiente');
-        sessionStorage.removeItem('pieza_3d_pendiente');
-
-        const mId = isNaN(Number(token3DPendiente)) ? token3DPendiente : Number(token3DPendiente);
-        let nombreMaquina = 'Máquina';
-
-        if (typeof dbSupabase !== 'undefined') {
-            const { data } = await dbSupabase
+    const piezaPendiente = sessionStorage.getItem('pieza_3d_pendiente');
+          sessionStorage.removeItem('maquina_3d_pendiente');
+          sessionStorage.removeItem('pieza_3d_pendiente');
+    //8.2.bloque que convierte el ID a número y consulta a Supabase en la tabla maquinas para traer el nombre correspondiente.
+    const mId = isNaN(Number(token3DPendiente)) ? token3DPendiente : Number(token3DPendiente);
+    let nombreMaquina = 'Máquina';
+    if (typeof dbSupabase !== 'undefined') {
+    const { data } = await dbSupabase
                 .from('maquinas')
                 .select('id, nombre')
                 .eq('id', mId)
                 .maybeSingle();
-
-            if (data && data.nombre) nombreMaquina = data.nombre;
-        }
-
-        // Abrir los datos internamente
-        if (typeof openMachineDetail === 'function') {
-            openMachineDetail(mId, nombreMaquina);
-        }
-
-// Forzar vista inmediata de Visual 3D (evita regresar al Kárdex)
-        setTimeout(() => {
-            if (typeof openOption === 'function') {
-                openOption('Visual3D');
-            } else {
-                document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active-view'));
-                const vista3D = document.getElementById('view-visual3d');
-                if (vista3D) vista3D.classList.add('active-view');
-            }
-
-            // OBTENER LA PIEZA DE SESSIONSTORAGE Y EJECUTAR EL PARPADEO
-            const piezaPendiente = sessionStorage.getItem('pieza_3d_pendiente');
-            if (piezaPendiente) {
-                hacerParpadearPieza(piezaPendiente);
-                sessionStorage.removeItem('pieza_3d_pendiente'); // Limpiar después de usar
-            }
-        }, 350);
-
-        return; // Detiene el flujo normal para que no vuelva a los datos
-    }
-
-    // 2. NAVEGACIÓN DESDE CÓDIGO QR (Ir a los datos/kardex de la máquina)
+    if (data && data.nombre) nombreMaquina = data.nombre;}
+    //8.3.Abre los datos internamente en segundo plano
+    if (typeof openMachineDetail === 'function') {openMachineDetail(mId, nombreMaquina);}
+    //8.4.Espera un breve lapso de 350 milisegundos para dar tiempo a la interfaz de renderizar, cambia la vista activa al Visor 3D y dispara el parpadeo de la pieza reportada.
+    setTimeout(() => {
+    if (typeof openOption === 'function') {openOption('Visual3D');} 
+    else {document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active-view'));
+    const vista3D = document.getElementById('view-visual3d');
+    if (vista3D) vista3D.classList.add('active-view');}
+    const piezaPendiente = sessionStorage.getItem('pieza_3d_pendiente');
+    if (piezaPendiente) {hacerParpadearPieza(piezaPendiente);sessionStorage.removeItem('pieza_3d_pendiente');}
+      },
+      350);
+    return;}//Corta la ejecución para evitar que el script prosiga hacia la navegación normal.
+    //8.5.NAVEGACIÓN DESDE CÓDIGO QR (Ir a los datos/kardex de la máquina)
+     //8.5.1.lee si la entrada fue por escanear el QR
     const tokenQRPendiente = sessionStorage.getItem('maquina_qr_pendiente');
-    if (tokenQRPendiente) {
-        sessionStorage.removeItem('maquina_qr_pendiente');
-        
+    if (tokenQRPendiente) {sessionStorage.removeItem('maquina_qr_pendiente');
+     //8.5.2.Remueve la clase de visibilidad CSS a todas las secciones de la página para ocultarlas instantáneamente.
         document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active-view'));
-
-        if (typeof dbSupabase !== 'undefined') {
-            let query = dbSupabase.from('maquinas').select('id, nombre');
-            if (!isNaN(Number(tokenQRPendiente))) {
-                query = query.eq('id', Number(tokenQRPendiente));
-            } else {
-                query = query.eq('qr_token', tokenQRPendiente);
-            }
-
-            const { data, error } = await query.maybeSingle();
-            if (error) {
-                console.error('No se encontró la máquina en Supabase:', error);
-                return;
-            }
-
-            if (data) {
-                openMachineDetail(data.id, data.nombre);
-                return; // ⚠️ Detener ejecución al abrir Kardex por QR
-            }
+     //8.5.3.Determina si la búsqueda en Supabase debe hacerse buscando por id numérico o por la columna qr_token.
+    if (typeof dbSupabase !== 'undefined') {
+    let query = dbSupabase.from('maquinas').select('id, nombre');
+    if (!isNaN(Number(tokenQRPendiente))) {query = query.eq('id', Number(tokenQRPendiente));} 
+    else {query = query.eq('qr_token', tokenQRPendiente);}
+    const { data, error } = await query.maybeSingle();
+    if (error) {console.error('No se encontró la máquina en Supabase:', error);return;}
+     //8.5.4.Si la máquina existe en la base de datos, abre su Kárdex detallado inmediatamente y detiene el flujo
+            if (data) {openMachineDetail(data.id, data.nombre);return;} // ⚠️ Detener ejecución al abrir Kardex por QR
         }
     }
-
-    // 3. NAVEGACIÓN NORMAL (Vista de líneas)
+   // 8.6. NAVEGACIÓN NORMAL POR LAS LINEAS DE PROCESO (Vista de líneas)
     document.querySelectorAll('.view-section').forEach(sec => sec.classList.remove('active-view'));
     const viewLines = document.getElementById('view-lines');
     if (viewLines) viewLines.classList.add('active-view');
 }
-
-
-async function openLine(lineName, icon) {
-    currentLine = lineName;
-    document.getElementById('lines-header-title').innerText = `${icon} ${lineName}`;
-    document.getElementById('view-lines').classList.remove('active-view');
-    document.getElementById('view-machines').classList.add('active-view');
-    
+//9.FUNCION QUE ABRE LAS LINEAS DE PROCESO 
+async function openLine(lineName, icon) {//Declara la función que se ejecuta cuando el usuario selecciona una línea de producción específica.
+    currentLine = lineName;//guarda el nombre de la linea en la variable global 
+    document.getElementById('lines-header-title').innerText = `${icon} ${lineName}`;//actualiza la tarjeta deonde esta el icono y el nombre de la linea 
+    document.getElementById('view-lines').classList.remove('active-view');//oculta las lineas
+    document.getElementById('view-machines').classList.add('active-view');//muestra las maquinas
+   //9.1.Evalúa el rol: si es administrador muestra la barra de herramientas (flex), de lo contrario la oculta (none).
     let toolbar = document.getElementById('admin-toolbar');
-    if (currentRole === 'admin') {
-        toolbar.style.display = 'flex';
-    } else {
-        toolbar.style.display = 'none';
-    }
-    renderMachines();
+    if (currentRole === 'admin') {toolbar.style.display = 'flex';} 
+    else {toolbar.style.display = 'none';}
+    renderMachines();//Ejecuta la función (linea 164) encargada de dibujar en pantalla las tarjetas de las máquinas correspondientes a esa línea.
 }
-
-async function renderMachines() {
+//10.Función que evalúa el estado (falla, revision o normal) y retorna la clase CSS correspondiente para pintar la luz LED de estado en rojo, amarillo o verde.
+function obtenerClaseLed(estado) {
+            if (estado === 'falla') return 'led-indicator led-rojo';
+            if (estado === 'revision') return 'led-indicator led-amarillo';
+            return 'led-indicator led-verde'; }
+//11.Esta función renderMachines() es la encargada de traer las máquinas de Supabase y dibujarlas dinámicamente en pantalla como tarjetas interactivas.
+async function renderMachines() {//Declara la función asíncrona para renderizar las tarjetas de las máquinas.
+   //11.1.Consulta la tabla maquinas filtrando solo las que pertenecen a la línea activa (currentLine)(fila 7) y ordenándolas de menor a mayor por su id.
     const { data: maquinas, error } = await dbSupabase
     .from('maquinas')
     .select('id, nombre, modelo_url, manual_url, linea, estado_alerta')
     .eq('linea', currentLine)
     .order('id', { ascending: true });
-
+   //11.2.Si la base de datos responde con un error, lo imprime en la consola y cancela la ejecución.
     if (error) {
         console.error("Error al cargar las máquinas:", error);
-        return;
-    }
-
+        return;}
+   //11.3.Selecciona el contenedor HTML del Grid de máquinas y vacía su contenido previo para no duplicar elementos.
     let container = document.getElementById('machines-grid-container');
     container.innerHTML = "";
-
+    //11.4.Inicia un bucle para procesar cada máquina obtenida de Supabase individualmente.
     maquinas.forEach(maq => { 
-        let card = document.createElement('div');
+        let card = document.createElement('div');//Crea la etiqueta de la tarjeta (<div>) y le asigna la clase CSS para el diseño visual.
         card.className = 'card-item';
-        
-        function obtenerClaseLed(estado) {
-            if (estado === 'falla') return 'led-indicator led-rojo';
-            if (estado === 'revision') return 'led-indicator led-amarillo';
-            return 'led-indicator led-verde';
-        }
-
-        if (currentRole === 'admin' && isEditMode) {
-            card.onclick = (e) => e.stopPropagation();
+    //11.5.Si el usuario es administrador y activó la edición (isEditMode === true), dibuja la tarjeta con el campo de cambiar nombre y eliminarla 
+    if (currentRole === 'admin' && isEditMode) {
+            card.onclick = (e) => e.stopPropagation();//detiene la programacion para que no entre a los datos mientras se edita 
+    //11.6.llamado de la funcion obtenerClaseLed(estado)
             card.innerHTML = `
                 <span class="card-icon"></span>
                 <input type="text" class="mach-input" data-id="${maq.id}" value="${maq.nombre || ''}" onchange="updateMachineNameInline('${maq.id}', this.value)">
-                <button class="btn-delete-mach" onclick="deleteMachine('${maq.id}')" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin-top: 5px; font-size: 10px;">🗑️ Eliminar</button>
-            `;
-        } else {
-            card.onclick = () => openMachineDetail(maq.id, maq.nombre);
-            card.innerHTML = `
-                <span class="card-icon">⚙️</span>
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                   <div class="card-title">${maq.nombre}</div>
-                   <span class="${obtenerClaseLed(maq.estado_alerta)}" title="Estado: ${maq.estado_alerta || 'normal'}"></span>
-                </div>
-            `;
-        }
-        
+                <button class="btn-delete-mach" onclick="deleteMachine('${maq.id}')" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin-top: 5px; font-size: 10px;">🗑️ Eliminar</button>`;}}
+      //11.7.Si está en modo lectura, al hacer clic en cualquier parte de la tarjeta se abre el Kárdex (openMachineDetail)linea .... Dibuja todo el contenido 
+   else {
+      card.onclick = () => openMachineDetail(maq.id, maq.nombre);
+      card.innerHTML = `
+          <span class="card-icon">⚙️</span>
+          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+          <div class="card-title">${maq.nombre}</div>
+          <span class="${obtenerClaseLed(maq.estado_alerta)}" title="Estado: ${maq.estado_alerta || 'normal'}"></span>
+          </div>`;}
+      //11.8.Inserta la tarjeta recién construida dentro del contenedor HTML principal de la pantalla.
         container.appendChild(card);
     });
 }
-
-async function addNewMachine() {
+//12.Creación de Máquinas
+async function addNewMachine() {//función para agregar una nueva máquina a la línea actual.
+//Valida la sesión: si el usuario no es administrador, bloquea el proceso y emite una alerta.
     if (currentRole !== 'admin') {
-        alert("No tienes permisos para realizar esta acción.");
-        return;
+    alert("No tienes permisos para realizar esta acción.");
+    return;
     }
- 
+    //Envía un comando .insert() a Supabase con los valores por defecto: nombre '⚙️Nueva Máquina', enlaces vacíos ('EMPTY') y asignada a la línea activa (currentLine).
     const { data, error } = await dbSupabase
         .from('maquinas')
         .insert([
-            { 
-                nombre: "⚙️Nueva Máquina",
+            {   nombre: "⚙️Nueva Máquina",
                 modelo_url: "EMPTY",
                 manual_url: "EMPTY",
                 linea: currentLine 
             }
         ]);
-
+//Muestra una alerta notificando si hubo un fallo en el servidor o permisos RLS al intentar guardar.
     if (error) {
         console.error("Error al agregar máquina:", error.message);
         alert("No se pudo agregar la máquina: " + error.message);
     } else {
-        renderMachines();
+        renderMachines();//Si el registro fue exitoso, vuelve a ejecutar renderMachines() para refrescar el Grid y mostrar la nueva tarjeta en pantalla.
     }
 }
-
+//13.Declara la función para guardar cambios de texto realizados directamente desde los <input> en modo edición.
 async function updateMachineNameInline(id, nuevoNombre) {
-    if (currentRole !== 'admin') {
+    if (currentRole !== 'admin') {//Verifica de nuevo los permisos de administrador para evitar peticiones no autorizadas.
         alert("No tienes permisos para modificar este campo.");
         return;
     }
-    const { error } = await dbSupabase
+    const { error } = await dbSupabase//Ejecuta un .update() directo en la tabla maquinas cambiando únicamente la columna nombre donde el id coincida.
         .from('maquinas')
         .update({ nombre: nuevoNombre })
         .eq('id', id);
-
-    if (error) console.error("Error al actualizar nombre:", error.message);
+    if (error) console.error("Error al actualizar nombre:", error.message);//Registra en consola si el cambio de nombre no logró guardarse.
 }
-
+//14.Define la función asíncrona que abre la vista detallada de una máquina seleccionada.
 async function openMachineDetail(id, name, token) {
-    currentMachineId = id;
-    currentMachineName = name; 
-    const { data, error } = await dbSupabase
-        .from('maquinas')
-        .select('qr_token')
-        .eq('id', id)
-        .maybeSingle();
-
-    if (data) {
-        currentMachineToken = data.qr_token;
+    currentMachineId = id;//Guarda el ID de la máquina en la variable global.linea 9
+    currentMachineName = name;//Guarda el nombre de la máquina en la variable global.linea 9
+    const { data, error } = await dbSupabase//Inicia la consulta a la base de datos de Supabase.
+        .from('maquinas')//Apunta a la tabla maquinas.
+        .select('qr_token')//Pide únicamente la columna del token QR.
+        .eq('id', id)//Filtra la búsqueda para la máquina con el ID activo.
+        .maybeSingle();//Retorna un solo objeto o null si no lo encuentra, evitando errores de array.
+    if (data) {//Verifica si la consulta devolvió información válida.
+        currentMachineToken = data.qr_token;//Asigna el token QR obtenido a la variable global.linea 9
     }
-    document.getElementById('selected-machine-title').innerText = name;
-    document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
-    document.getElementById('view-machine-detail').classList.add('active-view');
+    document.getElementById('selected-machine-title').innerText = name;//Actualiza el título del encabezado en la interfaz con el nombre de la máquina
+    document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));//Oculta todas las pantallas activas quitando la clase CSS.
+    document.getElementById('view-machine-detail').classList.add('active-view');//Muestra únicamente la pantalla de detalle de la máquina.
 }
-
+//15.Define la función para navegar entre los submódulos de la máquina.
 async function openOption(opt) {
-    document.getElementById('view-machine-detail').classList.remove('active-view');
-
-    if (opt === 'Kardex') {
-        document.getElementById('view-kardex').classList.add('active-view', 'fullscreen-mode');
-        abrirKardexDeMaquina(currentMachineName); 
-    } else if (opt === 'Instrucciones') {
-        document.getElementById('view-instructions').classList.add('active-view', 'fullscreen-mode');
-        loadInstructionsData(); 
-    } else if (opt === 'Manuals') {
-        document.getElementById('view-manuals').classList.add('active-view', 'fullscreen-mode');
-        loadManualsData();
-    } else if (opt === 'Visual3D') {
-        const vista3D = document.getElementById('view-visual3d');
-        vista3D.classList.add('active-view', 'fullscreen-mode');
-        
-        const innerBox = document.getElementById('visual3d-wrapper-box');
-        if(innerBox) {
-            innerBox.style.height = window.innerWidth < 768 ? '70vh' : 'calc(100vh - 65px)';
-        }
-
+    document.getElementById('view-machine-detail').classList.remove('active-view');//Esconde el menú principal de detalles.
+    if (opt === 'Kardex') {//Condición para la opción de Kárdex.
+        document.getElementById('view-kardex').classList.add('active-view', 'fullscreen-mode');//Activa y expande a pantalla completa la vista del Kárdex
+        abrirKardexDeMaquina(currentMachineName); //Llama a la función que carga los registros del Kárdex.linea....
+    } else if (opt === 'Instrucciones') {//Condición para la opción de Instrucciones.
+        document.getElementById('view-instructions').classList.add('active-view', 'fullscreen-mode');//Activa a pantalla completa la vista de Instrucciones.
+        loadInstructionsData(); //Carga las instrucciones desde la base de datos.linea ....
+    } else if (opt === 'Manuals') {//Condición para la opción de Manuales.
+        document.getElementById('view-manuals').classList.add('active-view', 'fullscreen-mode');//Activa a pantalla completa la vista de Manuales.
+        loadManualsData();//Ejecuta la carga de los archivos PDF o enlaces de manuales.
+    } else if (opt === 'Visual3D') {//Condición para el visor de modelos 3D.
+        const vista3D = document.getElementById('view-visual3d');//Obtiene el elemento HTML del contenedor 3D.
+        vista3D.classList.add('active-view', 'fullscreen-mode');//Le asigna visibilidad y modo pantalla completa
+        const innerBox = document.getElementById('visual3d-wrapper-box');//Selecciona la caja contenedora del modelo
+        if(innerBox) {//Verifica que el contenedor exista en el DOM.
+            innerBox.style.height = window.innerWidth < 768 ? '70vh' : 'calc(100vh - 65px)';}//Ajusta la altura dinámicamente según sea un teléfono o una pantalla de PC
+    //Modifican referencias del DOM para botones de importar, reportes de admin y desensamblaje.
         const contenedorImportar = document.getElementById('contenedor-importar-3d');
         const contenedorAdminBtn = document.getElementById('contenedor-admin-reportes-btn');
         const btnDesensamblaje = document.getElementById('btn-iniciar-desensamblaje'); 
-
+//Evalúan el rol (admin, mantenimiento u otros) para mostrar u ocultar mediante style.display los botones permitidos según los permisos de usuario.
         if (currentRole === 'admin') {
             if (contenedorImportar) contenedorImportar.style.display = 'block';
             if (contenedorAdminBtn) contenedorAdminBtn.style.display = 'block';
@@ -363,57 +287,54 @@ async function openOption(opt) {
             if (contenedorAdminBtn) contenedorAdminBtn.style.display = 'none';
             if (btnDesensamblaje) btnDesensamblaje.style.display = 'none';
         }
-
-        if (!window.is3DInitialized) {
-            init3D();
-            window.is3DInitialized = true;
-        } else {
-            cargarModeloMaquinaActual();
-            setTimeout(redimensionarCanvas3D, 50);
+        if (!window.is3DInitialized) {//Comprueba si el motor 3D aún no se ha iniciado.
+            init3D();//Inicializa el escenario, cámara y renderizador de Three.js.
+            window.is3DInitialized = true;//Marca la bandera global como iniciada para no duplicar procesos.
+        } else {//En caso de que el motor 3D ya estuviera inicializado previamente.
+            cargarModeloMaquinaActual();//Carga directamente la pieza o maqueta 3D correspondiente.linea ....
+            setTimeout(redimensionarCanvas3D, 50);//Da un margen de 50 milisegundos y reajusta las dimensiones del lienzo para evitar deformaciones del renderizado.
         }
     }
 }
-
+//16.Quita la clase de pantalla completa a la vista de Kárdex y regresa a la vista previa con goBack('detail').
 async function salirKardex() {
     document.getElementById('view-kardex').classList.remove('fullscreen-mode');
     goBack('detail');
 }
-
+//17.Quita el modo pantalla completa del módulo de instrucciones y retorna al detalle de máquina
 async function salirInstrucciones() {
     document.getElementById('view-instructions').classList.remove('fullscreen-mode');
     goBack('detail');
 }
-
+//18.Desactiva la vista de manuales y vuelve al menú anterior.
 async function salirManuales() {
     document.getElementById('view-manuals').classList.remove('fullscreen-mode');
     goBack('detail');
 }
-
+//19.Oculta el visor 3D, restablece la altura por defecto del contenedor a '480px', oculta banners activos y regresa al detalle general.
 async function salirVisual3D() {
     const vista3D = document.getElementById('view-visual3d');
     vista3D.classList.remove('fullscreen-mode');
-    
     const innerBox = document.getElementById('visual3d-wrapper-box');
     if(innerBox) innerBox.style.height = '480px';
-
-    ocultarBannerEnCreacion();
+    ocultarBannerEnCreacion(); // llama a la funciones de linea ...
     goBack('detail');
 }
-
+//20.Define la función de ajuste de lienzo 3D.
 async function redimensionarCanvas3D() {
-    const container = document.getElementById('canvas-3d');
-    if (container && renderer && camera) {
-        const w = container.clientWidth;
-        const h = container.clientHeight;
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-        renderer.setSize(w, h);
+    const container = document.getElementById('canvas-3d');//Asigna la referencia del elemento <canvas>.
+    if (container && renderer && camera) {//Valida que el contenedor, el renderizador y la cámara de Three.js estén creados.
+        const w = container.clientWidth;//Obtiene el ancho actual disponible en el navegador.
+        const h = container.clientHeight;//Obtiene el alto disponible.
+        camera.aspect = w / h;//Recalcula la relación de aspecto de la cámara proyectada.
+        camera.updateProjectionMatrix();//Aplica los cambios de la matriz de la cámara.
+        renderer.setSize(w, h);//Ajusta el tamaño de renderizado en píxeles de Three.js.
     }
 }
-
+//21.desactiva la vista visible quitando la clase CSS active-view a todos los contenedores .view-section
 async function goBack(target) {
     document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
-    if (target === 'main') {
+    if (target === 'main') {//Evalúa la variable target para activar la vista de destino (main, lines, machines o detail).
         document.getElementById('main-menu').classList.add('active-view');
     } else if (target === 'lines') {
         document.getElementById('view-lines').classList.add('active-view');
@@ -423,17 +344,16 @@ async function goBack(target) {
         document.getElementById('view-machine-detail').classList.add('active-view');
     }
 }
-
+//22.Evalúa la variable target para activar la vista de destino (main, lines, machines o detail).
 async function toggleEditMode() {
     if (currentRole !== 'admin') {
         alert("Acceso denegado.");
         return;
     }
-
-    if (isEditMode) {
+    if (isEditMode) {//Si isEditMode está activo, recorre mediante un bucle todos los campos .mach-input.
         const inputs = document.querySelectorAll('.mach-input');
         for (const input of inputs) {
-            const id = input.getAttribute('data-id');
+            const id = input.getAttribute('data-id');//Lee el data-id e input.value, actualizando la columna nombre en Supabase para cada máquina modificada.
             const nuevoNombre = input.value.trim();
 
             if (nuevoNombre) {
@@ -444,9 +364,9 @@ async function toggleEditMode() {
             }
         }
     }
-
+//isEditMode = !isEditMode; invierte el valor de la variable booleana de edición.
     isEditMode = !isEditMode;
-    let btn = document.getElementById('toggle-edit-btn');
+    let btn = document.getElementById('toggle-edit-btn');//Alterna el texto del botón entre "Guardar Nombres" y "Editar Nombres", aplicando estilos dinámicos.
     if (btn) {
         if (isEditMode) {
             btn.classList.add('btn-toggle-on');
@@ -456,41 +376,31 @@ async function toggleEditMode() {
             btn.innerText = "✏️ Editar Nombres";
         }
     }
-    renderMachines();
+    renderMachines();//vuelve a renderizar las tarjetas para reflejar los nombres actualizados.linea 162
 }
-
-// ==========================================
-// MÓDULO DE INSTRUCCIONES Y PASOS (JSONB)
-// ==========================================
+//23.loadInstructionsData() consulta los datos del JSONB de la máquina seleccionada.
 async function loadInstructionsData() {
     let wrapper = document.getElementById('instructions-gallery-wrapper');
     if (!wrapper) return;
-
-    const { data: maq, error } = await dbSupabase
+    const { data: maq, error } = await dbSupabase//Consulta la columna instrucciones filtrando por el currentMachineId.linea 8
         .from('maquinas')
         .select('instrucciones')
         .eq('id', currentMachineId)
         .single();
-
     if (error) {
         console.error("Error al cargar instrucciones:", error);
     }
-
-    window.currentInstructionsList = maq?.instrucciones || [];
+    window.currentInstructionsList = maq?.instrucciones || [];//Asigna la lista traída de Supabase a window.currentInstructionsList.
     let instrucciones = window.currentInstructionsList;
-
-    let isAdmin = (currentRole === 'admin');
+    let isAdmin = (currentRole === 'admin');//Muestra u oculta la barra de herramientas de administración según el rol.
     const adminPanel = document.getElementById('admin-instructions-toolbar');
     if (adminPanel) adminPanel.style.display = isAdmin ? 'flex' : 'none';
-
     if (instrucciones.length === 0) {
         wrapper.innerHTML = `<div style="padding: 20px; text-align: center; color: #666;">No hay instrucciones cargadas para esta máquina.</div>`;
         return;
     }
-
     let html = '<div style="display: flex; flex-direction: column; gap: 10px;">';
-    
-    instrucciones.forEach((inst, index) => {
+    instrucciones.forEach((inst, index) => {//Recorre cada instrucción y arma tarjetas HTML con botones para "Ver Pasos" o "Eliminar".
         html += `
             <div style="background: #1e293b; color: white; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                 <span onclick="abrirDetalleInstruccion(${index})" style="font-weight: bold; font-size: 14px; cursor: pointer; flex-grow: 1;">🔧 ${inst.titulo}</span>
@@ -501,24 +411,22 @@ async function loadInstructionsData() {
             </div>
         `;
     });
-    
     html += '</div>';
     wrapper.innerHTML = html;
 }
-
+//window.abrirDetalleInstruccion = function(index) despliega el desglose paso a paso de una instrucción.
 window.abrirDetalleInstruccion = function(index) {
     let instrucciones = window.currentInstructionsList || [];
     let inst = instrucciones[index];
     let wrapper = document.getElementById('instructions-gallery-wrapper');
     if (!wrapper || !inst) return;
-
     let isAdmin = (currentRole === 'admin');
     let botonAgregarPasoHTML = isAdmin ? `
         <button onclick="abrirModalAgregarPaso(${index})" style="background: #10b981; color: white; border: none; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-weight: bold; margin-bottom: 15px;">
             ➕ Añadir Paso con Imagen
         </button>
     ` : '';
-    
+    //Construye el listado dinámico de pasos adjuntos, proyectando la imagen codificada en Base64 o mostrando un texto alternativo si no tiene foto.
     let pasosHTML = '';
     if (inst.pasos && inst.pasos.length > 0) {
         inst.pasos.forEach((paso, pIndex) => {
@@ -537,10 +445,10 @@ window.abrirDetalleInstruccion = function(index) {
     } else {
         pasosHTML = `<p style="color: #666; font-style: italic;">No hay pasos definidos para esta instrucción.</p>`;
     }
-
+//Inserta el HTML generado dentro del contenedor wrapper.innerHTML.
     wrapper.innerHTML = `
         <button onclick="loadInstructionsData()" style="background: #64748b; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; margin-bottom: 15px; font-weight: bold;">
-            ⬅️ Volver a Instrucciones
+            ⬅ Volver a Instrucciones
         </button>
         <h3 style="color: #2026A0; margin-bottom: 15px; border-bottom: 2px solid #2026A0; padding-bottom: 5px;">${inst.titulo}</h3>
         ${botonAgregarPasoHTML}
@@ -549,89 +457,97 @@ window.abrirDetalleInstruccion = function(index) {
         </div>
     `;
 };
-
+//24.guardarInstruccionesEnSupabase() hace un .update() con el arreglo estructurado a la base de datos.
 async function guardarInstruccionesEnSupabase() {
     const { error } = await dbSupabase
         .from('maquinas')
         .update({ instrucciones: window.currentInstructionsList })
         .eq('id', currentMachineId);
-
     if (error) {
         console.error("Error al sincronizar instrucciones:", error);
         alert("Error al guardar cambios en la base de datos.");
     }
 }
-
+//window.agregarNuevaInstruccion pide un título mediante prompt() y añade un nuevo objeto con un array de pasos vacío.
 window.agregarNuevaInstruccion = async function() {
     let titulo = prompt("Ingrese el título de la nueva instrucción:");
     if (!titulo || !titulo.trim()) return;
-
     if (!window.currentInstructionsList) window.currentInstructionsList = [];
     window.currentInstructionsList.push({
         titulo: titulo.trim(),
         pasos: []
     });
-
     await guardarInstruccionesEnSupabase();
     loadInstructionsData();
 };
-
+//window.eliminarInstruccionCompleta quita el índice seleccionado con .splice(index, 1) y sincroniza los cambios.
 window.eliminarInstruccionCompleta = async function(index) {
     if (!confirm("¿Está seguro de eliminar esta instrucción completa?")) return;
-    
     window.currentInstructionsList.splice(index, 1);
     await guardarInstruccionesEnSupabase();
     loadInstructionsData();
 };
-
 let instruccionActivaIndex = null;
-
+//Controlan la apertura y el cierre del modal flotante para subir un nuevo paso.
 window.abrirModalAgregarPaso = function(index) {
     instruccionActivaIndex = index;
     document.getElementById('input-paso-desc').value = '';
     document.getElementById('input-paso-img').value = '';
     document.getElementById('modal-agregar-paso').style.display = 'flex';
 };
-
 window.cerrarModalPaso = function() {
     document.getElementById('modal-agregar-paso').style.display = 'none';
     instruccionActivaIndex = null;
 };
-
+//window.guardarNuevoPasoConImagen lee el archivo cargado mediante FileReader para transformarlo en Base64 e insertarlo al arreglo de pasos.
 window.guardarNuevoPasoConImagen = async function() {
     let descripcion = document.getElementById('input-paso-desc').value.trim();
     let fileInput = document.getElementById('input-paso-img');
-    
     if (!descripcion) {
         alert("Por favor, ingresa una descripción para el paso.");
         return;
     }
-
     let guardarPasoData = async (imagenUrl = '') => {
         let inst = window.currentInstructionsList[instruccionActivaIndex];
         if (!inst.pasos) inst.pasos = [];
-        
         inst.pasos.push({
             descripcion: descripcion,
             imagen: imagenUrl
         });
-
         await guardarInstruccionesEnSupabase();
         cerrarModalPaso();
         abrirDetalleInstruccion(instruccionActivaIndex);
     };
-
     if (fileInput.files && fileInput.files[0]) {
-        let reader = new FileReader();
-        reader.onload = async function(e) {
-            await guardarPasoData(e.target.result);
-        };
-        reader.readAsDataURL(fileInput.files[0]);
+        try {
+            const archivoOriginal = fileInput.files[0];
+            const blobComprimido = await comprimirImagenArchivo(archivoOriginal, 800, 0.7);// 1. Comprimir imagen en el cliente
+            const fileName = `paso_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.jpg`;// 2. Generar nombre único para la foto
+            const { data, error } = await dbSupabase.storage// 3. Subir el archivo comprimido a Supabase Storage
+                .from('imagenes-pasos')
+                .upload(fileName, blobComprimido, {
+                    contentType: 'image/jpeg',
+                    upsert: false
+                });
+            if (error) {
+                console.error("Error al subir imagen a Storage:", error);
+                alert("Ocurrió un error al subir la imagen. Se guardará solo el texto.");
+                await guardarPasoData('');
+                return;
+            }
+            const { data: publicUrlData } = dbSupabase.storage// 4. Obtener la URL pública directa de la foto subida
+                .from('imagenes-pasos')
+                .getPublicUrl(fileName);
+            await guardarPasoData(publicUrlData.publicUrl);// 5. Guardar únicamente la URL ligera en el JSONB
+        } catch (err) {
+            console.error("Error en el proceso de imagen:", err);
+            await guardarPasoData('');
+        }
     } else {
-        await guardarPasoData(''); 
+        await guardarPasoData('');
     }
 };
-
+//window.eliminarPasoDeInstruccion busca el paso por su índice dentro de la instrucción activa y lo remueve.
 window.eliminarPasoDeInstruccion = async function(instIndex, pasoIndex) {
     if (!confirm("¿Eliminar este paso?")) return;
 
@@ -646,7 +562,7 @@ window.eliminarPasoDeInstruccion = async function(instIndex, pasoIndex) {
 // ==========================================
 // MANUALES PDF
 // ==========================================
-async function loadManualsData() {
+async function loadManualsData() {//
     const { data: maq, error } = await dbSupabase
         .from('maquinas')
         .select('manuals_pdf')
@@ -2273,7 +2189,7 @@ function generarQRMaquina() {
     });
 }
 
-function actualizarVisibilidadQR() {
+function currentRolectualizarVisibilidadQR() {
     const seccionAdminQR = document.getElementById('seccion-admin-qr');
     if (currentRole === 'admin') {
         seccionAdminQR.style.display = 'block';
@@ -2677,15 +2593,15 @@ function seleccionarPiezaInteractiva(index) {
     }
 }
 
-async function enviarNotificacionEvento(titulo, mensaje, maquinaId) {
+async function enviarNotificacionEvento(titulo, mensaje, maquinaId, piezaNombre = '') {
     try {
         if (!dbSupabase) return;
 
-        // Invocar la Edge Function 'enviar-push' de forma segura desde Supabase
+        // Invocación a la Edge Function de Supabase
         const { data, error } = await dbSupabase.functions.invoke('enviar-push', {
             body: {
                 id_maquina: maquinaId,
-                pieza: typeof piezaSeleccionadaActual !== 'undefined' ? piezaSeleccionadaActual : '',
+                pieza: piezaNombre,
                 descripcion: mensaje,
                 titulo: titulo
             }
@@ -2694,7 +2610,7 @@ async function enviarNotificacionEvento(titulo, mensaje, maquinaId) {
         if (error) {
             console.error("Error al invocar Edge Function enviar-push:", error);
         } else {
-            console.log("Notificaciones push enviadas correctamente vía Edge Function:", data);
+            console.log("Notificaciones push enviadas correctamente via Edge Function:", data);
         }
     } catch (err) {
         console.error("Error al enviar notificación FCM:", err);
@@ -2712,10 +2628,11 @@ function activarEscuchaNotificacionesRealtime() {
             (payload) => {
                 const maquinaActualizada = payload.new;
                 const reportesNuevos = maquinaActualizada.reportes_piezas || {};
-                
+
                 const piezas = Object.keys(reportesNuevos);
                 if (piezas.length === 0) return;
 
+                // Extraer el último reporte registrado
                 const ultimaPieza = piezas[piezas.length - 1];
                 const infoReporte = reportesNuevos[ultimaPieza];
 
@@ -2724,8 +2641,8 @@ function activarEscuchaNotificacionesRealtime() {
                     const titulo = esPreventivo ? '⚠️ Alerta Preventiva' : '🔴 Reporte de Mantenimiento';
                     const mensaje = `Pieza "${ultimaPieza}": ${infoReporte.motivo || 'Sin detalles'}`;
 
-                    // Cambia la línea 2662 por:
-enviarNotificacionEvento(titulo, mensaje, maquinaActualizada.id, ultimaPieza);
+                    // Se pasa la pieza como 4to argumento
+                    enviarNotificacionEvento(titulo, mensaje, maquinaActualizada.id, ultimaPieza);
                 }
             }
         )
@@ -2834,9 +2751,7 @@ function procesarParametrosURL() {
 document.addEventListener('DOMContentLoaded', () => {
   procesarParametrosURL();
 
-  if (typeof inicializarPushNotifications === 'function') {
-    inicializarPushNotifications();
-  }
+  
   
   if (typeof cargarMaquinaDesdeURL === 'function') {
     cargarMaquinaDesdeURL();
@@ -2920,7 +2835,42 @@ function hacerParpadearPieza(nombrePieza) {
         setTimeout(() => elementoPieza.classList.remove('parpadeo-alerta'), 4000);
     }
 }
+// Función auxiliar para comprimir la imagen en el navegador
+function comprimirImagenArchivo(archivo, maxAncho = 800, calidad = 0.7) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(archivo);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
 
+                if (width > maxAncho) {
+                    height = Math.round((height * maxAncho) / width);
+                    width = maxAncho;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                canvas.toBlob(
+                    (blob) => {
+                        if (blob) resolve(blob);
+                        else reject(new Error("Error al comprimir la imagen"));
+                    },
+                    'image/jpeg',
+                    calidad
+                );
+            };
+        };
+        reader.onerror = (error) => reject(error);
+    });
+}
 // Exponer globalmente
 window.activarSeleccionMedidas = activarSeleccionMedidas;
 window.abrirModalMedidasPorPieza = abrirModalMedidasPorPieza;
