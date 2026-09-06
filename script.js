@@ -184,7 +184,7 @@ async function renderMachines() {//Declara la función asíncrona para renderiza
             card.innerHTML = `
                 <span class="card-icon"></span>
                 <input type="text" class="mach-input" data-id="${maq.id}" value="${maq.nombre || ''}" onchange="updateMachineNameInline('${maq.id}', this.value)">
-                <button class="btn-delete-mach" onclick="deleteMachine('${maq.id}')" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin-top: 5px; font-size: 10px;">🗑️ Eliminar</button>`;}}
+                <button class="btn-delete-mach" onclick="deleteMachine('${maq.id}')" style="background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; margin-top: 5px; font-size: 10px;">🗑️ Eliminar</button>`;}
       //11.7.Si está en modo lectura, al hacer clic en cualquier parte de la tarjeta se abre el Kárdex (openMachineDetail)linea .... Dibuja todo el contenido 
    else {
       card.onclick = () => openMachineDetail(maq.id, maq.nombre);
