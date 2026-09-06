@@ -2689,31 +2689,33 @@ async function guardarTokenEnSupabase(fcmToken) {
 }
 
 // Inicializar y obtener Token FCM (Compatible con Móviles y PC)
+// Inicializar y obtener Token FCM (Compatible con Móviles y PC)
 async function inicializarPushNotifications() {
     try {
+        // 1. Verificar soporte del navegador
         if (!('serviceWorker' in navigator) || !('Notification' in window)) {
             console.warn("Este navegador no soporta notificaciones Push.");
             return;
         }
 
-        // 1. Solicitar permisos de notificación
+        // 2. Solicitar permiso de notificación
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') {
             console.log("Permiso de notificaciones denegado.");
             return;
         }
 
-        // 2. Esperar a que el Service Worker esté completamente listo y activo
-        await navigator.serviceWorker.register('./firebase-messaging-sw.js');
-        const registration = await navigator.serviceWorker.ready;
+        // 3. Registrar el Service Worker y esperar a que esté activo
+        const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+        await navigator.serviceWorker.ready;
 
-        // 3. Obtener el token de FCM pasando la VAPID Key y el Service Worker registrado
+        // 4. Obtener el token de FCM
         if (typeof firebase !== 'undefined' && firebase.messaging) {
             const messaging = firebase.messaging();
-            
+
             const token = await messaging.getToken({
                 serviceWorkerRegistration: registration,
-                vapidKey: 'BJCaN5O8SG51JzbJ1-cowCyeM51mVkig8Xua5fPgNXJ6k-HuYW-cLPSNHjIrIrw1xdxdb00O0b1g2O_0'
+                vapidKey: 'BJCaN508SG51JzbJ1-cowCyeM51mVkig8Xua5FPgNXJ6k-HuYW-cLPSNHjIrIrw1xdxdb0000b1g20_0' 
             });
 
             if (token) {
