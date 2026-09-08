@@ -2709,31 +2709,32 @@ async function inicializarPushNotifications() {
         const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
         await navigator.serviceWorker.ready;
 
+        let token = null;
+
         // 4. Obtener el token de FCM
         if (typeof firebase !== 'undefined' && firebase.messaging) {
             const messaging = firebase.messaging();
 
-            const token = await messaging.getToken({
+            token = await messaging.getToken({
                 serviceWorkerRegistration: registration,
-                vapidKey: 'BI-IA8Hnm9ioPfGfYBsbBb0qjBdCD821sw6anGWrzPfNVsOjfnJDY26UBOEHET0wsyjQ321b64t_YDazazHTiq0' 
+                vapidKey: 'BI-IA8Hnm9ioPfGfYBsbBb0qJBdCD821sw6anGwrZPfNVsOjfnJDY26UBOEHETOwsyjQ321b64t_YDazazHTIq0'
             });
-
-            if (token) {
-                console.log("Token FCM obtenido correctamente:", token);
-                await guardarTokenEnSupabase(token);
-            } else {
-                console.warn("No se pudo obtener el token FCM.");
-            }
         }
+
+        // 5. Validar, mostrar alerta de prueba y guardar en Supabase
+        if (token) {
+            console.log("Token FCM obtenido correctamente:", token);
+            alert("Token generado con éxito: " + token.substring(0, 10) + "...");
+            await guardarTokenEnSupabase(token);
+        } else {
+            console.warn("No se pudo obtener el token FCM.");
+            alert("No se pudo generar el token en este dispositivo.");
+        }
+
     } catch (err) {
         console.error("Error en Push Notifications:", err);
+        alert("Error al inicializar notificaciones: " + err.message);
     }
-    if (token) {
-    alert("Token Móvil generado: " + token.substring(0, 10) + "...");
-    await guardarTokenEnSupabase(token);
-} else {
-    alert("No se pudo generar token en este dispositivo.");
-}
 }
 // ==========================================
 // DETECCIÓN Y MANEJO DE URL AL CARGAR LA PÁGINA
