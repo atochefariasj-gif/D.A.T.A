@@ -15,22 +15,32 @@ firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
-  const data = payload.data || {};
-  const title = payload.notification?.title || data.title || "🚨 Notificación D.A.T.A.";
-  const body = payload.notification?.body || data.body || "Nuevo reporte registrado.";
+    const data = payload.data || {};
+    const title = payload.notification?.title || data.title || "🚨 Reporte de Mantenimiento";
 
-  const options = {
-    body: body,
-    icon: data.icon || 'https://atochefariasj-gif.github.io/D.A.T.A/logo.png',
-    tag: 'reporte-mantenimiento-unico',
-    renotify: true,
-    data: {
-      machineId: data.machineId || data.maquina_id || '',
-      pieza: data.pieza || ''
+    // Extraer datos individuales enviados desde la Edge Function
+    const maquina = data.maquina || data.machineId || "Máquina no especificada";
+    const pieza = data.pieza || "Pieza no especificada";
+    const descripcion = data.descripcion || payload.notification?.body || "";
+
+    // Construir un texto multilínea limpio
+    let bodyText = `Máquina: ${maquina}\nPieza: ${pieza}`;
+    if (descripcion) {
+        bodyText += `\nDescripción: ${descripcion}`;
     }
-  };
 
-  return self.registration.showNotification(title, options);
+    const options = {
+        body: bodyText,
+        icon: data.icon || 'https://atochefariasj-gif.github.io/D.A.T.A/logo.png',
+        tag: 'reporte-mantenimiento-unico',
+        renotify: true,
+        data: {
+            machineId: maquina,
+            pieza: pieza
+        }
+    };
+
+    return self.registration.showNotification(title, options);
 });
 
 self.addEventListener('notificationclick', function(event) {
