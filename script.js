@@ -2717,7 +2717,7 @@ async function inicializarPushNotifications() {
 
             token = await messaging.getToken({
                 serviceWorkerRegistration: registration,
-                vapidKey: 'BI-IA8Hnm9ioPfGfYBsbBb0qJBdCD821sw6anGwrZPfNVsOjfnJDY26UBOEHETOwsyjQ321b64t_YDazazHTIq0'
+                vapidKey: 'BI-IA8Hnm9ioPfGfYBsbBb0qjBdCD821sw6anGWrzPfNVsOjfnJDY26UBOEHET0wsyjQ321b64t_YDazazHTiq0'
             });
         }
 
