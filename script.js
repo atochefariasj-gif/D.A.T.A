@@ -2728,6 +2728,12 @@ async function inicializarPushNotifications() {
     } catch (err) {
         console.error("Error en Push Notifications:", err);
     }
+    if (token) {
+    alert("Token Móvil generado: " + token.substring(0, 10) + "...");
+    await guardarTokenEnSupabase(token);
+} else {
+    alert("No se pudo generar token en este dispositivo.");
+}
 }
 // ==========================================
 // DETECCIÓN Y MANEJO DE URL AL CARGAR LA PÁGINA
