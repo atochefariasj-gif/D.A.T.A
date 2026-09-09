@@ -1031,8 +1031,20 @@ async function cargarModeloPorDefecto() {
 
 async function procesarModeloCargado(gltf, nombreEquipo) {
     ocultarBannerEnCreacion();
-    const modelo = gltf.scene;
     
+    // 1. Limpiar escena previa
+    while (grupoMaquina.children.length > 0) {
+        grupoMaquina.remove(grupoMaquina.children[0]);
+    }
+
+    const modelo = gltf.scene;
+
+    // Resetear transformaciones del modelo por seguridad
+    modelo.position.set(0, 0, 0);
+    modelo.rotation.set(0, 0, 0);
+    modelo.scale.set(1, 1, 1);
+
+    // Configurar materiales/sombras
     modelo.traverse((child) => {
         if (child.isMesh) {
             child.castShadow = false;
@@ -1044,19 +1056,21 @@ async function procesarModeloCargado(gltf, nombreEquipo) {
         }
     });
 
+    // 2. Calcular la caja delimitadora (Bounding Box) real del modelo
     const boxCentro = new THREE.Box3().setFromObject(modelo);
     const center = boxCentro.getCenter(new THREE.Vector3());
-    modelo.position.sub(center); 
+    const size = boxCentro.getSize(new THREE.Vector3());
 
     centroModeloGlobal = center.clone();
 
+    // 3. Procesar piezas individuales para explosión y lista
     piezasDetectadas = [];
     const lista = document.getElementById('lista-partes');
-    if(lista) lista.innerHTML = "";
+    if (lista) lista.innerHTML = "";
     let indexPieza = 1;
 
     const { data: maq } = await dbSupabase.from('maquinas').select('reportes_piezas, documentacion_piezas').eq('id', currentMachineId).single();
-    reportesCargados = maq?.reportes_piezas || {}; 
+    reportesCargados = maq?.reportes_piezas || {};
     documentacionPiezasCargada = maq?.documentacion_piezas || {};
 
     modelo.traverse((child) => {
@@ -1067,11 +1081,13 @@ async function procesarModeloCargado(gltf, nombreEquipo) {
             child.name = nombreVisual;
             piezasDetectadas.push(child);
 
+            // IMPORTANTE: Guardar posición original relativa a la geometría del modelo
             const posOrig = child.position.clone();
             const meshBox = new THREE.Box3().setFromObject(child);
             const meshCenter = meshBox.getCenter(new THREE.Vector3());
+            
             const direccionExplosion = meshCenter.clone().sub(center).normalize();
-            if(direccionExplosion.lengthSq() === 0) direccionExplosion.set(0, 1, 0);
+            if (direccionExplosion.lengthSq() === 0) direccionExplosion.set(0, 1, 0);
             const posExp = posOrig.clone().add(direccionExplosion.multiplyScalar(2));
 
             let colorOriginal = 0x888888;
@@ -1083,18 +1099,20 @@ async function procesarModeloCargado(gltf, nombreEquipo) {
             let repInfo = reportesCargados[child.name];
             let colorHex = colorOriginal;
             if (repInfo) {
-                if (repInfo.estado === 'mantenimiento') colorHex = 0xef4444; 
-                else if (repInfo.estado === 'preventivo') colorHex = 0xf59e0b; 
+                if (repInfo.estado === 'mantenimiento') colorHex = 0xef4444;
+                else if (repInfo.estado === 'preventivo') colorHex = 0xf59e0b;
             }
 
             child.userData = { posOrig, posExp, colorBase: colorOriginal };
-
-            child.material = new THREE.MeshStandardMaterial({ 
+            child.material = new THREE.MeshStandardMaterial({
                 color: colorHex,
-                roughness: 0.4, metalness: 0.2, transparent: true, opacity: 1.0
+                roughness: 0.4,
+                metalness: 0.2,
+                transparent: true,
+                opacity: 1.0
             });
 
-            if(lista) {
+            if (lista) {
                 const btn = document.createElement('button');
                 btn.className = "w-full text-left p-1.5 rounded bg-gray-800 hover:bg-gray-700 text-white text-xs mb-1";
                 btn.innerHTML = `⚙️ ${child.name}`;
@@ -1105,17 +1123,36 @@ async function procesarModeloCargado(gltf, nombreEquipo) {
         }
     });
 
+    // 4. Centrar la geometría internamente moviendo la malla relativa a su pivote
+    modelo.position.x = -center.x;
+    modelo.position.y = -center.y;
+    modelo.position.z = -center.z;
+
     grupoMaquina.add(modelo);
+
+    // 5. AUTO-CENTRAR CÁMARA Y PIVOTE DE CONTROL EN EL ORIGEN (0,0,0)
+    const maxDim = Math.max(size.x, size.y, size.z) || 5;
+    const fov = camera.fov * (Math.PI / 180);
+    let cameraDistance = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
+
+    // Colocar la cámara a una distancia adecuada enfocando al centro real (0,0,0)
+    camera.position.set(cameraDistance, cameraDistance * 0.6, cameraDistance);
+    camera.lookAt(0, 0, 0);
+
+    if (controls) {
+        controls.target.set(0, 0, 0); // Establecer el pivote exacto
+        controls.update();
+    }
+
     let indicador = document.getElementById('indicador-equipo');
-    if(indicador) indicador.innerText = `📍 Vista: ${nombreEquipo}`;
+    if (indicador) indicador.innerText = `📍 Vista: ${nombreEquipo}`;
 
     const btnExplo = document.getElementById('btn-explo');
-    if(btnExplo) {
+    if (btnExplo) {
         btnExplo.innerText = "💥 Activar Vista Explosionada";
         btnExplo.disabled = false;
     }
 }
-
 async function seleccionarComponente(nombrePieza) {
     const panel = document.getElementById('panel-info');
     const piezaEncontrada = piezasDetectadas.find(p => p.name === nombrePieza);
