@@ -235,21 +235,42 @@ async function updateMachineNameInline(id, nuevoNombre) {
         .eq('id', id);
     if (error) console.error("Error al actualizar nombre:", error.message);//Registra en consola si el cambio de nombre no logró guardarse.
 }
-//14.Define la función asíncrona que abre la vista detallada de una máquina seleccionada.
+// 14. Define la función asíncrona que abre la vista detallada de una máquina seleccionada.
 async function openMachineDetail(id, name, token) {
-    currentMachineId = id;//Guarda el ID de la máquina en la variable global.linea 9
-    currentMachineName = name;//Guarda el nombre de la máquina en la variable global.linea 9
-    const { data, error } = await dbSupabase//Inicia la consulta a la base de datos de Supabase.
-        .from('maquinas')//Apunta a la tabla maquinas.
-        .select('qr_token')//Pide únicamente la columna del token QR.
-        .eq('id', id)//Filtra la búsqueda para la máquina con el ID activo.
-        .maybeSingle();//Retorna un solo objeto o null si no lo encuentra, evitando errores de array.
-    if (data) {//Verifica si la consulta devolvió información válida.
-        currentMachineToken = data.qr_token;//Asigna el token QR obtenido a la variable global.linea 9
+    currentMachineId = id; // Guarda el ID de la máquina en la variable global
+    currentMachineName = name; // Guarda el nombre de la máquina en la variable global
+
+    // Consulta en Supabase para obtener el token QR de la máquina seleccionada
+    const { data, error } = await dbSupabase
+        .from('maquinas')
+        .select('qr_token')
+        .eq('id', id)
+        .maybeSingle();
+
+    if (error) {
+        console.error("Error al obtener el token QR de la máquina:", error.message);
     }
-    document.getElementById('selected-machine-title').innerText = name;//Actualiza el título del encabezado en la interfaz con el nombre de la máquina
-    document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));//Oculta todas las pantallas activas quitando la clase CSS.
-    document.getElementById('view-machine-detail').classList.add('active-view');//Muestra únicamente la pantalla de detalle de la máquina.
+
+    if (data) {
+        currentMachineToken = data.qr_token; // Asigna el token QR a la variable global
+    }
+
+    // Actualiza el título del encabezado en la interfaz con el nombre de la máquina
+    const titleElement = document.getElementById('selected-machine-title');
+    if (titleElement) {
+        titleElement.innerText = name;
+    }
+
+    // Evalúa el rol actual y muestra/oculta el botón "Generar / Ver Código QR"
+    actualizarVisibilidadQR();
+
+    // Oculta todas las pantallas activas y muestra únicamente la vista de detalle de la máquina
+    document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
+    
+    const detailView = document.getElementById('view-machine-detail');
+    if (detailView) {
+        detailView.classList.add('active-view');
+    }
 }
 //15.Define la función para navegar entre los submódulos de la máquina.
 async function openOption(opt) {
@@ -2189,9 +2210,13 @@ function generarQRMaquina() {
     });
 }
 
-function currentRolectualizarVisibilidadQR() {
+// CÓDIGO CORREGIDO:
+function actualizarVisibilidadQR() {
     const seccionAdminQR = document.getElementById('seccion-admin-qr');
-    if (currentRole === 'admin') {
+    if (!seccionAdminQR) return;
+
+    // Acepta tanto 'admin' como 'Administrador'
+    if (currentRole === 'admin' || currentRole === 'Administrador') {
         seccionAdminQR.style.display = 'block';
     } else {
         seccionAdminQR.style.display = 'none';
@@ -2717,7 +2742,7 @@ async function inicializarPushNotifications() {
 
             token = await messaging.getToken({
                 serviceWorkerRegistration: registration,
-                vapidKey: 'BI-IA8Hnm9ioPfGfYBsbBb0qjBdCD821sw6anGWrzPfNVsOjfnJDY26UBOEHET0wsyjQ321b64t_YDazazHTiq0'
+                vapidKey: 'BI-IA8Hnm9ioPfGfYBsbBb0qJBdCD821sw6anGwrZPfNVsOjfnJDY26UBOEHETOwsyjQ321b64t_YDazazHTIq0'
             });
         }
 
