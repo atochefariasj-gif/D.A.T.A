@@ -16,14 +16,16 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
     const data = payload.data || {};
-    const title = payload.notification?.title || data.title || "🚨 Reporte de Mantenimiento";
+    
+    // Título dinámico
+    const title = data.title || payload.notification?.title || "🚨 Reporte de Mantenimiento";
 
     // Extraer datos individuales enviados desde la Edge Function
     const maquina = data.maquina || data.machineId || "Máquina no especificada";
     const pieza = data.pieza || "Pieza no especificada";
     const descripcion = data.descripcion || payload.notification?.body || "";
 
-    // Construir un texto multilínea limpio
+    // Construir texto multilínea
     let bodyText = `Máquina: ${maquina}\nPieza: ${pieza}`;
     if (descripcion) {
         bodyText += `\nDescripción: ${descripcion}`;
@@ -32,7 +34,8 @@ messaging.onBackgroundMessage((payload) => {
     const options = {
         body: bodyText,
         icon: data.icon || 'https://atochefariasj-gif.github.io/D.A.T.A/logo.png',
-        tag: 'reporte-mantenimiento-unico',
+        // Genera un ID único basado en la hora para evitar que Android/Chrome reescriba la notificación previa
+        tag: `reporte-${Date.now()}`,
         renotify: true,
         data: {
             machineId: maquina,
