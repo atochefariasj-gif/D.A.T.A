@@ -1871,6 +1871,13 @@ window.vincularSkuAhora = function(nombrePieza) {
 };
 
 window.eliminarManualPdf = async function(idx) {
+    const indexNumber = parseInt(idx, 10);
+
+    if (isNaN(indexNumber)) {
+        alert("Índice de manual no válido.");
+        return;
+    }
+
     if (!currentMachineId) {
         alert("No hay una máquina seleccionada.");
         return;
@@ -1880,7 +1887,7 @@ window.eliminarManualPdf = async function(idx) {
     if (!confirmar) return;
 
     try {
-        // 1. Obtener los manuales actuales de la máquina
+        // 1. Obtener la lista actual de la base de datos
         const { data: maq, error: fetchError } = await dbSupabase
             .from('maquinas')
             .select('manuals_pdf')
@@ -1892,34 +1899,37 @@ window.eliminarManualPdf = async function(idx) {
             return;
         }
 
-        let manuals = Array.isArray(maq.manuals_pdf) ? maq.manuals_pdf : [];
+        let manuals = maq.manuals_pdf;
+        if (typeof manuals === 'string') {
+            try { manuals = JSON.parse(manuals); } catch (e) { manuals = []; }
+        }
+        if (!Array.isArray(manuals)) manuals = [];
 
-        if (idx < 0 || idx >= manuals.length) {
-            alert("Índice de manual no válido.");
+        if (indexNumber < 0 || indexNumber >= manuals.length) {
+            alert("Índice fuera de rango.");
             return;
         }
 
-        // 2. Extraer el nombre del archivo desde la URL para borrarlo del Storage (opcional/limpieza)
-        const targetManual = manuals[idx];
-        if (targetManual && targetManual.url) {
-            const urlParts = targetManual.url.split('/');
+        // 2. Extraer archivo para borrarlo de Supabase Storage
+        const targetManual = manuals[indexNumber];
+        if (targetManual && (targetManual.url || targetManual.enlace)) {
+            const fileUrl = targetManual.url || targetManual.enlace;
+            const urlParts = fileUrl.split('/');
             const fileName = urlParts[urlParts.length - 1];
-            
-            // Borrado del bucket 'manuales'
             await dbSupabase.storage.from('manuales').remove([fileName]);
         }
 
-        // 3. Remover el elemento del Array
-        manuals.splice(idx, 1);
+        // 3. Eliminar el registro del arreglo
+        manuals.splice(indexNumber, 1);
 
-        // 4. Actualizar la base de datos
+        // 4. Guardar cambios en Supabase
         const { error: updateError } = await dbSupabase
             .from('maquinas')
             .update({ manuals_pdf: manuals })
             .eq('id', currentMachineId);
 
         if (updateError) {
-            alert("Error al actualizar la base de datos: " + updateError.message);
+            alert("Error al actualizar: " + updateError.message);
         } else {
             alert("Manual eliminado correctamente.");
             if (typeof loadManualsData === 'function') {
@@ -1927,12 +1937,12 @@ window.eliminarManualPdf = async function(idx) {
             }
         }
     } catch (err) {
-        console.error("Error al eliminar manual:", err);
-        alert("Ocurrió un error inesperado al eliminar.");
+        console.error("Error al eliminar el manual:", err);
+        alert("Ocurrió un error al procesar la solicitud.");
     }
 };
 
-// Alias para evitar errores si el HTML llama a removeManualPdf
+// Asignar alias por si algún otro botón usa removeManualPdf
 window.removeManualPdf = window.eliminarManualPdf;
 
 async function subirManualPdf(event) {
