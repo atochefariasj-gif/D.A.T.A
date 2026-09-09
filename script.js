@@ -2714,16 +2714,16 @@ async function guardarTokenEnSupabase(fcmToken) {
     }
 }
 
-// Inicializar y obtener Token FCM (Compatible con Móviles y PC)
-// Inicializar y obtener Token FCM (Compatible con Móviles y PC)
 async function inicializarPushNotifications() {
-    try {
-        // 1. Verificar soporte del navegador
-        if (!('serviceWorker' in navigator) || !('Notification' in window)) {
-            console.warn("Este navegador no soporta notificaciones Push.");
-            return;
-        }
+    let token = null;
 
+    // 1. Verificar soporte del navegador
+    if (!('serviceWorker' in navigator) || !('Notification' in window)) {
+        console.warn("Este navegador no soporta notificaciones Push.");
+        return;
+    }
+
+    try {
         // 2. Solicitar permiso de notificación
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') {
@@ -2735,31 +2735,24 @@ async function inicializarPushNotifications() {
         const registration = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
         await navigator.serviceWorker.ready;
 
-        let token = null;
-
         // 4. Obtener el token de FCM
         if (typeof firebase !== 'undefined' && firebase.messaging) {
             const messaging = firebase.messaging();
-
+            
             token = await messaging.getToken({
                 serviceWorkerRegistration: registration,
-                vapidKey: 'BI-IA8Hnm9ioPfGfYBsbBb0qJBdCD821sw6anGwrZPfNVsOjfnJDY26UBOEHETOwsyjQ321b64t_YDazazHTIq0'
+                vapidKey: 'BI-IA8Hnm9ioPfGfYBsbBb0qjBdCD821sw6anGWrzPfNVsOjfnJDY26UBOEHET0wsyjQ321b64t_YDazazHTiq0'
             });
-        }
 
-        // 5. Validar, mostrar alerta de prueba y guardar en Supabase
-        if (token) {
-            console.log("Token FCM obtenido correctamente:", token);
-            alert("Token generado con éxito: " + token.substring(0, 10) + "...");
-            await guardarTokenEnSupabase(token);
-        } else {
-            console.warn("No se pudo obtener el token FCM.");
-            alert("No se pudo generar el token en este dispositivo.");
+            if (token) {
+                console.log("Token FCM obtenido correctamente:", token);
+                await guardarTokenEnSupabase(token);
+            } else {
+                console.warn("No se pudo obtener el token FCM.");
+            }
         }
-
     } catch (err) {
         console.error("Error en Push Notifications:", err);
-        alert("Error al inicializar notificaciones: " + err.message);
     }
 }
 // ==========================================
