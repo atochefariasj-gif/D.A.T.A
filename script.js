@@ -1870,13 +1870,70 @@ window.vincularSkuAhora = function(nombrePieza) {
     });
 };
 
-window.removeManualPdf = async function(idx) {
-    const { data: maq } = await dbSupabase.from('maquinas').select('manuals_pdf').eq('id', currentMachineId).single();
-    let manuals = maq?.manuals_pdf || [];
-    manuals.splice(idx, 1);
-    await dbSupabase.from('maquinas').update({ manuals_pdf: manuals }).eq('id', currentMachineId);
-    loadManualsData();
+window.eliminarManualPdf = async function(idx) {
+    if (!currentMachineId) {
+        alert("No hay una máquina seleccionada.");
+        return;
+    }
+
+    const confirmar = confirm("¿Estás seguro de que deseas eliminar este manual?");
+    if (!confirmar) return;
+
+    try {
+        // 1. Obtener los manuales actuales de la máquina
+        const { data: maq, error: fetchError } = await dbSupabase
+            .from('maquinas')
+            .select('manuals_pdf')
+            .eq('id', currentMachineId)
+            .single();
+
+        if (fetchError || !maq) {
+            alert("Error al consultar la base de datos.");
+            return;
+        }
+
+        let manuals = Array.isArray(maq.manuals_pdf) ? maq.manuals_pdf : [];
+
+        if (idx < 0 || idx >= manuals.length) {
+            alert("Índice de manual no válido.");
+            return;
+        }
+
+        // 2. Extraer el nombre del archivo desde la URL para borrarlo del Storage (opcional/limpieza)
+        const targetManual = manuals[idx];
+        if (targetManual && targetManual.url) {
+            const urlParts = targetManual.url.split('/');
+            const fileName = urlParts[urlParts.length - 1];
+            
+            // Borrado del bucket 'manuales'
+            await dbSupabase.storage.from('manuales').remove([fileName]);
+        }
+
+        // 3. Remover el elemento del Array
+        manuals.splice(idx, 1);
+
+        // 4. Actualizar la base de datos
+        const { error: updateError } = await dbSupabase
+            .from('maquinas')
+            .update({ manuals_pdf: manuals })
+            .eq('id', currentMachineId);
+
+        if (updateError) {
+            alert("Error al actualizar la base de datos: " + updateError.message);
+        } else {
+            alert("Manual eliminado correctamente.");
+            if (typeof loadManualsData === 'function') {
+                loadManualsData();
+            }
+        }
+    } catch (err) {
+        console.error("Error al eliminar manual:", err);
+        alert("Ocurrió un error inesperado al eliminar.");
+    }
 };
+
+// Alias para evitar errores si el HTML llama a removeManualPdf
+window.removeManualPdf = window.eliminarManualPdf;
 
 async function subirManualPdf(event) {
     const fileInput = document.getElementById('pdf-file-input');
