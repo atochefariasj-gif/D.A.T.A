@@ -950,23 +950,38 @@ function toggleVistaExplosionada() {
 
 function centrarVistaGeneral() {
     if (!controls || !camera) return;
-    targetControlsTarget = centroModeloGlobal.clone();
-    targetCameraPos = centroModeloGlobal.clone().add(new THREE.Vector3(0, 3, 7));
+
+    // Obtener dimensiones reales del modelo para calcular la distancia justa
+    const box = new THREE.Box3().setFromObject(grupoMaquina);
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z) || 5;
+    const fov = camera.fov * (Math.PI / 180);
+    let distancia = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 1.5;
+
+    // El punto de rotación es (0,0,0)
+    targetControlsTarget = new THREE.Vector3(0, 0, 0);
+    targetCameraPos = new THREE.Vector3(distancia, distancia * 0.6, distancia);
 }
 
 function cambiarVistaRapida(tipo) {
     if (!camera || !controls) return;
-    const distancia = 7;
-    targetControlsTarget = centroModeloGlobal.clone();
+
+    const box = new THREE.Box3().setFromObject(grupoMaquina);
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z) || 5;
+    const distancia = maxDim * 1.5;
+
+    // El eje de la cámara apunta siempre al origen
+    targetControlsTarget = new THREE.Vector3(0, 0, 0);
 
     if (tipo === 'frontal') {
-        targetCameraPos = centroModeloGlobal.clone().add(new THREE.Vector3(0, 0, distancia));
+        targetCameraPos = new THREE.Vector3(0, 0, distancia);
     } else if (tipo === 'superior') {
-        targetCameraPos = centroModeloGlobal.clone().add(new THREE.Vector3(0, distancia, 0.01));
+        targetCameraPos = new THREE.Vector3(0, distancia, 0.01);
     } else if (tipo === 'lateral') {
-        targetCameraPos = centroModeloGlobal.clone().add(new THREE.Vector3(distancia, 0, 0));
+        targetCameraPos = new THREE.Vector3(distancia, 0, 0);
     } else if (tipo === 'isometrica') {
-        targetCameraPos = centroModeloGlobal.clone().add(new THREE.Vector3(distancia, distancia, distancia));
+        targetCameraPos = new THREE.Vector3(distancia, distancia, distancia);
     }
 }
 
