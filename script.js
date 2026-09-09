@@ -2678,13 +2678,14 @@ function activarEscuchaNotificacionesRealtime() {
 // ==========================================
 
 const firebaseConfig = {
-  apiKey: "AIzaSyARO3Y2z_FZmC-_sL1LNGL7NKXPIIbCjPo",
-  authDomain: "data-control-activos.firebaseapp.com",
-  projectId: "data-control-activos",
-  storageBucket: "data-control-activos.firebasestorage.app",
-  messagingSenderId: "290148330315",
-  appId: "1:290148330315:web:0653f07ed372fef8e9ddce"
-};
+    apiKey: "AIzaSyBNfhgBdIe05n3L0YfbsmZbNVYVlDxDXZk",
+    authDomain: "data-control-activos.firebaseapp.com",
+    projectId: "data-control-activos",
+    storageBucket: "data-control-activos.firebasestorage.app",
+    messagingSenderId: "290148330315",
+    appId: "1:290148330315:web:0b53f07e03f72fefe9d6ce",
+    measurementId: "G-ZE1NC3LB15"
+  };
 
 if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
